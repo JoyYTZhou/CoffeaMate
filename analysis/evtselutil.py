@@ -3,25 +3,19 @@ import dask
 import pandas as pd
 import awkward as ak
 
-from config.selectionconfig import selectionsettings as selcfg
-from config.selectionconfig import namemap
-from src.utils.cutflowutil import weightedSelection
-from src.analysis.objutil import Object
-
-default_trigsel = selcfg.triggerselections
-default_objsel = selcfg.objselections
-default_mapcfg = namemap
+from ..utils.cutflowutil import weightedSelection
+from ..analysis.objutil import Object
 
 class BaseEventSelections:
-    """Base class for event selections.
-    
-    Attributes
-    - `mapcfg`: mapping configuration {key=abbreviation, value=nanoaodname}
-    - `objsel`: WeightedSelection object to keep track of cutflow
-    - `cutflow`: cutflow object
-    """
-    def __init__(self, sequential=True, trigcfg=default_trigsel, objcfg=default_objsel, mapcfg=default_mapcfg) -> None:
-        """Initialize the event selection object with the given selection configurations."""
+    """Base class for event selections."""
+    def __init__(self, trigcfg, objcfg, mapcfg, sequential=True) -> None:
+        """Initialize the event selection object with the given selection configurations.
+        
+        Parameters
+        - `trigcfg`: trigger configuration, {key=triggername, value=bool (whether to apply)}
+        - `objcfg`: object selection configuration, {key=AODPrefix, value={key=abbreviation, value=threshold}}. AODPrefix example: Electron, Muon, Jet
+        - `mapcfg`: mapping configuration, {key=AODPrefix, value={key=abbreviation, value=nanoaodname}}
+        - `sequential`: whether the selections will be applied sequentially"""
         self._trigcfg = trigcfg
         self._objselcfg = objcfg
         self._mapcfg = mapcfg

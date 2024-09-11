@@ -5,13 +5,7 @@ import operator as opr
 import dask_awkward as dak
 import awkward as ak
 
-from src.utils.datautil import arr_handler
-from config.selectionconfig import selectionsettings as selcfg
-from config.selectionconfig import namemap
-
-default_trigsel = selcfg.triggerselections
-default_objsel = selcfg.objselections
-default_mapcfg = namemap
+from ..utils.datautil import arr_handler
 
 class Object:
     """Object class for handling object selections, meant as an observer of the events.
@@ -19,16 +13,16 @@ class Object:
     Attributes
     - `name`: name of the object
     - `events`: a weak proxy of the events 
-    - `selcfg`: selection configuration for the object
+    - `selcfg`: selection configuration for the object, {key=abbreviation, value=threshold}
     - `mapcfg`: mapping configuration for the object
     - `fields`: list of fields in the object
     """
 
-    def __init__(self, events, name, weakrefEvt=True, **kwargs):
+    def __init__(self, events, name, selcfg, mapcfg, weakrefEvt=True):
         """Construct an object from provided events with given selection configuration.
         
         Parameters
-        - `name`: name of the object
+        - `name`: AOD prefix name of the object, e.g. Electron, Muon, Jet
 
         kwargs: 
         - `selcfg`: selection configuration for the object
@@ -37,9 +31,8 @@ class Object:
         self._name = name
         self.__weakref = weakrefEvt
         self.events = events
-        self._selcfg = kwargs.get('selcfg', default_objsel[name])
-        self._mapcfg = kwargs.get('mapcfg', default_mapcfg[name])
-        self._cutflow = kwargs.get('cutflow', None)
+        self._selcfg = selcfg
+        self._mapcfg = mapcfg
         self.fields = list(self.mapcfg.keys())
     
     @property
@@ -56,10 +49,6 @@ class Object:
     @selcfg.setter
     def selcfg(self, value):
         self._selcfg = weakref.proxy(value)
-    
-    @property
-    def cutflow(self):
-        return self._cutflow
 
     @property
     def name(self):

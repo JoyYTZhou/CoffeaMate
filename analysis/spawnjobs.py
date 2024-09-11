@@ -1,37 +1,13 @@
-from dask.distributed import Client, LocalCluster
 from dask.distributed import as_completed
 import json as json
 import gzip, glob, traceback, os
 from itertools import islice
 
-from .custom import switch_selections
 from .processor import Processor
-from src.utils.filesysutil import glob_files, cross_check, checkpath, pjoin
-from config.selectionconfig import runsetting as rs
-from config.selectionconfig import dasksetting as daskcfg
-
-evtselclass = switch_selections(rs.SEL_NAME)
-
-p_dirname = os.path.dirname
-
-src_dir = p_dirname(p_dirname(os.path.abspath(__file__)))
-base_dir = p_dirname(src_dir)
-data_dir = pjoin(base_dir, 'data')
-
-datapath = pjoin(data_dir, 'availableQuery.json')
-with open(datapath, 'r') as data:
-    realmeta = json.load(data)
-
-transferPBase = rs.get("TRANSFER_PATH", None)
-if transferPBase is not None: checkpath(transferPBase, createdir=True)
+from ..utils.filesysutil import glob_files, cross_check, checkpath, pjoin
 
 def get_fi_prefix(filepath):
     return os.path.basename(filepath).split('.')[0].split('_')[0]
-
-def div_list(original_list, chunk_size):
-    """Divide a list into smaller lists of given size."""
-    for i in range(0, len(original_list), chunk_size):
-        yield original_list[i:i + chunk_size]
 
 def div_dict(original_dict, chunk_size):
     """Divide a dictionary into smaller dictionaries of given size."""
@@ -39,12 +15,13 @@ def div_dict(original_dict, chunk_size):
     for _ in range(0, len(original_dict), chunk_size):
         yield dict(islice(it, chunk_size))
 
-def filterExisting(ds: 'str', dsdata: 'dict', outputpattern=".root", tsferP=transferPBase) -> bool:
+def filterExisting(ds: 'str', dsdata: 'dict', tsferP, out_endpattern=".root") -> bool:
     """Update dsdata on files that need to be processed for a MC dataset based on the existing output files and cutflow tables.
     
     Parameters
     - `ds`: Dataset name
     - `dsdata`: A dictionary of dataset information with keys 'files', 'metadata', 'filelist'
+    - `out_endpattern`: A string or a list of strings representing output ending file pattern to check for. No wildcards needed.
 
     Return
     - bool: True if some files need to be processed, False otherwise. 
@@ -52,15 +29,20 @@ def filterExisting(ds: 'str', dsdata: 'dict', outputpattern=".root", tsferP=tran
     if not tsferP or checkpath(tsferP, createdir=False) != 0:
         return True
     
+    if isinstance(outputpattern, str):
+        outputpattern = [outputpattern]
+    
     files_to_remove = [] 
 
     for filename, fileinfo in dsdata['files'].items():
         prefix = f"{ds}_{fileinfo['uuid']}"
-        outputfile = f"{prefix}*{outputpattern}"
-        cutflowfile = f"{prefix}_cutflow.csv"
-        outputfiles = glob_files(tsferP, '*.root')
-        cutflowfiles = glob_files(tsferP, '*cutflow.csv')
-        if cross_check(outputfile, outputfiles) and cross_check(cutflowfile, cutflowfiles):
+        matched = 0
+        for pattern in out_endpattern:
+            outfiles = glob_files(tsferP, f"*{pattern}")
+            expected = f"{prefix}*{pattern}"
+            matched += cross_check(expected, outfiles)
+        
+        if matched == len(out_endpattern):
             files_to_remove.append(filename)
         
     for file in files_to_remove:
@@ -69,19 +51,31 @@ def filterExisting(ds: 'str', dsdata: 'dict', outputpattern=".root", tsferP=tran
     return len(dsdata['files']) > 0
     
 class JobRunner:
-    def __init__(self, jobfile, eventSelection=evtselclass) -> None:
+    """
+    Attributes
+    - `selclass`: Event selection class. Derived from BaseEventSelections"""
+    def __init__(self, runsetting, jobfile, eventSelection):
+        """Initialize the job runner with the job file and event selection class.
+        
+        Parameters
+        - `runsetting`: Run settings, a dynaconf object/dictionary
+        - `jobfile`: Job file path
+        - `eventSelection`: Event selection class"""
         self.selclass = eventSelection
+        self.rs = runsetting 
         with open(jobfile, 'r') as job:
             self.loaded = json.load(job)
             grp_name = get_fi_prefix(jobfile)
         self.grp_name = grp_name
+        self.transferPBase = self.rs.get("TRANSFER_PATH", None)
+        if self.transferPBase is not None: checkpath(self.transferPBase, createdir=True)
         
     def submitjobs(self, client) -> int:
         """Run jobs based on client settings.
         If a valid client is found and future mode is true, submit simultaneously run jobs.
         If not, fall back into a loop mode. Note that even in this mode, any dask computations will be managed by client explicitly or implicitly.
         """
-        proc = Processor(rs, self.loaded, f'{transferPBase}/{self.grp_name}', self.selclass)
+        proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass)
         rc = proc.runfiles()
         return 0
     
@@ -96,7 +90,7 @@ class JobRunner:
         """
         futures = []
         def job(fn, i):
-            proc = Processor(rs, filelist, self.grp_name, transferPBase) 
+            proc = Processor(self.rs, filelist, self.grp_name, self.transferPBase) 
             rc = proc.runfile(fn, i)
             return rc
         if indx is None:
@@ -106,8 +100,14 @@ class JobRunner:
         return futures
 
 class JobLoader():
-    """Load meta job files and prepare for processing."""
-    def __init__(self, jobpath, datapath=pjoin(data_dir, 'preprocessed')) -> None:
+    """Load meta job files and prepare for processing by slicing the files into smaller jobs."""
+    def __init__(self, datapath, jobpath, transferPBase) -> None:
+        """Initialize the job loader.
+        
+        Parameters
+        - `datapath`: Path to the data file in json.gz format
+        - `jobpath`: Path to one job file in json format
+        - `transferPBase`: Path to which root/cutflow output files of the selections will be ultimately transferred."""
         self.inpath = datapath
         checkpath(self.inpath, createdir=False, raiseError=True)
         self.tsferP = transferPBase
@@ -168,56 +168,4 @@ def process_futures(futures, results_file='futureresult.txt', errors_file='futur
             for error in errors:
                 f.write(str(error) + '\n')
     return processed_results, errors
-
-def spawnLocal():
-    """Spawn dask client for local cluster"""
-    # size_mb = size/1024/1024
-    cluster = LocalCluster(processes=daskcfg.get('SPAWN_PROCESS', False), threads_per_worker=daskcfg.get('THREADS_NO', 2))
-    cluster.adapt(minimum=1, maximum=4)
-    client = Client(cluster)
-    print("successfully created a dask client in local cluster!")
-    print("===================================")
-    print(client)
-    return client
-
-def spawnclient(default=False):
-    """Spawn appropriate client based on runsetting."""
-    if not daskcfg.SPAWN_CONDOR:
-        client = spawnLocal()
-    else:
-        client = spawnCondor(default)
-    return client 
-
-def spawnCondor(default=False):
-    """Spawn dask client for condor cluster"""
-    from lpcjobqueue import LPCCondorCluster
-
-    print("Trying to submit jobs to condor via dask!")
-
-    if default:
-        cluster = LPCCondorCluster(ship_env=True)
-        cluster.adapt(maximum=3)
-        print(cluster.job_script())
-    else:
-        condor_args = {"ship_env": True, 
-                    "processes": daskcfg.PROCESS_NO,
-                    "cores": daskcfg.CORE_NO,
-                    "memory": daskcfg.MEMORY,
-                    "disk": daskcfg.DISK
-                    }
-        cluster = LPCCondorCluster(**condor_args)
-        cluster.job_extra_directives = {
-            'output': 'dask_output.$(ClusterId).$(ProcId).out',
-            'error': 'daskr_error.$(ClusterId).$(ProcId).err',
-            'log': 'dask_log.$(ClusterId).log',
-        }
-        cluster.adapt(minimum=daskcfg.MIN_WORKER, maximum=daskcfg.MAX_WORKER)
-        print(cluster.job_script())
-
-    client = Client(cluster)
-    print("One client created in LPC Condor!")
-    print("===================================")
-    print(client)
-
-    return client
 

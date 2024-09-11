@@ -7,7 +7,7 @@ import pandas as pd
 import dask_awkward as dak
 import awkward as ak
 
-from src.utils.filesysutil import *
+from ..utils.filesysutil import *
 from .evtselutil import BaseEventSelections
 
 def inittransfer(selname, processname) -> str:
