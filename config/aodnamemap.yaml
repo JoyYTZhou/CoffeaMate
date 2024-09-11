@@ -1,0 +1,35 @@
+default:
+  Tau:
+    dxy: Tau_dxy
+    dz: Tau_dz
+    jetidx: Tau_jetIdx
+    charge: Tau_charge
+    idvsjet: Tau_idDeepTau2017v2p1VSjet
+    idvsmu: Tau_idDeepTau2017v2p1VSmu
+    idvse: Tau_idDeepTau2017v2p1VSe
+    genflav: Tau_genPartFlav
+  Electron:
+    cbtightid: Electron_cutBased
+    mvaisoid: Electron_mvaIso_WP90
+    charge: Electron_charge
+  Muon:
+    looseid: Muon_looseId
+    isoid: Muon_pfIsoId
+    cbtightid: Muon_tightId
+    charge: Muon_charge
+  Jet:
+    btag: Jet_btagDeepFlavB
+    # pnetbtag: Jet_btagPNetB
+    jetid: Jet_jetId
+  GenPart:
+    pdgid: GenPart_pdgId
+    motherid: GenPart_genPartIdxMother
+    charge: GenPart_charge
+  GenVisTau:
+    charge: GenVisTau_charge
+    motherid: GenVisTau_genPartIdxMother
+
+
+
+          
+          

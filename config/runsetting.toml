@@ -1,0 +1,20 @@
+[PRESELECT]
+SEL_NAME = 'prelim_total'
+COPY_LOCAL = false
+DELAYED_OPEN = false
+JOB_DIRNAME = 'preseljson'
+
+[SKIM]
+SEL_NAME = 'vetoskim'
+OUTPUTDIR_PATH = "outputs"
+COPY_LOCAL = false
+JOB_DIRNAME = 'skimjson'
+TRANSFER_PATH = '/store/user/joyzhou/vetoskim'
+
+[LPCTEST]
+SEL_NAME = 'vetoskim'
+DATA_PATH = "data/preprocessed"
+OUTPUTDIR_PATH = "/uscms/home/joyzhou/nobackup/tests"
+COPY_LOCAL = false
+TRANSFER_PATH = '/store/user/joyzhou/tests'
+COPY_DIR = "/uscms/home/joyzhou/nobackup/temp"

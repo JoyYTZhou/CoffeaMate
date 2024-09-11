@@ -1,0 +1,20 @@
+
+{
+    "TTbar": {
+        "TTtoLNu2Q": { 
+            "/TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer22EENanoAODv12-130X_mcRun3_2022_realistic_postEE_v6-v2/NANOAODSIM": {
+                "xsection": 404.5368
+            }
+        },
+        "TTto2L2N": {
+            "/TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer22EENanoAODv12-130X_mcRun3_2022_realistic_postEE_v6-v2/NANOAODSIM": {
+                "xsection": 96.978
+            }
+        },
+        "TTto4Q":{
+            "/TTto4Q_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer22EENanoAODv12-130X_mcRun3_2022_realistic_postEE_v6-v2/NANOAODSIM": {
+                "xsection": 422.0582
+            }
+        }
+    }
+} 

@@ -1,0 +1,34 @@
+
+# Ignore dynaconf secret files
+.secrets.*
+# Ignore all ipynb files
+test/.ipynb_checkpoints/
+# Ignore all pycache files
+**/__pycache__
+# Ignore the virtual python env
+hhbbttrun/
+# Ignore datachecks
+src/data/objectchecks/
+src/analysis/.api_key.txt
+# Ignore outputs
+outputs/
+# Ignore the exec output
+exec/*.log
+exec/*.err
+exec/*.pem
+exec/*.out
+exec/joblog/
+exec/skimjson/
+exec/runtime/
+# Ignore error log directory
+exec/errors/
+# Ignore all log files
+**/*.log
+.DS_Store
+# Ignore test file
+src/test.py
+# Ignore tarball
+*.tar.gz
+*.dat
+# Ignore all hidden files
+.*
