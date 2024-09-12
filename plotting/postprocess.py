@@ -2,12 +2,10 @@ import uproot, json, random, subprocess, gzip
 import awkward as ak
 import pandas as pd
 
-from src.analysis.objutil import Object
-from config.selectionconfig import cleansetting as cleancfg
-from src.utils.filesysutil import transferfiles, glob_files, checkpath, delfiles, pjoin
-from src.utils.cutflowutil import combine_cf, calc_eff, load_csvs
+from ..analysis.objutil import Object
+from ..utils.filesysutil import transferfiles, glob_files, checkpath, delfiles, pjoin
+from ..utils.cutflowutil import combine_cf, calc_eff, load_csvs
 
-indir = cleancfg.INPUTDIR
 localout = cleancfg.LOCALOUTPUT
 lumi = cleancfg.LUMI * 1000
 resolve = cleancfg.get("RESOLVE", False)
@@ -33,28 +31,59 @@ def iterprocess(endpattern):
     return inner
 
 class PostProcessor():
-    """Class for loading and hadding data from skims/predefined selections produced directly by Processor."""
-    def __init__(self) -> None:
+    """Class for loading and hadding data from skims/predefined selections produced directly by Processor.
+    
+    Attributes
+    - `cfg`: the configuration file for post processing of datasets
+    - `inputdir`: the directory where the input files are stored
+    - `meta_dict`: the metadata dictionary for all datasets. {Groupname: {Datasetname: {metadata}}}"""
+    def __init__(self, cleancfg) -> None:
+        """Parameters
+        - `cleancfg`: the configuration file for post processing of datasets"""
+        self.cfg = cleancfg
+        self.inputdir = cleancfg.INPUTDIR
+        self.tempdir = cleancfg.LOCALOUTPUT
+        self.transferP = cleancfg.get("CONDORPATH", f'{self.inputdir}_hadded')
+        checkpath(self.inputdir, createdir=False, raiseError=True)
+        
         with open(pjoin(cleancfg.DATAPATH, 'availableQuery.json'), 'r') as f:
             self.meta_dict = json.load(f)
 
-    def __call__(self, output_type=cleancfg.OUTTYPE, inputdir=condorpath):
-        PostProcessor.hadd_cfs(self.meta_dict)
+    def __call__(self, output_type=None, outputdir=None):
+        """Hadd the root/csv files of the datasets and save to the output directory."""
+        if output_type is None:
+            output_type = self.cfg.get("OUTPUTTYPE", 'root')
+        if outputdir is None:
+            outputdir = self.tempdir
+
+        self.hadd_cfs(self.meta_dict)
         if output_type == 'root': 
-            PostProcessor.hadd_roots(self.meta_dict)
-            self.meta_dict = PostProcessor.calc_wgt(inputdir, self.meta_dict)
+            self.hadd_roots(self.meta_dict)
+            self.meta_dict = PostProcessor.calc_wgt(outputdir, self.meta_dict)
         elif output_type == 'csv': PostProcessor.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
-
+    
     @staticmethod
-    @iterprocess('.root')
-    def hadd_roots(process, dtdir, outdir, meta) -> str:
-        """Hadd root files of datasets into appropriate size based on settings.
-        Might be eliminated depending on dask.write update."""
-        for _, dsitem in meta[process].items():
-            dsname = dsitem['shortname']
+    def check_roots(inputdir):
+        pass
+
+    def __iterate_meta(self, callback):
+        """Iterate over all datasets in the metadata dictionary and apply the callback function."""
+        for group, datasets in self.meta_dict.items():
+            for _, dsitems in datasets.items():
+                dsname = dsitems['shortname']
+                dtdir = pjoin(self.inputdir, group)
+                outdir = pjoin(self.tempdir, group)
+                if not checkpath(dtdir, createdir=False): continue
+                callback(dsname, dtdir, outdir)
+                transferfiles(outdir, condorpath, filepattern=f'*{endpattern}')
+                delfiles(outdir, pattern=f'{startpattern}*{endpattern}')
+    
+    def hadd_roots(self) -> str:
+        """Hadd root files of datasets into appropriate size based on settings"""
+        def process_ds(dsname, dtdir, outdir):
             root_files = glob_files(dtdir, f'{dsname}*.root', add_prefix=True)
-            batch_size = 200
+            batch_size = self.cfg.get("BATCHSIZE", 200)
             for i in range(0, len(root_files), batch_size):
                 batch_files = root_files[i:i+batch_size]
                 outname = pjoin(outdir, f"{dsname}_{i//batch_size+1}.root") 
@@ -63,7 +92,8 @@ class PostProcessor():
                 except Exception as e:
                     print(f"Hadding encountered error {e}")
                     print(batch_files)
-        return ''
+        
+        self.__iterate_meta(process_ds)
 
     @staticmethod
     @iterprocess('.csv')
@@ -192,8 +222,13 @@ class PostProcessor():
     
     @staticmethod
     def calc_wgt(datasrcpath, meta_dict) -> dict:
-        for process in cleancfg.DATASETS:
-            resolved_df = pd.read_csv(glob_files(pjoin(datasrcpath, process), f'{process}*cf.csv')[0], index_col=0) 
+        """Calculate the weight per event for each dataset and save to a json file with provided metadata.
+        
+        Parameters
+        - `datasrcpath`: path to the output directory (base level)
+        - `meta_dict`: metadata dictionary for all datasets. {group: {dataset: {metadata}}}"""
+        for group, datasets in meta_dict.items():
+            resolved_df = pd.read_csv(glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0) 
             for ds, dsitems in meta_dict[process].items():
                 nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
                 meta_dict[process][ds]['nwgt'] = nwgt

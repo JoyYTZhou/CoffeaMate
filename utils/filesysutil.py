@@ -27,11 +27,14 @@ def glob_files(dirname, filepattern='*', **kwargs) -> list:
     return sorted(files)
 
 def checkpath(dirname, createdir=True, raiseError=False) -> bool:
-    """Check if a directory exists. If not will create one."""
+    """Check if a directory exists. If not will create one.
+    
+    Return:
+    - True if the path exists, False otherwise"""
     if dirname.startswith('/store/user/'):
         return checkcondorpath(dirname, createdir, raiseError=raiseError)
     else:
-        return checklocalpath(dirname, raiseError)
+        return checklocalpath(dirname, createdir, raiseError)
 
 def transferfiles(srcpath, destpath, filepattern=False, remove=False) -> None:
     """Transfer all files in srcpath to destpath. Will check if destpath exist.
@@ -107,19 +110,19 @@ def display_top(snapshot, key_type='lineno', limit=10):
     total = sum(stat.size for stat in top_stats)
     print("Total allocated size: %.1f KiB" % (total / 1024))
     
-def checklocalpath(pathstr, raiseError=False) -> bool:
+def checklocalpath(pathstr, createdir=True, raiseError=False) -> bool:
     """Check if a local path exists. If not will create one.
     
     Return
-    - 0 if the path exists"""
+    - True if the path exists, False otherwise"""
     path = Path(pathstr) 
     if not path.exists():
         if raiseError:
             raise FileNotFoundError(f"this path {pathstr} does not exist.")
         else:
-            path.mkdir(parents=True, exist_ok=True)
-        return 1
-    return 0
+            if createdir: path.mkdir(parents=True, exist_ok=True)
+        return False
+    return True
 
 def cpfcondor(srcpath, localpath):
     """Copy a root file FROM condor to LOCAL."""
@@ -156,13 +159,16 @@ def cross_check(filepattern, existentfiles) -> bool:
             return True
     return False
 
-def checkcondorpath(dirname, createdir=True, raiseError=False) -> True:
+def checkcondorpath(dirname, createdir=True, raiseError=False) -> bool:
     """Check if a condor path exists and potentially create one.
 
     Parameters:
     `dirname`: directory path to check
     `createdir`: if True, create the directory if it doesn't exist. If false, return stat code. 
-    `raiseError`: if True, raise an error if the directory doesn't exist."""
+    `raiseError`: if True, raise an error if the directory doesn't exist.
+    
+    Return: 
+    - bool: True if the directory exists, False otherwise."""
     check_dir_cmd = f"xrdfs {PREFIX} stat {dirname}"
     create_dir_cmd = f"xrdfs {PREFIX} mkdir -p {dirname}"
     proc = runcom(check_dir_cmd, shell=True, capture_output=True, text=True, check=raiseError) 
@@ -170,9 +176,9 @@ def checkcondorpath(dirname, createdir=True, raiseError=False) -> True:
         if createdir:
             runcom(create_dir_cmd, shell=True)
         else:
-            return proc.returncode
+            return False
     else:
-        return 0
+        return True
 
 def delfiles(dirname, pattern='*.root'):
     """Delete all files in a directory with a specific pattern."""
