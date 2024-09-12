@@ -5,21 +5,22 @@ import numpy as np
 import pandas as pd
 import json
 
-from src.utils.datautil import arr_handler, iterwgt
-from src.analysis.objutil import Object
-from src.utils.filesysutil import checkpath, glob_files, pjoin
-from src.utils.cutflowutil import load_csvs
-
-from config.selectionconfig import cleansetting as cleancfg
-
-resolve = cleancfg.get("RESOLVE", False)
-lumi = cleancfg.LUMI
-processes = cleancfg.DATASETS
+from ..utils.datautil import arr_handler, iterwgt
+from ..analysis.objutil import Object
+from ..utils.filesysutil import checkpath, glob_files, pjoin
+from ..utils.cutflowutil import load_csvs
 
 colors = list(mpl.colormaps['Set2'].colors)
 
 class CSVPlotter():
-    def __init__(self, outdir):
+    """Plot the histograms and other visualizations from the csv files.
+    
+    Attributes
+    - `cfg`: the configuration object for plotting
+    - `meta_dict`: the metadata dictionary
+    - `data_dict`: the dictionary of dataframes"""
+    def __init__(self, outdir, cleancfg):
+        self.cfg = cleancfg
         with open(pjoin(cleancfg.DATAPATH, 'availableQuery.json'), 'r') as f:
             self.meta_dict = json.load(f)
         self.data_dict = {}
@@ -40,13 +41,16 @@ class CSVPlotter():
         cutflow[f'{ds}_raw'] = len(df)
         cutflow[f'{ds}_wgt'] = df[wgtname].sum()
     
-    def postprocess_csv(self, datasource=pjoin(cleancfg.LOCALOUTPUT, 'datasource'), per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass') -> pd.DataFrame:
+    def postprocess_csv(self, datasource, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass') -> pd.DataFrame:
         """Post-process the datasets and save the processed dataframes to csv files.
         
         Parameters
         - `fitype`: the file type to be saved
         - `per_evt_wgt`: the weight to be multiplied to the flat weights
-        - `extraprocess`: additional processing to be done on the dataframe"""
+        - `extraprocess`: additional processing to be done on the dataframe
+        
+        Return 
+        - `grouped`: the concatenated dataframe"""
         list_of_df = []
         new_outdir = f'{datasource}_extrasel'
         checkpath(new_outdir)
@@ -58,15 +62,15 @@ class CSVPlotter():
             df['group'] = group 
             if extraprocess: return extraprocess(df)
             else: return df
-        for process in processes:
-            load_dir = pjoin(datasource, process) 
+        for group in self.meta_dict.keys():
+            load_dir = pjoin(datasource, group) 
             cf_dict = {}
-            cf_df = load_csvs(load_dir, f'{process}_cf')[0]
-            for ds in self.meta_dict[process].keys():
-                rwfac = self.rwgt_fac(process, ds) 
-                dsname = self.meta_dict[process][ds]['shortname']
-                df = load_csvs(load_dir, f'{dsname}_out', func=add_wgt, rwfac=rwfac, ds=dsname, group=process)
-                checkpath(f'{new_outdir}/{process}')
+            cf_df = load_csvs(load_dir, f'{group}_cf')[0]
+            for ds in self.meta_dict[group].keys():
+                rwfac = self.rwgt_fac(group, ds) 
+                dsname = self.meta_dict[group][ds]['shortname']
+                df = load_csvs(load_dir, f'{dsname}_out', func=add_wgt, rwfac=rwfac, ds=dsname, group=group)
+                checkpath(f'{new_outdir}/{group}')
                 if df is not None: 
                     list_of_df.append(df)
                     self.addextcf(cf_dict, df, dsname, per_evt_wgt)
@@ -74,9 +78,9 @@ class CSVPlotter():
                     cf_dict[f'{dsname}_raw'] = 0
                     cf_dict[f'{dsname}_wgt'] = 0
             cf_df = pd.concat([cf_df, pd.DataFrame(cf_dict, index=[selname])])
-            cf_df.to_csv(pjoin(new_outdir, process, f'{process}_{selname.replace(" ", "")}_cf.csv'))
-        processed = pd.concat(list_of_df, axis=0).reset_index().drop('index', axis=1)
-        return processed
+            cf_df.to_csv(pjoin(new_outdir, group, f'{group}_{selname.replace(" ", "")}_cf.csv'))
+        grouped = pd.concat(list_of_df, axis=0).reset_index().drop('index', axis=1)
+        return grouped
 
     @iterwgt
     def getdata(self, process, ds, file_type='.root'):
