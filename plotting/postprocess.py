@@ -6,7 +6,6 @@ from ..analysis.objutil import Object
 from ..utils.filesysutil import transferfiles, glob_files, checkpath, delfiles, pjoin
 from ..utils.cutflowutil import combine_cf, calc_eff, load_csvs
 
-localout = cleancfg.LOCALOUTPUT
 lumi = cleancfg.LUMI * 1000
 resolve = cleancfg.get("RESOLVE", False)
 
