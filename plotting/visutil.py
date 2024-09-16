@@ -10,7 +10,7 @@ from src.analysis.objutil import Object
 from src.utils.filesysutil import checkpath, glob_files, pjoin
 from src.utils.cutflowutil import load_csvs
 
-from config.selectionconfig import cleansetting as cleancfg
+from config.projectconfg import cleansetting as cleancfg
 
 resolve = cleancfg.get("RESOLVE", False)
 lumi = cleancfg.LUMI
