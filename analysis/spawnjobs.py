@@ -3,8 +3,8 @@ import json as json
 import gzip, glob, traceback, os
 from itertools import islice
 
-from .processor import Processor
-from ..utils.filesysutil import glob_files, cross_check, checkpath, pjoin
+from src.analysis.processor import Processor
+from src.utils.filesysutil import FileSysHelper, pjoin
 
 def get_fi_prefix(filepath):
     return os.path.basename(filepath).split('.')[0].split('_')[0]
@@ -15,18 +15,20 @@ def div_dict(original_dict, chunk_size):
     for _ in range(0, len(original_dict), chunk_size):
         yield dict(islice(it, chunk_size))
 
-def filterExisting(ds: 'str', dsdata: 'dict', tsferP, out_endpattern=".root") -> bool:
+def filterExisting(ds: 'str', dsdata: 'dict', tsferP, out_endpattern=".root", prefix=None) -> bool:
     """Update dsdata on files that need to be processed for a MC dataset based on the existing output files and cutflow tables.
     
     Parameters
     - `ds`: Dataset name
     - `dsdata`: A dictionary of dataset information with keys 'files', 'metadata', 'filelist'
     - `out_endpattern`: A string or a list of strings representing output ending file pattern to check for. No wildcards needed.
+    - `prefix`: Prefix to be used in case of xrootd system for tsferP. Treat tsferP as a local path if None.
 
     Return
     - bool: True if some files need to be processed, False otherwise. 
     """
-    if not tsferP or checkpath(tsferP, createdir=False) != 0:
+    helper = FileSysHelper()
+    if not tsferP or helper.checkpath(tsferP, createdir=False) != 0:
         return True
     
     if isinstance(outputpattern, str):
@@ -38,9 +40,9 @@ def filterExisting(ds: 'str', dsdata: 'dict', tsferP, out_endpattern=".root") ->
         prefix = f"{ds}_{fileinfo['uuid']}"
         matched = 0
         for pattern in out_endpattern:
-            outfiles = glob_files(tsferP, f"*{pattern}")
+            outfiles = helper.glob_files(tsferP, f"*{pattern}")
             expected = f"{prefix}*{pattern}"
-            matched += cross_check(expected, outfiles)
+            matched += helper.cross_check(expected, outfiles)
         
         if matched == len(out_endpattern):
             files_to_remove.append(filename)
@@ -54,7 +56,7 @@ class JobRunner:
     """
     Attributes
     - `selclass`: Event selection class. Derived from BaseEventSelections"""
-    def __init__(self, runsetting, jobfile, eventSelection):
+    def __init__(self, runsetting, jobfile, eventSelection, dasksetting=None):
         """Initialize the job runner with the job file and event selection class.
         
         Parameters
@@ -68,7 +70,9 @@ class JobRunner:
             grp_name = get_fi_prefix(jobfile)
         self.grp_name = grp_name
         self.transferPBase = self.rs.get("TRANSFER_PATH", None)
-        if self.transferPBase is not None: checkpath(self.transferPBase, createdir=True)
+        if self.transferPBase is not None:
+            helper = FileSysHelper()
+            helper.checkpath(self.transferPBase, createdir=True)
         
     def submitjobs(self, client) -> int:
         """Run jobs based on client settings.
@@ -109,10 +113,11 @@ class JobLoader():
         - `jobpath`: Path to one job file in json format
         - `transferPBase`: Path to which root/cutflow output files of the selections will be ultimately transferred."""
         self.inpath = datapath
-        checkpath(self.inpath, createdir=False, raiseError=True)
+        self.helper = FileSysHelper()
+        self.helper.checkpath(self.inpath, createdir=False, raiseError=True)
         self.tsferP = transferPBase
         self.jobpath = jobpath
-        checkpath(jobpath)
+        self.helper.checkpath(self.jobpath, createdir=True)
 
     def writejobs(self) -> None:
         """Write job parameters to json file"""

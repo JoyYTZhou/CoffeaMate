@@ -21,19 +21,62 @@ class FileSysHelper:
         pass
 
     @staticmethod
-    def checkpath(pathstr, createdir=True, raiseError=False) -> bool:
+    def cross_check(filepattern, existentfiles) -> bool:
+        """Check if a file pattern exists in a list of files.
+        
+        Parameters
+        - `filepattern`: pattern to match the file name
+        - `existentfiles`: list of files to check
+        
+        Return
+        - bool: True if the file pattern exists in the list of files
+        """
+        for file in existentfiles:
+            basename = file.split('/')[-1]
+            if fnmatch.fnmatch(basename, filepattern):
+                return True
+        return False
+
+    @staticmethod
+    def glob_files(dirname, filepattern='*', **kwargs) -> list:
+        """Returns a SORTED list of files matching a pattern in a directory. By default will return all files.
+        
+        Parameters
+        - `dirname`: directory path (remote/local)
+        - `filepattern`: pattern to match the file name. Wildcards allowed
+        - `kwargs`: additional arguments for filtering files
+
+        Return
+        - A SORTED list of files (str)
+        """
+        if dirname.startswith('/store/user'):
+            xrdhelper = XRootDHelper(kwargs.get("prefix", PREFIX))
+            files = xrdhelper.glob_files(dirname, filepattern)
+        else:
+            if filepattern == '*':
+                files = [str(file.absolute()) for file in Path(dirname).iterdir() if file.is_file()]
+            else:
+                files = glob.glob(pjoin(dirname, filepattern)) 
+        return sorted(files)
+    
+    @staticmethod
+    def checkpath(pathstr, createdir=True, raiseError=False, prefix=PREFIX) -> bool:
         """Check if a path exists. If not will create one.
         
         Return
         - True if the path exists, False otherwise"""
-        path = Path(pathstr)
-        if not path.exists():
-            if raiseError:
-                raise FileNotFoundError(f"this path {pathstr} does not exist.")
-            else:
-                if createdir: path.mkdir(parents=True, exist_ok=True)
-            return False
-        return True
+        if pathstr.startswith('/store/user'):
+            xrdhelper = XRootDHelper(prefix)
+            return xrdhelper.check_path(pathstr, createdir, raiseError)
+        else:
+            path = Path(pathstr)
+            if not path.exists():
+                if raiseError:
+                    raise FileNotFoundError(f"this path {pathstr} does not exist.")
+                else:
+                    if createdir: path.mkdir(parents=True, exist_ok=True)
+                return False
+            return True
 
     @staticmethod
     def transfer_files(srcpath, destpath, filepattern='*', remove=False, overwrite=False, **kwargs) -> None:
@@ -77,7 +120,7 @@ class XRootDHelper:
             files = [entry.name for entry in listing.dirlist if match(entry.name, filepattern)]
         return files
     
-    def __check_path(self, dirname, createdir=True, raiseError=False) -> bool:
+    def check_path(self, dirname, createdir=True, raiseError=False) -> bool:
         """Check if a directory exists. If not will create one.
         
         Return 
@@ -121,7 +164,7 @@ class XRootDHelper:
         if not(destpath.startswith('/store/user')):
             raise ValueError("Destination path should be a remote directory. Use FileSysHelper for local transfers.")
 
-        self.__check_path(destpath)
+        self.check_path(destpath)
         for file in files:
             src_file = file
             dest_file = pjoin(destpath, file)
@@ -134,27 +177,6 @@ class XRootDHelper:
                     raise Exception(f"Failed to remove {src_file}: {status.message}")
             else:
                 return
-
-def glob_files(dirname, filepattern='*', **kwargs) -> list:
-    """Returns a SORTED list of files matching a pattern in a directory. By default will return all files.
-    
-    Parameters
-    - `dirname`: directory path (remote/local)
-    - `filepattern`: pattern to match the file name. Wildcards allowed
-    - `kwargs`: additional arguments for filtering files
-
-    Return
-    - A SORTED list of files (str)
-    """
-    if dirname.startswith('/store/user'):
-        files = get_xrdfs_files(dirname, filepattern, **kwargs)
-    else:
-        if filepattern == '*':
-            files = [str(file.absolute()) for file in Path(dirname).iterdir() if file.is_file()]
-        else:
-            files = glob.glob(pjoin(dirname, filepattern)) 
-    return sorted(files)
-
 
 def checkx509():
     """Check if the X509 proxy and certificate directory are set."""
@@ -211,21 +233,7 @@ def isremote(pathstr):
     is_remote = pathstr.startswith('/store/user') or pathstr.startswith("root://")
     return is_remote
 
-def cross_check(filepattern, existentfiles) -> bool:
-    """Check if a file pattern exists in a list of files.
-    
-    Parameters
-    - `filepattern`: pattern to match the file name
-    - `existentfiles`: list of files to check
-    
-    Return
-    - bool: True if the file pattern exists in the list of files
-    """
-    for file in existentfiles:
-        basename = file.split('/')[-1]
-        if fnmatch.fnmatch(basename, filepattern):
-            return True
-    return False
+
 
 def delfiles(dirname, pattern='*.root'):
     """Delete all files in a directory with a specific pattern."""

@@ -5,7 +5,7 @@ import operator as opr
 import dask_awkward as dak
 import awkward as ak
 
-from ..utils.datautil import arr_handler
+from src.utils.datautil import arr_handler
 
 class Object:
     """Object class for handling object selections, meant as an observer of the events.

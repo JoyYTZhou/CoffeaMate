@@ -11,7 +11,19 @@ from src.utils.filesysutil import FileSysHelper, pjoin
 from src.analysis.evtselutil import BaseEventSelections
 
 class Processor:
-    """Process individual file or filesets given strings/dicts belonging to one dataset."""
+    """Process individual file or filesets given strings/dicts belonging to one dataset.
+    
+    Attributes
+    - `rtcfg`: runtime configuration object
+    - `dsdict`: dictionary containing file information
+    - `dataset`: dataset name
+    - `evtsel_kwargs`: keyword arguments for event selection class
+    - `evtselclass`: event selection class
+    - `transfer`: transfer object
+    - `filehelper`: file system helper object
+    - `outdir`: output directory
+    - `copydir`: copy directory. If COPY_LOCAL is True, this will be used.
+    - `evtsel`: event selection object alive"""
     def __init__(self, rt_cfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
         """
         Parameters

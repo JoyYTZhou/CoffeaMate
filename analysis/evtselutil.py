@@ -3,8 +3,8 @@ import dask
 import pandas as pd
 import awkward as ak
 
-from ..utils.cutflowutil import weightedSelection
-from ..analysis.objutil import Object
+from src.utils.cutflowutil import weightedSelection
+from src.analysis.objutil import Object
 
 class BaseEventSelections:
     """Base class for event selections."""
