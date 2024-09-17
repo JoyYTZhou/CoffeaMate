@@ -5,6 +5,7 @@ from pathlib import Path
 runcom = subprocess.run
 pjoin = os.path.join
 DEBUG_ON = os.environ.get("DEBUG_MODE", default=False)
+PREFIX = "root://cmseos.fnal.gov"
 
 def pbase(pathstr) -> str:
     """Get the base name of a path."""
@@ -15,7 +16,7 @@ def match(pathstr, pattern) -> bool:
     return fnmatch.fnmatch(pbase(pathstr), pattern)
 
 class XRootDHelper:
-    def __init__(self, prefix="root://cmseos.fnal.gov") -> None:
+    def __init__(self, prefix=PREFIX) -> None:
         self.xrdfs_client = client.FileSystem(prefix)
 
     def glob_files(self, dirname, filepattern="*", **kwargs) -> list:
@@ -47,7 +48,7 @@ class XRootDHelper:
         return True
     
     def remove_files(self, dirname, pattern='*') -> None:
-        """Delete all files in a directory with a specific pattern."""
+        """Delete all files in an xrd directory with a specific pattern."""
         files = self.glob_files(dirname, pattern)
         for file in files:
             status, _ = self.xrdfs_client.rm(pjoin(dirname, file))
@@ -56,14 +57,21 @@ class XRootDHelper:
     
     def transfer_files(self, srcpath, destpath, filepattern='*', remove=False) -> None:
         """Transfer all files matching filepattern from srcpath to destpath. Will create the destpath if it doesn't exist.
-        This is only meant for transferring files from local to xrdfs."""
+        This is only meant for transferring files from local to xrdfs.
+        
+        Parameters 
+        - `srcpath`: source path (local), a directory
+        - `destpath`: destination path (remote), a directory
+        - `filepattern`: pattern to match the file name. Passed into glob.glob(filepattern)
+        - `remove`: whether to remove the files from srcpath after transferring"""
 
         if srcpath.startswith('/store/user'):
             raise ValueError("Source path should be a local directory. Why are you transferring from one EOS to another?")
         else:
             files = glob.glob(pjoin(srcpath, filepattern))
+            print(files)
 
-        status = self.__check_path(destpath)
+        self.__check_path(destpath)
         for file in files:
             src_file = file
             dest_file = pjoin(destpath, file)
@@ -74,6 +82,8 @@ class XRootDHelper:
                 os.remove(src_file)
                 if not status.ok:
                     raise Exception(f"Failed to remove {src_file}: {status.message}")
+            else:
+                return
 
 def glob_files(dirname, filepattern='*', **kwargs) -> list:
     """Returns a SORTED list of files matching a pattern in a directory. By default will return all files.
@@ -95,54 +105,6 @@ def glob_files(dirname, filepattern='*', **kwargs) -> list:
             files = glob.glob(pjoin(dirname, filepattern)) 
     return sorted(files)
 
-def checkpath(dirname, createdir=True, raiseError=False) -> bool:
-    """Check if a directory exists. If not will create one.
-    
-    Return:
-    - True if the path exists, False otherwise"""
-    if dirname.startswith('/store/user/'):
-        return checkcondorpath(dirname, createdir, raiseError=raiseError)
-    else:
-        return checklocalpath(dirname, createdir, raiseError)
-
-def transferfiles(srcpath, destpath, filepattern=False, remove=False) -> None:
-    """Transfer all files in srcpath to destpath. Will check if destpath exist.
-    
-    Parameters
-    - `srcpath`: source path (local/remote), a directory
-    - `destpath`: destination path (remote/local), a directory
-    - `filepattern`: 
-    - `remove`: mv/cp. Only supported when moving from local to remote
-    """
-    if isremote(destpath):
-        if isremote(srcpath):
-            raise ValueError("Source path should be a local directory. Why are you transferring from one EOS to another?")
-        else:
-            checkcondorpath(destpath)
-            if filepattern:
-                for srcfile in glob_files(srcpath, filepattern):
-                    cpcondor(srcfile, f'{destpath}/{os.path.basename(srcfile)}')
-                    if remove: os.remove(srcfile)
-            else:
-                cpcondor(srcpath, destpath)
-                if remove: os.remove(srcpath)
-    elif isremote(srcpath):
-        if isremote(destpath):
-            raise ValueError("Destination path should be a local directory. Why are you transferring from EOS to EOS?")
-        else:
-            checklocalpath(destpath)
-            if filepattern:
-                for srcfile in glob_files(srcpath, filepattern):
-                    cpfcondor(srcfile, f'{destpath}/')
-            else: cpfcondor(srcpath, f'{destpath}/')
-
-def remove_xrdfs_file(file_path):
-    """Remove a file from xrdfs.
-    
-    Parameters
-    - `file_path`: file path to remove. without prefix"""
-    cmd = ["xrdfs", PREFIX, "rm", file_path]
-    subprocess.run(cmd)
 
 def checkx509():
     """Check if the X509 proxy and certificate directory are set."""
@@ -193,19 +155,6 @@ def checklocalpath(pathstr, createdir=True, raiseError=False) -> bool:
         return False
     return True
 
-def cpfcondor(srcpath, localpath):
-    """Copy a root file FROM condor to LOCAL."""
-    comstr = f'xrdcp {srcpath} {localpath}' if srcpath.startswith('root://') else f'xrdcp {PREFIX}/{srcpath} {localpath}'
-    result = runcom(comstr, shell=True, capture_output=True, text=True)
-    if DEBUG_ON and result.returncode !=0 : print(result.stderr)
-    return result
-
-def cpcondor(srcpath, destpath):
-    """Copy srcpath (file/directory) FROM local to condor destpath"""
-    comstr = f'xrdcp {srcpath} {destpath}' if destpath.startswith('root://') else f'xrdcp {srcpath} {PREFIX}/{destpath}' 
-    result = runcom(comstr, shell=True, capture_output=True, text=True)
-    if DEBUG_ON and result.returncode !=0 : print(result.stderr)
-    return result
 
 def isremote(pathstr):
     """Check if a path is remote."""
@@ -227,27 +176,6 @@ def cross_check(filepattern, existentfiles) -> bool:
         if fnmatch.fnmatch(basename, filepattern):
             return True
     return False
-
-def checkcondorpath(dirname, createdir=True, raiseError=False) -> bool:
-    """Check if a condor path exists and potentially create one.
-
-    Parameters:
-    `dirname`: directory path to check
-    `createdir`: if True, create the directory if it doesn't exist. If false, return stat code. 
-    `raiseError`: if True, raise an error if the directory doesn't exist.
-    
-    Return: 
-    - bool: True if the directory exists, False otherwise."""
-    check_dir_cmd = f"xrdfs {PREFIX} stat {dirname}"
-    create_dir_cmd = f"xrdfs {PREFIX} mkdir -p {dirname}"
-    proc = runcom(check_dir_cmd, shell=True, capture_output=True, text=True, check=raiseError) 
-    if proc.returncode != 0:
-        if createdir:
-            runcom(create_dir_cmd, shell=True)
-        else:
-            return False
-    else:
-        return True
 
 def delfiles(dirname, pattern='*.root'):
     """Delete all files in a directory with a specific pattern."""
