@@ -1,17 +1,86 @@
 import os, glob, tracemalloc, linecache, subprocess, datetime, fnmatch
+from XRootD import client
 from pathlib import Path
 
 runcom = subprocess.run
 pjoin = os.path.join
-PREFIX = "root://cmseos.fnal.gov"
 DEBUG_ON = os.environ.get("DEBUG_MODE", default=False)
 
+def pbase(pathstr) -> str:
+    """Get the base name of a path."""
+    return pathstr.split('/')[-1]
+
+def match(pathstr, pattern) -> bool:
+    """Match a path with a pattern. Returns True if the path matches the pattern."""
+    return fnmatch.fnmatch(pbase(pathstr), pattern)
+
+class XRootDHelper:
+    def __init__(self, prefix="root://cmseos.fnal.gov") -> None:
+        self.xrdfs_client = client.FileSystem(prefix)
+
+    def glob_files(self, dirname, filepattern="*", **kwargs) -> list:
+        """Returns a list of files matching a pattern in a directory. By default will return all files."""
+        status, listing = self.xrdfs_client.dirlist(dirname)
+        if not status.ok:
+            raise Exception(f"Failed to list directory {dirname}: {status.message}")
+        if filepattern == '*':
+            files = [entry.name for entry in listing.dirlist]
+        else:
+            files = [entry.name for entry in listing.dirlist if match(entry.name, filepattern)]
+        return files
+    
+    def __check_path(self, dirname, createdir=True, raiseError=False) -> bool:
+        """Check if a directory exists. If not will create one.
+        
+        Return 
+        - True if the path exists, False otherwise"""
+        status, _ = self.xrdfs_client.stat(dirname)
+        if not status.ok:
+            if raiseError:
+                raise FileNotFoundError(f"this path {dirname} does not exist.")
+            else:
+                if createdir:
+                    status, _ = self.xrdfs_client.mkdir(dirname)
+                    if not status.ok:
+                        raise Exception(f"Failed to create directory {dirname}: {status.message}")
+                return False
+        return True
+    
+    def remove_files(self, dirname, pattern='*') -> None:
+        """Delete all files in a directory with a specific pattern."""
+        files = self.glob_files(dirname, pattern)
+        for file in files:
+            status, _ = self.xrdfs_client.rm(pjoin(dirname, file))
+            if not status.ok:
+                raise Exception(f"Failed to remove {file}: {status.message}")
+    
+    def transfer_files(self, srcpath, destpath, filepattern='*', remove=False) -> None:
+        """Transfer all files matching filepattern from srcpath to destpath. Will create the destpath if it doesn't exist.
+        This is only meant for transferring files from local to xrdfs."""
+
+        if srcpath.startswith('/store/user'):
+            raise ValueError("Source path should be a local directory. Why are you transferring from one EOS to another?")
+        else:
+            files = glob.glob(pjoin(srcpath, filepattern))
+
+        status = self.__check_path(destpath)
+        for file in files:
+            src_file = file
+            dest_file = pjoin(destpath, file)
+            status, _ = self.xrdfs_client.copy(src_file, dest_file)
+            if not status.ok:
+                raise Exception(f"Failed to copy {src_file} to {dest_file}: {status.message}")
+            if remove:
+                os.remove(src_file)
+                if not status.ok:
+                    raise Exception(f"Failed to remove {src_file}: {status.message}")
+
 def glob_files(dirname, filepattern='*', **kwargs) -> list:
-    """Returns a SORTED list of files matching a pattern in a directory. If both patterns are None, return all files.
+    """Returns a SORTED list of files matching a pattern in a directory. By default will return all files.
     
     Parameters
     - `dirname`: directory path (remote/local)
-    - `filepattern`: pattern to match the file name
+    - `filepattern`: pattern to match the file name. Wildcards allowed
     - `kwargs`: additional arguments for filtering files
 
     Return
