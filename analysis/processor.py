@@ -7,23 +7,8 @@ import pandas as pd
 import dask_awkward as dak
 import awkward as ak
 
-from ..utils.filesysutil import *
-from .evtselutil import BaseEventSelections
-
-def inittransfer(selname, processname) -> str:
-    """Initialize transfer path for condor jobs.
-    
-    Parameters
-    - `selname`: Selection name
-    - `processname`: Process name
-    
-    Returns
-    - `transfer`: Transfer path string"""
-    condorbase = os.environ.get("CONDOR_BASE", False)
-    if condorbase:
-        return pjoin(condorbase, selname, processname)
-    else:
-        raise EnvironmentError("Export condor base directory properly!")
+from src.utils.filesysutil import FileSysHelper, pjoin
+from src.analysis.evtselutil import BaseEventSelections
 
 class Processor:
     """Process individual file or filesets given strings/dicts belonging to one dataset."""
@@ -39,8 +24,7 @@ class Processor:
         self.evtsel_kwargs = kwargs
         self.evtselclass = evtselclass
         self.transfer = transferP
-        if self.transfer is not None: 
-            checkcondorpath(self.transfer)
+        self.filehelper = FileSysHelper()
         self.initdir()
 
     @property
@@ -50,12 +34,12 @@ class Processor:
     def initdir(self) -> None:
         """Initialize the output directory and copy directory if necessary.
         If the copy directory is specified, it will be created and checked.
-        The output directory will be created and checked."""
+        The output directory will be checked and created if necessary."""
         self.outdir = pjoin(self.rtcfg.OUTPUTDIR_PATH, self.dataset)
         if self.rtcfg.COPY_LOCAL: 
             self.copydir = self.rtcfg.get("COPY_DIR", 'temp')
-            checkpath(self.copydir, createdir=True)
-        checkpath(self.outdir) 
+            self.filehelper.checkpath(self.copydir)
+        self.filehelper.checkpath(self.outdir)
     
     def loadfile_remote(self, fileargs: dict) -> tuple[ak.Array, bool]:
         """This is a wrapper function around uproot._dask.
@@ -104,12 +88,11 @@ class Processor:
             npzname = pjoin(self.outdir, f'cutflow_{suffix}.npz')
             self.evtsel.cfobj.to_npz(npzname)
         cutflow_name = f'{self.dataset}_{suffix}_cutflow.csv'
-        checkpath(self.outdir)
         cutflow_df = self.evtsel.cf_to_df() 
         cutflow_df.to_csv(pjoin(self.outdir, cutflow_name))
         print("Cutflow written to local!")
-        if self.transfer:
-            transferfiles(self.outdir, self.transfer, filepattern=False, remove=True)
+        if self.transfer is not None:
+            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_name, remove=True)
         return 0
     
     def writeevts(self, passed, suffix, **kwargs) -> int:
@@ -120,8 +103,8 @@ class Processor:
             rc = self.writedf(passed, suffix)
         else:
             rc = self.writepickle(passed, suffix, **kwargs)
-        if self.transfer:
-            transferfiles(self.outdir, self.transfer, filepattern='*', remove=True)
+        if self.transfer is not None:
+            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True)
         return rc
 
     def writedask(self, passed, suffix, fields=None) -> int:
@@ -155,7 +138,7 @@ class Processor:
         Parameters:
         - `passed`: DataFrame to write
         - `suffix`: index to append to filename"""
-        outname = pjoin(self.outdir, f'{self.dataset}_output_{suffix}.csv')
+        outname = pjoin(self.outdir, f'{self.dataset}_{suffix}_output.csv')
         passed.to_csv(outname)
         return 0
         

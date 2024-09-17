@@ -1,4 +1,4 @@
-import os, glob, tracemalloc, linecache, subprocess, datetime, fnmatch
+import os, glob, shutil, tracemalloc, linecache, subprocess, datetime, fnmatch
 from XRootD import client
 from pathlib import Path
 
@@ -15,6 +15,53 @@ def match(pathstr, pattern) -> bool:
     """Match a path with a pattern. Returns True if the path matches the pattern."""
     return fnmatch.fnmatch(pbase(pathstr), pattern)
 
+class FileSysHelper:
+    """Helper class for file system operations. Can be used for both local and remote file systems."""
+    def __init__(self) -> None:
+        pass
+
+    @staticmethod
+    def checkpath(pathstr, createdir=True, raiseError=False) -> bool:
+        """Check if a path exists. If not will create one.
+        
+        Return
+        - True if the path exists, False otherwise"""
+        path = Path(pathstr)
+        if not path.exists():
+            if raiseError:
+                raise FileNotFoundError(f"this path {pathstr} does not exist.")
+            else:
+                if createdir: path.mkdir(parents=True, exist_ok=True)
+            return False
+        return True
+
+    @staticmethod
+    def transfer_files(srcpath, destpath, filepattern='*', remove=False, overwrite=False, **kwargs) -> None:
+        """Transfer all files matching filepattern from srcpath to destpath. Will create the destpath if it doesn't exist.
+        
+        Parameters 
+        - `srcpath`: source path (local), a directory
+        - `destpath`: destination path (remote), a directory
+        - `filepattern`: pattern to match the file name. Passed into glob.glob(filepattern)
+        - `remove`: whether to remove the files from srcpath after transferring
+        - `overwrite`: whether to overwrite the files in the destination
+        """
+        if destpath.startswith('/store/user'):
+            xrdhelper = XRootDHelper(kwargs.get("prefix", PREFIX))
+            xrdhelper.transfer_files(srcpath, destpath, filepattern, remove, overwrite)
+        else:
+            files = glob.glob(pjoin(srcpath, filepattern))
+            if not os.path.exists(destpath):
+                os.makedirs(destpath, exist_ok=True)
+            for file in files:
+                dest_file = pjoin(destpath, pbase(file))
+                if not os.path.exists(dest_file) or overwrite:
+                    shutil.copy(file, dest_file)
+                    if remove:
+                        os.remove(file)
+                else:
+                    print(f"File {dest_file} exists. Skipping.")
+    
 class XRootDHelper:
     def __init__(self, prefix=PREFIX) -> None:
         self.xrdfs_client = client.FileSystem(prefix)
@@ -55,7 +102,7 @@ class XRootDHelper:
             if not status.ok:
                 raise Exception(f"Failed to remove {file}: {status.message}")
     
-    def transfer_files(self, srcpath, destpath, filepattern='*', remove=False) -> None:
+    def transfer_files(self, srcpath, destpath, filepattern='*', remove=False, overwrite=False) -> None:
         """Transfer all files matching filepattern from srcpath to destpath. Will create the destpath if it doesn't exist.
         This is only meant for transferring files from local to xrdfs.
         
@@ -70,12 +117,15 @@ class XRootDHelper:
         else:
             files = glob.glob(pjoin(srcpath, filepattern))
             print(files)
+        
+        if not(destpath.startswith('/store/user')):
+            raise ValueError("Destination path should be a remote directory. Use FileSysHelper for local transfers.")
 
         self.__check_path(destpath)
         for file in files:
             src_file = file
             dest_file = pjoin(destpath, file)
-            status, _ = self.xrdfs_client.copy(src_file, dest_file)
+            status, _ = self.xrdfs_client.copy(src_file, dest_file, force=overwrite)
             if not status.ok:
                 raise Exception(f"Failed to copy {src_file} to {dest_file}: {status.message}")
             if remove:
