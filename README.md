@@ -20,6 +20,8 @@ This repository contains utilities for data analysis packages like Coffea and ot
     - [`weightedCutflow` Class](#weightedcutflow-class)
     - [`weightedSelection` Class](#weightedselection-class)
     - [`CSVPlotter` Class](#csvplotter-class)
+    - [`FileSysHelper` Class](#filesyshelper-class)
+      - [Methods](#methods)
   - [Adding as a submodule](#adding-as-a-submodule)
 
 ## Features
@@ -60,6 +62,15 @@ The `weightedSelection` class extends the `PackedSelection` class and represents
 ### `CSVPlotter` Class
 
 The `CSVPlotter` class is designed to plot histograms and other visualizations from CSV files. It utilizes various libraries such as `mplhep`, `matplotlib`, `numpy`, and `pandas` to create and manage plots. The class is initialized with an output directory and a configuration object for plotting.
+
+### `FileSysHelper` Class
+The `FileSysHelper` class is a utility for performing file system operations on both local and remote file systems. It provides methods to check and create directories, as well as transfer files between directories with various options for handling existing files.
+
+#### Methods
+- **`checkpath(pathstr, createdir=True, raiseError=False) -> bool`**
+  - Checks if a path exists. Optionally creates the directory or raises an error if the path does not exist.
+- **`transfer_files(srcpath, destpath, filepattern='*', remove=False, overwrite=False, **kwargs) -> None`**
+  - Transfers files matching a pattern from a source directory to a destination directory. Handles existing files by overwriting, renaming, or skipping them.
 
 ## Adding as a submodule
 
