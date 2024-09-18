@@ -111,6 +111,9 @@ class XRootDHelper:
 
     def glob_files(self, dirname, filepattern="*", **kwargs) -> list:
         """Returns a list of files matching a pattern in a directory. By default will return all files."""
+        exist = self.check_path(dirname, createdir=False, raiseError=False)
+        if exist == False:
+            return []
         status, listing = self.xrdfs_client.dirlist(dirname)
         if not status.ok:
             raise Exception(f"Failed to list directory {dirname}: {status.message}")
@@ -134,11 +137,16 @@ class XRootDHelper:
                     status, _ = self.xrdfs_client.mkdir(dirname)
                     if not status.ok:
                         raise Exception(f"Failed to create directory {dirname}: {status.message}")
+                else:
+                    print(f"Path {dirname} does not exist.")
                 return False
         return True
     
     def remove_files(self, dirname, pattern='*') -> None:
         """Delete all files in an xrd directory with a specific pattern."""
+        exist = self.check_path(dirname, createdir=False, raiseError=False)
+        if exist == False:
+            return
         files = self.glob_files(dirname, pattern)
         for file in files:
             status, _ = self.xrdfs_client.rm(pjoin(dirname, file))
