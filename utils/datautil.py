@@ -4,7 +4,7 @@ import uproot, pickle, os
 from functools import wraps
 import dask_awkward as dak
 import json
-from src.utils.filesysutil import glob_files, pjoin
+from src.utils.filesysutil import pjoin
 
 parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 datadir = pjoin(parent_directory, 'data', 'preprocessed')
