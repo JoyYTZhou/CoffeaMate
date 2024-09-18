@@ -7,7 +7,8 @@ import coffea.util
 import dask_awkward, dask
 from collections import namedtuple
 
-from src.utils.filesysutil import glob_files 
+from src.utils.filesysutil import FileSysHelper
+
 pjoin = os.path.join
 runcom = subprocess.run
 
@@ -151,7 +152,7 @@ def load_csvs(dirname, startpattern, func=None, *args, **kwargs) -> pd.DataFrame
     - `func`: function to apply to the list of DataFrames. Must return an Pandas object.
     - `*args`, `**kwargs`: additional arguments to pass to the function
     """
-    file_names = glob_files(dirname, filepattern=f'{startpattern}*.csv')
+    file_names = FileSysHelper.glob_files(dirname, filepattern=f'{startpattern}*.csv')
     dfs = [pd.read_csv(file_name, index_col=0, header=0) for file_name in file_names] 
     if func is None:
         return dfs
