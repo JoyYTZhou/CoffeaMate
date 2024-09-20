@@ -55,6 +55,7 @@ class FileSysHelper:
         else:
             if filepattern == '*':
                 files = [str(file.absolute()) for file in Path(dirname).iterdir() if file.is_file()]
+                print(files)
             else:
                 files = glob.glob(pjoin(dirname, filepattern)) 
         return sorted(files)
@@ -171,16 +172,18 @@ class XRootDHelper:
             raise ValueError("Destination path should be a remote directory. Use FileSysHelper for local transfers.")
 
         self.check_path(destpath)
+        checkx509()
         for file in files:
             src_file = file
             dest_file = pjoin(destpath, pbase(file))
-            status, _ = self.xrdfs_client.copy(src_file, dest_file, force=overwrite)
-            if not status.ok:
+            # at some point needs to try copyprocess 
+            # status, _ = self.xrdfs_client.copy(src_file, dest_file, force=True)
+            # if not status.ok:
+            status = runcom(f'xrdcp {src_file} {PREFIX}/{dest_file}', shell=True, capture_output=True)
+            if not status.returncode == 0:
                 raise Exception(f"Failed to copy {src_file} to {dest_file}: {status.message}")
             if remove:
                 os.remove(src_file)
-                if not status.ok:
-                    raise Exception(f"Failed to remove {src_file}: {status.message}")
             else:
                 continue
 

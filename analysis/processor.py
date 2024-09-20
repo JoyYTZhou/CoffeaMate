@@ -36,7 +36,6 @@ class Processor:
         self.evtsel_kwargs = kwargs
         self.evtselclass = evtselclass
         self.transfer = transferP
-        print(f"Transferring to {self.transfer}")
         self.filehelper = FileSysHelper()
         self.initdir()
 
@@ -62,7 +61,6 @@ class Processor:
             events = uproot.dask(**fileargs)
         else:
             events = uproot.open(fileargs['files']).arrays()
-            print("Not delayed!")
 
         return events
 
