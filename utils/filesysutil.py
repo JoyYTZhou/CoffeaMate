@@ -162,12 +162,10 @@ class XRootDHelper:
         - `destpath`: destination path (remote), a directory
         - `filepattern`: pattern to match the file name. Passed into glob.glob(filepattern)
         - `remove`: whether to remove the files from srcpath after transferring"""
-
         if srcpath.startswith('/store/user'):
             raise ValueError("Source path should be a local directory. Why are you transferring from one EOS to another?")
         else:
             files = glob.glob(pjoin(srcpath, filepattern))
-            print(files)
         
         if not(destpath.startswith('/store/user')):
             raise ValueError("Destination path should be a remote directory. Use FileSysHelper for local transfers.")
@@ -175,7 +173,7 @@ class XRootDHelper:
         self.check_path(destpath)
         for file in files:
             src_file = file
-            dest_file = pjoin(destpath, file)
+            dest_file = pjoin(destpath, pbase(file))
             status, _ = self.xrdfs_client.copy(src_file, dest_file, force=overwrite)
             if not status.ok:
                 raise Exception(f"Failed to copy {src_file} to {dest_file}: {status.message}")
@@ -184,7 +182,7 @@ class XRootDHelper:
                 if not status.ok:
                     raise Exception(f"Failed to remove {src_file}: {status.message}")
             else:
-                return
+                continue
 
 def checkx509():
     """Check if the X509 proxy and certificate directory are set."""
