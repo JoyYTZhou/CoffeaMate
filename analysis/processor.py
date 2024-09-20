@@ -36,6 +36,7 @@ class Processor:
         self.evtsel_kwargs = kwargs
         self.evtselclass = evtselclass
         self.transfer = transferP
+        print(f"Transferring to {self.transfer}")
         self.filehelper = FileSysHelper()
         self.initdir()
 

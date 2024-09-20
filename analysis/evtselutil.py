@@ -7,17 +7,18 @@ from src.utils.cutflowutil import weightedSelection
 from src.analysis.objutil import Object
 
 class BaseEventSelections:
-    """Base class for event selections."""
-    def __init__(self, trigcfg, objcfg, mapcfg, sequential=True) -> None:
+    """Base class for event selections.
+    """
+    def __init__(self, trigcfg, objselcfg, mapcfg, sequential=True) -> None:
         """Initialize the event selection object with the given selection configurations.
         
         Parameters
         - `trigcfg`: trigger configuration, {key=triggername, value=bool (whether to apply)}
-        - `objcfg`: object selection configuration, {key=AODPrefix, value={key=abbreviation, value=threshold}}. AODPrefix example: Electron, Muon, Jet
+        - `objselcfg`: object selection configuration, {key=AODPrefix, value={key=abbreviation, value=threshold}}. AODPrefix example: Electron, Muon, Jet
         - `mapcfg`: mapping configuration, {key=AODPrefix, value={key=abbreviation, value=nanoaodname}}
         - `sequential`: whether the selections will be applied sequentially"""
         self._trigcfg = trigcfg
-        self._objselcfg = objcfg
+        self._objselcfg = objselcfg
         self._mapcfg = mapcfg
         self._sequential = sequential
         self.objsel = None
@@ -121,3 +122,6 @@ class BaseEventSelections:
     
     def saveWeights(self, events: ak.Array, weights=['Generator_weight', 'LHEReweightingWeight']) -> None:
         self.objcollect.update({weight: events[weight] for weight in weights})
+    
+    def getObj(self, name, events, **kwargs) -> Object:
+        return Object(events, name, self.objselcfg[name], self.mapcfg[name], **kwargs)
