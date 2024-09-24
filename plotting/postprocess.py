@@ -121,7 +121,7 @@ class PostProcessor():
         self.__iterate_meta(process_cf)
 
     # not usable for now
-    @staticmethod
+    # @staticmethod
     # def check_cf(groupnames, base_dir) -> None:
     #     """Check the cutflow numbers against the number of events in the root files."""
     #     for group in groupnames:
