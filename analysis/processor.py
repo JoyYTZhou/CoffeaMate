@@ -61,7 +61,6 @@ class Processor:
             events = uproot.dask(**fileargs)
         else:
             events = uproot.open(fileargs['files']).arrays()
-
         return events
 
     def runfiles(self, write_npz=False):

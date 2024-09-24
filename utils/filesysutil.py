@@ -78,6 +78,37 @@ class FileSysHelper:
                     if createdir: path.mkdir(parents=True, exist_ok=True)
                 return False
             return True
+    
+    @staticmethod
+    def remove_files(dirname, pattern='*', prefix=PREFIX) -> None:
+        """Delete all files in a directory with a specific pattern.
+        
+        Parameters
+        - `dirname`: directory path (remote/local)
+        - `pattern`: pattern to match the file name. Wildcards allowed
+        """
+        if dirname.startswith('/store/user'):
+            xrdhelper = XRootDHelper(prefix)
+            xrdhelper.remove_files(dirname, pattern)
+        else:
+            files = glob.glob(pjoin(dirname, pattern))
+            for file in files:
+                os.remove(file)
+        
+    def remove_filelist(filelist, prefix=PREFIX) -> None:
+        """Delete a list of files.
+        
+        Parameters
+        - `filelist`: list of files to delete
+        """
+        if filelist[0].startswith('/store/user'):
+            xrdhelper = XRootDHelper(prefix)
+            status, _ = xrdhelper.xrdfs_client.rm(file)
+            if not status.ok:
+                raise Exception(f"Failed to remove {file}: {status.message}")
+        else:
+            for file in filelist:
+                os.remove(file)
 
     @staticmethod
     def transfer_files(srcpath, destpath, filepattern='*', remove=False, overwrite=False, **kwargs) -> None:

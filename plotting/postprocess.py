@@ -3,31 +3,8 @@ import awkward as ak
 import pandas as pd
 
 from src.analysis.objutil import Object
-from src.utils.filesysutil import FileSysHelper
+from src.utils.filesysutil import FileSysHelper, pjoin, pbase
 from src.utils.cutflowutil import combine_cf, calc_eff, load_csvs
-
-lumi = cleancfg.LUMI * 1000
-resolve = cleancfg.get("RESOLVE", False)
-
-condorpath = cleancfg.get("CONDORPATH", f'{indir}_hadded')
-
-def iterprocess(endpattern):
-    """Decorator function that iterates over all processes in the cleancfg.DATASETS, and
-    transfers all necessary files to condorpath."""
-    def inner(func):
-        def wrapper(*args, **kwargs):
-            for process in cleancfg.DATASETS:
-                dtdir = pjoin(indir, process)
-                checkpath(dtdir, createdir=False, raiseError=True)
-                outdir = pjoin(localout, process)
-                checkpath(outdir, createdir=True, raiseError=False)
-                print(f"Processing {process} files ..................................................")
-                condorpath = cleancfg.CONDORPATH if cleancfg.get("CONDORPATH", False) else pjoin(f'{indir}_hadded', process)
-                startpattern = func(process, dtdir, outdir, *args, **kwargs)
-                transferfiles(outdir, condorpath, filepattern=f'*{endpattern}')
-                delfiles(outdir, pattern=f'{startpattern}*{endpattern}')
-        return wrapper
-    return inner
 
 class PostProcessor():
     """Class for loading and hadding data from skims/predefined selections produced directly by Processor.
@@ -36,22 +13,27 @@ class PostProcessor():
     - `cfg`: the configuration file for post processing of datasets
     - `inputdir`: the directory where the input files are stored
     - `meta_dict`: the metadata dictionary for all datasets. {Groupname: {Datasetname: {metadata}}}"""
-    def __init__(self, cleancfg) -> None:
+    def __init__(self, ppcfg, groups=None) -> None:
         """Parameters
-        - `cleancfg`: the configuration file for post processing of datasets"""
-        self.cfg = cleancfg
-        self.inputdir = cleancfg.INPUTDIR
-        self.tempdir = cleancfg.LOCALOUTPUT
-        self.transferP = cleancfg.get("CONDORPATH", f'{self.inputdir}_hadded')
-        checkpath(self.inputdir, createdir=False, raiseError=True)
+        - `ppcfg`: the configuration file for post processing of datasets"""
+        self.cfg = ppcfg
+        self.lumi = ppcfg.LUMI * 1000
+        self.inputdir = ppcfg.INPUTDIR
+        self.tempdir = ppcfg.LOCALOUTPUT
+        self.transferP = ppcfg.get("TRANSFERPATH", None)
+
+        FileSysHelper.checkpath(self.inputdir, createdir=False, raiseError=True)
+        FileSysHelper.checkpath(self.tempdir, createdir=True, raiseError=False)
         
-        with open(pjoin(cleancfg.DATAPATH, 'availableQuery.json'), 'r') as f:
+        with open(ppcfg.METADATA, 'r') as f:
             self.meta_dict = json.load(f)
+
+        self.groups = groups if not None else self.meta_dict.keys()
 
     def __call__(self, output_type=None, outputdir=None):
         """Hadd the root/csv files of the datasets and save to the output directory."""
         if output_type is None:
-            output_type = self.cfg.get("OUTPUTTYPE", 'root')
+            output_type = self.cfg.get("OUTTYPE", 'root')
         if outputdir is None:
             outputdir = self.tempdir
 
@@ -64,24 +46,45 @@ class PostProcessor():
     
     @staticmethod
     def check_roots(inputdir):
-        pass
+        helper = FileSysHelper()
+        possible_corrupted = []
+        for root_file in helper.glob_files(inputdir, '*.root'):
+            try: 
+                with uproot.open(root_file) as f:
+                    f.keys()
+            except Exception as e:
+                print(f"Error reading file {root_file}: {e}")
+                possible_corrupted.append(root_file)
+        with open(f'{pbase(inputdir)}_corrupted_files.txt', 'w') as f:
+            f.write('\n'.join(possible_corrupted))
+    
+    @staticmethod
+    def delete_corrupted(filelist_path):
+        with open(filelist_path, 'r') as f:
+            filelist = f.read().splitlines()
+        FileSysHelper.remove_filelist(filelist)
 
     def __iterate_meta(self, callback):
-        """Iterate over all datasets in the metadata dictionary and apply the callback function."""
-        for group, datasets in self.meta_dict.items():
+        """Iterate over datasets and apply the callback function.
+        
+        Parameters
+        - `callback`: the function to apply to each dataset. Expects output in the temp directory."""
+        for group in self.groups:
+            datasets = self.meta_dict[group]
+            transferP = f"{self.transferP}/{group}" if self.transferP else None
             for _, dsitems in datasets.items():
                 dsname = dsitems['shortname']
                 dtdir = pjoin(self.inputdir, group)
                 outdir = pjoin(self.tempdir, group)
-                if not checkpath(dtdir, createdir=False): continue
+                if not FileSysHelper.checkpath(dtdir, createdir=False): continue
                 callback(dsname, dtdir, outdir)
-                transferfiles(outdir, condorpath, filepattern=f'*{endpattern}')
-                delfiles(outdir, pattern=f'{startpattern}*{endpattern}')
+                if transferP is not None:
+                    FileSysHelper.transfer_files(outdir, transferP, remove=True)
     
     def hadd_roots(self) -> str:
         """Hadd root files of datasets into appropriate size based on settings"""
         def process_ds(dsname, dtdir, outdir):
-            root_files = glob_files(dtdir, f'{dsname}*.root', add_prefix=True)
+            root_files = FileSysHelper.glob_files(dtdir, f'{dsname}*.root', add_prefix=True)
             batch_size = self.cfg.get("BATCHSIZE", 200)
             for i in range(0, len(root_files), batch_size):
                 batch_files = root_files[i:i+batch_size]
@@ -94,52 +97,42 @@ class PostProcessor():
         
         self.__iterate_meta(process_ds)
 
-    @staticmethod
-    @iterprocess('.csv')
-    def hadd_csvouts(process, dtdir, outdir, meta) -> None:
-        concat = lambda dfs: pd.concat(dfs, axis=0)
-        for _, dsitems in meta[process].keys():
+    def hadd_csvouts(self) -> None:
+        def process_csv(dsname, dtdir, outdir):
+            concat = lambda dfs: pd.concat(dfs, axis=0)
             try:
-                dsname = dsitems['shortname']
                 df = load_csvs(dtdir, f'{dsname}_output', func=concat)
                 df.to_csv(pjoin(outdir, f"{dsname}_out.csv"))
             except Exception as e:
                 print(f"Error loading csv files for {dsname}: {e}")
-        return ''
         
-    @staticmethod
-    @iterprocess('.csv')
-    def hadd_cfs(process, dtdir, outdir, meta) -> str:
-        """Hadd cutflow table output from processor, saved to LOCALOUTPUT. 
-        Transfer to prenamed condorpath if needed.
+        self.__iterate_meta(process_csv)
         
-        Parameters
-        - `process`: Process
-        - `meta`: metadata for the process"""
-        dflist = []
-        for _, dsitems in meta[process].items():
-            dsname = dsitems['shortname']
+    def hadd_cfs(self):
+        """Hadd cutflow table output from processor"""
+        def process_cf(dsname, dtdir, outdir):
             print(f"Dealing with {dsname} now ...............................")
             try:
                 df = combine_cf(inputdir=dtdir, dsname=dsname, output=False)
-                dflist.append(df)
             except Exception as e:
                 print(f"Error combining cutflow tables for {dsname}: {e}")
-        pd.concat(dflist, axis=1).to_csv(pjoin(outdir, f"{process}_cf.csv"))
-        return f'{process}_cf'
-    
+            df.to_csv(pjoin(outdir, f"{dsname}_cf.csv"))
+        
+        self.__iterate_meta(process_cf)
+
+    # not usable for now
     @staticmethod
-    def check_cf() -> None:
-        """Check the cutflow numbers against the number of events in the root files."""
-        for process in cleancfg.DATASETS:
-            condorpath = pjoin(cleancfg.CONDORPATH, process) if cleancfg.get("CONDORPATH", False) else pjoin(f'{indir}_hadded', process)
-            cf = PostProcessor.load_cf(process, condorpath)[0]
-            if check_last_no(cf, f"{process}_raw", glob_files(condorpath, f'{process}*.root')):
-                print(f"Cutflow check for {process} passed!")
-            else:
-                print(f"Discrepancies between cutflow numbers and output number exist for {process}. Please double check selections.")
+    # def check_cf(groupnames, base_dir) -> None:
+    #     """Check the cutflow numbers against the number of events in the root files."""
+    #     for group in groupnames:
+    #         query_dir = pjoin(base_dir, group)
+    #         cf = PostProcessor.load_cf(group, base_dir)[0]
+    #         if check_last_no(cf, f"{process}_raw", glob_files(condorpath, f'{process}*.root')):
+    #             print(f"Cutflow check for {process} passed!")
+    #         else:
+    #             print(f"Discrepancies between cutflow numbers and output number exist for {process}. Please double check selections.")
                 
-    def merge_cf(self, inputdir=condorpath, outputdir=localout) -> pd.DataFrame:
+    def merge_cf(self, inputdir=None, outputdir=None) -> pd.DataFrame:
         """Merge all cutflow tables for all processes into one. Save to LOCALOUTPUT.
         Output formatted cutflow table as well.
         
@@ -148,11 +141,15 @@ class PostProcessor():
         
         Return 
         - dataframe of weighted cutflows for every dataset merged"""
-        checkpath(outputdir, createdir=True)
-        checkpath(inputdir, createdir=False, raiseError=True)
+        if inputdir is None: inputdir = self.inputdir
+        else: FileSysHelper.checkpath(inputdir, createdir=False, raiseError=True)
+        
+        if outputdir is None: outputdir = self.tempdir
+        else: FileSysHelper.checkpath(outputdir, createdir=True)
+
         resolved_list = []
-        for process in cleancfg.DATASETS:
-            resolved, _ = PostProcessor.load_cf(process, self.meta_dict, inputdir) 
+        for group in self.groups:
+            resolved, _ = PostProcessor.load_cf(group, self.meta_dict, inputdir) 
             resolved_list.append(resolved)
         resolved_all = pd.concat(resolved_list, axis=1)
         resolved_all.to_csv(pjoin(outputdir, "allDatasetCutflow.csv"))
@@ -165,11 +162,11 @@ class PostProcessor():
         return wgt_resolved
     
     @staticmethod
-    def present_yield(wgt_resolved, signals, regroup_dict=None, outputdir=localout) -> pd.DataFrame:
+    def present_yield(wgt_resolved, signals, outputdir, regroup_dict=None) -> pd.DataFrame:
         """Present the yield dataframe with grouped datasets. Regroup if necessary.
         
         Parameters
-        - `signals`: list of signal process names
+        - `signals`: list of signal group names
         - `regroup_dict`: dictionary of regrouping keywords. Passed into `PostProcessor.categorize`.
         """
         if regroup_dict is not None:
@@ -182,11 +179,11 @@ class PostProcessor():
     
     @staticmethod
     def process_yield(yield_df, signals) -> pd.DataFrame:
-        """Process the yield dataframe to include signal and background efficiencies.
+        """group the yield dataframe to include signal and background efficiencies.
 
         Parameters
         - `yield_df`: dataframe of yields
-        - `signals`: list of signal process names
+        - `signals`: list of signal group names
         
         Return
         - processed yield dataframe"""
@@ -220,41 +217,41 @@ class PostProcessor():
         return df
     
     @staticmethod
-    def calc_wgt(datasrcpath, meta_dict) -> dict:
+    def calc_wgt(datasrcpath, meta_dict, dict_outpath) -> dict:
         """Calculate the weight per event for each dataset and save to a json file with provided metadata.
         
         Parameters
         - `datasrcpath`: path to the output directory (base level)
         - `meta_dict`: metadata dictionary for all datasets. {group: {dataset: {metadata}}}"""
-        for group, datasets in meta_dict.items():
-            resolved_df = pd.read_csv(glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0) 
-            for ds, dsitems in meta_dict[process].items():
+        for group, _ in meta_dict.items():
+            resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0) 
+            for ds, dsitems in meta_dict[group].items():
                 nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
-                meta_dict[process][ds]['nwgt'] = nwgt
-                meta_dict[process][ds]['per_evt_wgt'] = meta_dict[process][ds]['xsection'] / nwgt
+                meta_dict[group][ds]['nwgt'] = nwgt
+                meta_dict[group][ds]['per_evt_wgt'] = meta_dict[group][ds]['xsection'] / nwgt
         
-        with open(pjoin(cleancfg.DATAPATH, 'availableQuery.json'), 'w') as f:
+        with open(pjoin(dict_outpath), 'w') as f:
             json.dump(meta_dict, f)
         
         return meta_dict
 
     @staticmethod
-    def load_cf(process, meta_dict, datasrcpath) -> tuple[pd.DataFrame]:
-        """Load cutflow tables for one process containing datasets to be grouped tgt and scale it by xsection 
+    def load_cf(group, meta_dict, datasrcpath) -> tuple[pd.DataFrame]:
+        """Load cutflow tables for one group containing datasets to be grouped tgt and scale it by xsection 
 
         Parameters
-        -`process`: the name of the cutflow that will be grepped from datasrcpath
+        -`group`: the name of the cutflow that will be grepped from datasrcpath
         -`datasrcpath`: path to the output directory (base level)
         
         Returns
-        - tuple of resolved (per channel) cutflow dataframe and combined cutflow (per process) dataframe"""
-        resolved_df = pd.read_csv(glob_files(pjoin(datasrcpath, process), f'{process}*cf.csv')[0], index_col=0)
-        for _, dsitems in meta_dict[process].items():
+        - tuple of resolved (per channel) cutflow dataframe and combined cutflow (per group) dataframe"""
+        resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0)
+        for _, dsitems in meta_dict[group].items():
             dsname = dsitems['shortname']
             per_evt_wgt = dsitems['per_evt_wgt']
             sel_cols = resolved_df.filter(like=dsname).filter(like='wgt')
             resolved_df[sel_cols.columns] = sel_cols * per_evt_wgt
-            combined_cf = PostProcessor.sum_kwd(resolved_df, 'wgt', f"{process}_wgt")
+            combined_cf = PostProcessor.sum_kwd(resolved_df, 'wgt', f"{group}_wgt")
         return resolved_df, combined_cf
 
     @staticmethod
@@ -273,22 +270,6 @@ class PostProcessor():
         cfdf = cfdf.drop(columns=same_cols)
         cfdf[name] = sumcol
         return sumcol
-
-    def get_objs(self) -> None:
-        """Writes the selected, concated objects to root files.
-        Get from processes in cleancfg only, regardless of the entries in weight dictionary.
-        Results saved to LOCALOUTPUT/objlimited
-        """
-        outdir = pjoin(localout, 'objlimited')
-        checkpath(outdir)
-        for process in cleancfg.DATASETS:
-            for ds in self.wgt_dict[process].keys():
-                datadir = pjoin(cleancfg.INPUTDIR, process)
-                files = glob_files(datadir,  f'{ds}*.root')
-                destination = pjoin(outdir, f"{ds}_limited.root")
-                with uproot.recreate(destination) as output:
-                    print(f"Writing limited data to file {destination}")
-                    PostProcessor.write_obj(output, files, cleancfg.PLOT_VARS, cleancfg.EXTRA_VARS)
 
     @staticmethod
     def write_obj(writable, filelist, objnames, extra=[]) -> None:
@@ -319,11 +300,11 @@ class PostProcessor():
                 writable['extra'] = {branchname: ak.concatenate(arrlist[branchname]) for branchname in arrlist.keys()}
     
     @staticmethod
-    def process_file(path, process, resolution):
-        """Read and process a file based on resolution."""
+    def process_file(path, group, resolution):
+        """Read and group a file based on resolution."""
         df = pd.read_csv(path, index_col=0)
         if resolution == 0:
-            df = df.sum(axis=1).to_frame(name=process)
+            df = df.sum(axis=1).to_frame(name=group)
         return df
 
 def check_last_no(df, col_name, rootfiles):
@@ -426,31 +407,3 @@ def call_hadd(output_file, input_files):
         print(f"Merged files into {output_file}")
     else:
         print(f"Error merging files: {result.stderr}")    
-
-def concat_roots(directory, startpattern, outdir, fields=None, extra_branches = [], **kwargs):
-    """
-    Load specific branches from ROOT files matching a pattern in a directory, and combine them into a single DataFrame.
-
-    Parameters:
-    - directory: Path to the directory containing ROOT files.
-    - startpattern: Pattern to match the start of the ROOT file name.
-    - fields: List of field names to load from each ROOT file.
-    - outdir: Path to the directory to save the combined DataFrame.
-
-    Returns:
-    - A list of empty files among the searched ROOT files
-    """
-    checkpath(outdir)
-    tree_name=kwargs.pop('tree_name', "Events")
-    root_files = glob_files(directory, f'{startpattern}*.root')
-    random.shuffle(root_files)
-    emptyfiles = []
-    if fields is not None:
-        branch_names = find_branches(root_files[0], fields, tree_name=tree_name, extra=extra_branches)
-    else:
-        branch_names = None
-    combined_evts, empty_list = load_fields(root_files, branch_names, tree_name=tree_name)
-    emptyfiles.extend(empty_list)
-    outfilepath = pjoin(outdir, f'{startpattern}.root')
-    write_root(combined_evts, outfilepath, **kwargs)
-    return emptyfiles
