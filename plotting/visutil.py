@@ -4,11 +4,12 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import json
+from matplotlib.ticker import ScalarFormatter
 
-from ..utils.datautil import arr_handler, iterwgt
-from ..analysis.objutil import Object
-from ..utils.filesysutil import checkpath, glob_files, pjoin
-from ..utils.cutflowutil import load_csvs
+from src.utils.datautil import arr_handler, iterwgt
+from src.analysis.objutil import Object
+from src.utils.filesysutil import FileSysHelper, pjoin
+from src.utils.cutflowutil import load_csvs
 
 colors = list(mpl.colormaps['Set2'].colors)
 
@@ -16,24 +17,24 @@ class CSVPlotter():
     """Plot the histograms and other visualizations from the csv files.
     
     Attributes
-    - `cfg`: the configuration object for plotting
     - `meta_dict`: the metadata dictionary
     - `data_dict`: the dictionary of dataframes"""
-    def __init__(self, outdir, cleancfg):
-        self.cfg = cleancfg
-        with open(pjoin(cleancfg.DATAPATH, 'availableQuery.json'), 'r') as f:
+    def __init__(self, outdir):
+        self.outdir = outdir
+        FileSysHelper.checkpath(self.outdir)
+    
+    def __set_meta(self, metadata_path):
+        with open(metadata_path, 'r') as f:
             self.meta_dict = json.load(f)
         self.data_dict = {}
         self.labels = list(self.meta_dict.keys())
-        self.outdir = outdir
-        checkpath(self.outdir)
     
-    def set_group(self, sig_group, bkg_group):
+    def __set_group(self, sig_group, bkg_group):
         """Set the signal and background groups."""
         self.sig_group = sig_group
         self.bkg_group = bkg_group
     
-    def addextcf(self, cutflow: 'dict', df, ds, wgtname) -> None:
+    def __addextcf(self, cutflow: 'dict', df, ds, wgtname) -> None:
         """Add the cutflow to the dictionary to be udpated to the cutflow table.
         
         Parameters
@@ -41,7 +42,15 @@ class CSVPlotter():
         cutflow[f'{ds}_raw'] = len(df)
         cutflow[f'{ds}_wgt'] = df[wgtname].sum()
     
-    def postprocess_csv(self, datasource, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass') -> pd.DataFrame:
+    def __get_rwgt_fac(self, group, ds, signals, factor):
+        if group in signals: 
+            multiply = factor
+        else:
+            multiply = 1
+        flat_wgt = self.meta_dict[group][ds]['per_evt_wgt'] * multiply
+        return flat_wgt
+    
+    def postprocess_csv(self, datasource, metadata_path, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100) -> pd.DataFrame:
         """Post-process the datasets and save the processed dataframes to csv files.
         
         Parameters
@@ -53,7 +62,8 @@ class CSVPlotter():
         - `grouped`: the concatenated dataframe"""
         list_of_df = []
         new_outdir = f'{datasource}_extrasel'
-        checkpath(new_outdir)
+        FileSysHelper.checkpath(new_outdir)
+        self.__set_meta(metadata_path)
         def add_wgt(dfs, rwfac, ds, group):
             df = dfs[0]
             if df.empty: return None
@@ -62,18 +72,18 @@ class CSVPlotter():
             df['group'] = group 
             if extraprocess: return extraprocess(df)
             else: return df
-        for group in self.meta_dict.keys():
+        for group in self.labels:
             load_dir = pjoin(datasource, group) 
             cf_dict = {}
             cf_df = load_csvs(load_dir, f'{group}_cf')[0]
             for ds in self.meta_dict[group].keys():
-                rwfac = self.rwgt_fac(group, ds) 
+                rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor)
                 dsname = self.meta_dict[group][ds]['shortname']
                 df = load_csvs(load_dir, f'{dsname}_out', func=add_wgt, rwfac=rwfac, ds=dsname, group=group)
-                checkpath(f'{new_outdir}/{group}')
+                FileSysHelper.checkpath(f'{new_outdir}/{group}')
                 if df is not None: 
                     list_of_df.append(df)
-                    self.addextcf(cf_dict, df, dsname, per_evt_wgt)
+                    self.__addextcf(cf_dict, df, dsname, per_evt_wgt)
                 else:
                     cf_dict[f'{dsname}_raw'] = 0
                     cf_dict[f'{dsname}_wgt'] = 0
@@ -85,7 +95,7 @@ class CSVPlotter():
     @iterwgt
     def getdata(self, process, ds, file_type='.root'):
         """Returns the root files for the datasets."""
-        result = glob_files(self._datadir, filepattern=f'{ds}*{file_type}')
+        result = FileSysHelper.glob_files(self._datadir, filepattern=f'{ds}*{file_type}')
         if result: 
             rootfile = result[0]
             if not process in self.data_dict: 
@@ -93,15 +103,6 @@ class CSVPlotter():
             if rootfile: self.data_dict[process][ds] = rootfile
         else:
             raise FileNotFoundError(f"Check if there are any files of specified pattern in {self._datadir}.")
-    
-    def rwgt_fac(self, process, ds):
-        signalname = cleancfg.get("signal", ['ggF'])
-        if process in signalname: 
-            factor = cleancfg.get('factor', 100)
-        else:
-            factor = 1 
-        flat_wgt = self.meta_dict[process][ds]['per_evt_wgt'] * factor 
-        return flat_wgt
    
     def get_hist(self, evts: 'pd.DataFrame', att, options, group: 'dict'=None, **kwargs) -> tuple[list, list, list[int, int], list, list]:
         """Histogram an attribute of the object for the given dataframe for groups of datasets. 
@@ -153,6 +154,7 @@ class CSVPlotter():
         - `list_of_evts`: the list of dataframes to be histogrammed and compared"""
 
         assert len(list_of_evts) == 2, "The number of dataframes must be 2."
+        assert 'weight' in list_of_evts[0].columns, "The weight column must be present in the dataframe."
 
         for att, options in attridict.items():
             pltopts = options['plot'].copy()
@@ -167,7 +169,7 @@ class CSVPlotter():
                 wgt_list.append(evts['weight'])
             ObjectPlotter.plot_var_with_err(ax, ax2, hist_list, wgt_list, bins, labels, bin_range, **pltopts)
 
-            fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'), dpi=300, bbox_inches='tight', pad_inches=0.2)
+            fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'), dpi=400, bbox_inches='tight')
     
     def plot_SvBHist(self, ax, evts, att, attoptions, title, **kwargs) -> list:
         """Plot the signal and background histograms.
@@ -191,7 +193,7 @@ class CSVPlotter():
 
     def plot_fourRegions(self, regionA, regionB, regionC, regionD, attridict, bgroup, sgroup, title='', save_name='', **kwargs):
         """Plot the signal and background histograms for the four regions."""
-        self.set_group(sgroup, bgroup)
+        self.__set_group(sgroup, bgroup)
         for att, options in attridict.items():
             fig, axes = ObjectPlotter.set_style(title, '', n_row=2, n_col=2)
 
@@ -226,6 +228,7 @@ class ObjectPlotter():
         ax.set_ylabel(top_ylabel, fontsize=12)
         ax.tick_params(axis='both', which='major', labelsize=10, length=0, labelbottom=False)
 
+        ax2.yaxis.get_offset_text().set_fontsize(11)  # Adjust the font size as needed
         ax2.set_ylabel(bottom_ylabel, fontsize=11)
         ax2.set_xlabel(x_label, fontsize=12)
         ax2.tick_params(axis='both', which='major', labelsize=10, length=0)
@@ -288,7 +291,9 @@ class ObjectPlotter():
         ratio = np.nan_to_num(hist_list[0] / hist_list[1], nan=0., posinf=0.)
         ratio_err = np.nan_to_num(ratio * np.sqrt((norm_err_list[0]/norm_hist_list[0])**2 + (norm_err_list[1]/norm_hist_list[1])**2), nan=0., posinf=0.)
 
-        ObjectPlotter.plot_var(ax, norm_hist_list, bins, label, xrange, histtype='step', alpha=1.0, yerr=norm_err_list, **kwargs) 
+        ObjectPlotter.plot_var(ax, norm_hist_list, bins, label, xrange, histtype='step', alpha=1.0, **kwargs) 
+
+        np.seterr(divide='ignore', invalid='ignore')
         ax2.errorbar((bins[:-1] + bins[1:])/2, ratio, yerr=ratio_err, markersize=4, fmt='o', color='black')
     
     @staticmethod

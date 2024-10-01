@@ -1,16 +1,67 @@
 from sklearn.model_selection import train_test_split, GridSearchCV
+from src.plotting.visutil import CSVPlotter
+
 import pandas as pd
-import numpy as np
 from hep_ml import reweight 
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.utils.class_weight import compute_class_weight
 from matplotlib import pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from xgboost import XGBClassifier
-from hep_ml.metrics_utils import ks_2samp_weighted
+
+def drop_likes(df: 'pd.DataFrame', drop_kwd: 'list[str]' = []):
+    for kwd in drop_kwd:
+        df = df.drop(columns=df.filter(like=kwd).columns, inplace=False)
+    return df
+
+class Reweighter():
+    def __init__(self, ori_data:'pd.DataFrame', tar_data:'pd.DataFrame', weight_column, results_dir):
+        """
+        Parameters:
+        `ori_data`: pandas DataFrame containing the original data.
+        `tar_data`: pandas DataFrame containing the target data."""
+        self.ori_data = ori_data
+        self.tar_data = tar_data
+        self.weight_column = weight_column
+        self.ori_weight = None
+        self.tar_weight = None
+        self.reweighter = None
+        self.visualizer = CSVPlotter(results_dir)
+    
+    def preprocess_data(self, drop_kwd: 'list[str]' = []):
+        self.ori_data = drop_likes(self.ori_data, drop_kwd)
+        self.tar_data = drop_likes(self.tar_data, drop_kwd)
+            
+        self.ori_weight = self.ori_data[self.weight_column]
+        self.tar_weight = self.tar_data[self.weight_column]
+        
+        self.ori_data.drop(columns=[self.weight_column], inplace=True)
+        self.tar_data.drop(columns=[self.weight_column], inplace=True)
+    
+    def fit_rwgt(self):
+        self.reweighter = reweight.GBReweighter(n_estimators=50, learning_rate=0.1, max_depth=5, min_samples_leaf=200, 
+                                   gb_args={'subsample': 0.4})
+        ori_train, ori_test, wo_train, wo_test = train_test_split(self.ori_data, self.ori_weight, test_size=0.3, random_state=42)
+        tar_train, tar_test, wt_train, wt_test = train_test_split(self.tar_data, self.tar_weight, test_size=0.3, random_state=42)
+
+        self.reweighter.fit(ori_train, tar_train, wo_train, wt_train)
+
+        return ori_test, wo_test, tar_test, wt_test
+    
+    def pred_n_compare(self, ori_test, ori_wgt, tar_test, tar_wgt, attridict, ratio_ylabel, save_name, title=''):
+        new_ori_wgt = self.reweighter.predict_weights(ori_test, ori_wgt)
+        ori = ori_test.copy()
+        ori['weight'] = new_ori_wgt
+        tar_test['weight'] = tar_wgt
+        
+        self.visualizer.plot_shape([ori, tar_test], ['Reweighted', 'Target'], attridict, ratio_ylabel=ratio_ylabel, save_name=f'{save_name}_rwgt', title=title)
+
+        ori['weight'] = ori_wgt
+        tar_test['weight'] = tar_wgt
+        self.visualizer.plot_shape([ori, tar_test], ['Original', 'Target'], attridict, ratio_ylabel=ratio_ylabel, save_name=f'{save_name}_ori', title=title)
+
 
 
 class DataLoader():
@@ -148,9 +199,7 @@ def binaryBDTReweighter(X_train, y_train, X_test):
     grid_search.fit(X_train, y_train)
 
     labels = xgb_clf.predict(X_test)
-
     probabilities = xgb_clf.predict_proba(X_test)
-
 
 
 def XGBweighter(original_train, target_train, original_test, target_test, original_weight, target_weight, draw_cols):
