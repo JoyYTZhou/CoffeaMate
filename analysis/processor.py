@@ -7,7 +7,7 @@ import pandas as pd
 import dask_awkward as dak
 import awkward as ak
 
-from src.utils.filesysutil import FileSysHelper, pjoin
+from src.utils.filesysutil import FileSysHelper, pjoin, checkx509
 from src.analysis.evtselutil import BaseEventSelections
 
 class Processor:
@@ -22,7 +22,6 @@ class Processor:
     - `transfer`: transfer object
     - `filehelper`: file system helper object
     - `outdir`: output directory
-    - `copydir`: copy directory. If COPY_LOCAL is True, this will be used.
     - `evtsel`: event selection object alive"""
     def __init__(self, rt_cfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
         """
@@ -36,6 +35,7 @@ class Processor:
         self.evtsel_kwargs = kwargs
         self.evtselclass = evtselclass
         self.transfer = transferP
+        checkx509()
         self.filehelper = FileSysHelper()
         self.initdir()
 
@@ -48,9 +48,6 @@ class Processor:
         If the copy directory is specified, it will be created and checked.
         The output directory will be checked and created if necessary."""
         self.outdir = pjoin(self.rtcfg.OUTPUTDIR_PATH, self.dataset)
-        if self.rtcfg.COPY_LOCAL: 
-            self.copydir = self.rtcfg.get("COPY_DIR", 'temp')
-            self.filehelper.checkpath(self.copydir)
         self.filehelper.checkpath(self.outdir)
     
     def loadfile_remote(self, fileargs: dict) -> tuple[ak.Array, bool]:

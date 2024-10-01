@@ -153,8 +153,13 @@ class XRootDHelper:
             status, _ = self.xrdfs_client.rm(pjoin(dirname, file))
             if not status.ok:
                 raise Exception(f"Failed to remove {file}: {status.message}")
+    @staticmethod 
+    def call_xrdcp(src_file, dest_file, prefix=PREFIX):
+        status = runcom(f'xrdcp {src_file} {prefix}/{dest_file}', shell=True, capture_output=True)
+        if status.returncode != 0:
+            raise Exception(f"Failed to copy {src_file} to {dest_file}: {status.stderr}")
     
-    def transfer_files(self, srcpath, destpath, filepattern='*', remove=False, overwrite=False) -> None:
+    def transfer_files(self, srcpath, destpath, filepattern='*', remove=False, overwrite=True) -> None:
         """Transfer all files matching filepattern from srcpath to destpath. Will create the destpath if it doesn't exist.
         This is only meant for transferring files from local to xrdfs.
         
@@ -172,16 +177,19 @@ class XRootDHelper:
             raise ValueError("Destination path should be a remote directory. Use FileSysHelper for local transfers.")
 
         self.check_path(destpath)
-        checkx509()
         for file in files:
             src_file = file
             dest_file = pjoin(destpath, pbase(file))
+            status, _ = self.xrdfs_client.stat(dest_file)
+            if status.ok:
+                if overwrite: 
+                    self.xrdfs_client.rm(dest_file)
+                    self.call_xrdcp(src_file, dest_file)
+            else:
+                self.call_xrdcp(src_file, dest_file)
             # at some point needs to try copyprocess 
             # status, _ = self.xrdfs_client.copy(src_file, dest_file, force=True)
             # if not status.ok:
-            status = runcom(f'xrdcp {src_file} {PREFIX}/{dest_file}', shell=True, capture_output=True)
-            if not status.returncode == 0:
-                raise Exception(f"Failed to copy {src_file} to {dest_file}: {status.message}")
             if remove:
                 os.remove(src_file)
             else:
