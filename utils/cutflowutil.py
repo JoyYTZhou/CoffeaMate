@@ -143,7 +143,7 @@ class weightedSelection(PackedSelection):
             names, nevonecut, nevcutflow, wgtevcutflow, masksonecut, maskscutflow, self.delayed_mode
         )
 
-def load_csvs(dirname, startpattern, func=None, *args, **kwargs) -> pd.DataFrame:
+def load_csvs(dirname, filepattern, func=None, *args, **kwargs) -> pd.DataFrame:
     """Load csv files matching a pattern into a list of DataFrames. Post process if func is provided.
     
     Parameters
@@ -152,7 +152,7 @@ def load_csvs(dirname, startpattern, func=None, *args, **kwargs) -> pd.DataFrame
     - `func`: function to apply to the list of DataFrames. Must return an Pandas object.
     - `*args`, `**kwargs`: additional arguments to pass to the function
     """
-    file_names = FileSysHelper.glob_files(dirname, filepattern=f'{startpattern}*.csv')
+    file_names = FileSysHelper.glob_files(dirname, filepattern=filepattern)
     dfs = [pd.read_csv(file_name, index_col=0, header=0) for file_name in file_names] 
     if func is None:
         return dfs
@@ -161,16 +161,16 @@ def load_csvs(dirname, startpattern, func=None, *args, **kwargs) -> pd.DataFrame
 
 def combine_cf(inputdir, dsname, keyword='cutflow', output=True, outpath=None):
     """Combines all cutflow tables in a source directory belonging to one datset and output them into output directory.
-    Essentially this will grep files of pattern "{dsname}_{keyword}*.csv" and combine them to one csv file.
+    Essentially this will grep files of pattern "{dsname}*{keyword}*.csv" and combine them to one csv file.
     
     Parameters
     - `inputdir`: source directory
     - `dsname`: dataset name. 
-    - `keyword`: keyword in file names to search for
+    - `keyword`: keyword to search for 
     - `output`: whether to save the combined table into a csv file
     - `outpath`: path to the output
     """
-    concat_df = load_csvs(dirname=inputdir, startpattern=f'{dsname}_cutflow', 
+    concat_df = load_csvs(dirname=inputdir, filepattern=f'{dsname}*{keyword}*.csv', 
                           func=lambda dfs: pd.concat(dfs))
     combined = concat_df.groupby(concat_df.index, sort=False).sum()
     if combined.shape[1] != 1:

@@ -38,7 +38,7 @@ class FileSysHelper:
         return False
 
     @staticmethod
-    def glob_files(dirname, filepattern='*', **kwargs) -> list:
+    def glob_files(dirname, filepattern='*', full_path=True, **kwargs) -> list:
         """Returns a SORTED list of files matching a pattern in a directory. By default will return all files.
         
         Parameters
@@ -51,7 +51,7 @@ class FileSysHelper:
         """
         if dirname.startswith('/store/user'):
             xrdhelper = XRootDHelper(kwargs.get("prefix", PREFIX))
-            files = xrdhelper.glob_files(dirname, filepattern)
+            files = xrdhelper.glob_files(dirname, filepattern, full_path)
         else:
             if filepattern == '*':
                 files = [str(file.absolute()) for file in Path(dirname).iterdir() if file.is_file()]
@@ -140,8 +140,9 @@ class FileSysHelper:
 class XRootDHelper:
     def __init__(self, prefix=PREFIX) -> None:
         self.xrdfs_client = client.FileSystem(prefix)
+        self.prefix = prefix
 
-    def glob_files(self, dirname, filepattern="*", **kwargs) -> list:
+    def glob_files(self, dirname, filepattern="*", full_path=True, **kwargs) -> list:
         """Returns a list of files matching a pattern in a directory. By default will return all files."""
         exist = self.check_path(dirname, createdir=False, raiseError=False)
         if exist == False:
@@ -153,6 +154,8 @@ class XRootDHelper:
             files = [entry.name for entry in listing.dirlist]
         else:
             files = [entry.name for entry in listing.dirlist if match(entry.name, filepattern)]
+        if full_path:
+            files = [f'{self.prefix}/{os.path.join(dirname, f)}' for f in files]
         return files
     
     def check_path(self, dirname, createdir=True, raiseError=False) -> bool:

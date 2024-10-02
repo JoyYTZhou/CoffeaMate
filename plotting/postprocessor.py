@@ -37,10 +37,10 @@ class PostProcessor():
         if outputdir is None:
             outputdir = self.tempdir
 
-        self.hadd_cfs(self.meta_dict)
+        self.hadd_cfs()
         if output_type == 'root': 
-            self.hadd_roots(self.meta_dict)
-            self.meta_dict = PostProcessor.calc_wgt(outputdir, self.meta_dict)
+            self.hadd_roots()
+            self.meta_dict = PostProcessor.calc_wgt(outputdir, self.meta_dict, self.cfg.NEWMETA)
         elif output_type == 'csv': PostProcessor.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
     
@@ -76,6 +76,7 @@ class PostProcessor():
                 dsname = dsitems['shortname']
                 dtdir = pjoin(self.inputdir, group)
                 outdir = pjoin(self.tempdir, group)
+                FileSysHelper.checkpath(outdir, createdir=True)
                 if not FileSysHelper.checkpath(dtdir, createdir=False): continue
                 callback(dsname, dtdir, outdir)
                 if transferP is not None:
@@ -114,9 +115,9 @@ class PostProcessor():
             print(f"Dealing with {dsname} now ...............................")
             try:
                 df = combine_cf(inputdir=dtdir, dsname=dsname, output=False)
+                df.to_csv(pjoin(outdir, f"{dsname}_cf.csv"))
             except Exception as e:
                 print(f"Error combining cutflow tables for {dsname}: {e}")
-            df.to_csv(pjoin(outdir, f"{dsname}_cf.csv"))
         
         self.__iterate_meta(process_cf)
 
