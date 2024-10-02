@@ -100,7 +100,7 @@ class Processor:
         cutflow_df.to_csv(pjoin(self.outdir, cutflow_name))
         print("Cutflow written to local!")
         if self.transfer is not None:
-            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_name, remove=True)
+            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_name, remove=True, overwrite=True)
         return 0
     
     def writeevts(self, passed, suffix, **kwargs) -> int:
