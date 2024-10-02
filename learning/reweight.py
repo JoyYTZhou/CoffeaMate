@@ -2,6 +2,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from src.plotting.visutil import CSVPlotter
 
 import pandas as pd
+import numpy as np
 from hep_ml import reweight 
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from matplotlib import pyplot as plt
@@ -9,12 +10,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+from hep_ml.metrics_utils import ks_2samp_weighted
 from xgboost import XGBClassifier
 
 def drop_likes(df: 'pd.DataFrame', drop_kwd: 'list[str]' = []):
     for kwd in drop_kwd:
         df = df.drop(columns=df.filter(like=kwd).columns, inplace=False)
     return df
+
 
 class Reweighter():
     def __init__(self, ori_data:'pd.DataFrame', tar_data:'pd.DataFrame', weight_column, results_dir):
@@ -31,6 +34,7 @@ class Reweighter():
         self.visualizer = CSVPlotter(results_dir)
     
     def preprocess_data(self, drop_kwd: 'list[str]' = []):
+        """Preprocess the data by dropping columns containing the keywords in `drop_kwd`."""
         self.ori_data = drop_likes(self.ori_data, drop_kwd)
         self.tar_data = drop_likes(self.tar_data, drop_kwd)
             
@@ -40,29 +44,67 @@ class Reweighter():
         self.ori_data.drop(columns=[self.weight_column], inplace=True)
         self.tar_data.drop(columns=[self.weight_column], inplace=True)
     
-    def fit_rwgt(self):
-        self.reweighter = reweight.GBReweighter(n_estimators=50, learning_rate=0.1, max_depth=5, min_samples_leaf=200, 
-                                   gb_args={'subsample': 0.4})
+    def gridSearch(self, param_grid, scoring='roc_auc', cv=5, n_jobs=-1):
+        estimator = reweight.GBReweighter()
+        grid_search = GridSearchCV(estimator, param_grid, scoring=scoring, cv=cv, n_jobs=n_jobs)
+        
+    
+    def fit_rwgt(self, **kwargs) -> 'reweight.GBReweighter':
+        """Fit the reweighter on the original and target data."""
+        self.reweighter = reweight.GBReweighter(**kwargs)
         ori_train, ori_test, wo_train, wo_test = train_test_split(self.ori_data, self.ori_weight, test_size=0.3, random_state=42)
         tar_train, tar_test, wt_train, wt_test = train_test_split(self.tar_data, self.tar_weight, test_size=0.3, random_state=42)
 
         self.reweighter.fit(ori_train, tar_train, wo_train, wt_train)
 
-        return ori_test, wo_test, tar_test, wt_test
+        self.o_train = ori_train
+        self.o_test = ori_test
+        self.wo_train = wo_train
+        self.wo_test = wo_test
+
+        self.t_train = tar_train
+        self.t_test = tar_test
+        self.wt_train = wt_train
+        self.wt_test = wt_test
+
+        return self.reweighter
     
-    def pred_n_compare(self, ori_test, ori_wgt, tar_test, tar_wgt, attridict, ratio_ylabel, save_name, title=''):
-        new_ori_wgt = self.reweighter.predict_weights(ori_test, ori_wgt)
-        ori = ori_test.copy()
+    def add_test_data(self, ori_test, tar_test, ori_wgt, tar_wgt):
+        self.o_test = pd.concat([self.o_test, ori_test], ignore_index=True)
+        self.wo_test = pd.concat([self.wo_test, ori_wgt], ignore_index=True)
+        self.t_test = pd.concat([self.t_test, tar_test], ignore_index=True)
+        self.wt_test = pd.concat([self.wt_test, tar_wgt], ignore_index=True)
+
+    def get_new_weights_train(self):
+        return self.reweighter.predict_weights(self.o_train, self.wo_train)
+    
+    def get_new_weights_test(self):
+        return self.reweighter.predict_weights(self.o_test, self.wo_test)
+    
+    def pred_n_compare(self, attridict, ratio_ylabel, save_name, title=''):
+        new_ori_wgt = self.reweighter.predict_weights(self.o_test, self.wo_test)
+        ori = self.o_test.copy()
         ori['weight'] = new_ori_wgt
-        tar_test['weight'] = tar_wgt
+        self.t_test['weight'] = self.wt_test
         
-        self.visualizer.plot_shape([ori, tar_test], ['Reweighted', 'Target'], attridict, ratio_ylabel=ratio_ylabel, save_name=f'{save_name}_rwgt', title=title)
+        self.visualizer.plot_shape([ori, self.t_test], ['Reweighted', 'Target'], attridict, ratio_ylabel=ratio_ylabel, save_name=f'{save_name}_rwgt', title=title)
 
-        ori['weight'] = ori_wgt
-        tar_test['weight'] = tar_wgt
-        self.visualizer.plot_shape([ori, tar_test], ['Original', 'Target'], attridict, ratio_ylabel=ratio_ylabel, save_name=f'{save_name}_ori', title=title)
-
-
+        ori['weight'] = self.wo_test
+        self.visualizer.plot_shape([ori, self.t_test], ['Original', 'Target'], attridict, ratio_ylabel=ratio_ylabel, save_name=f'{save_name}_ori', title=title)
+    
+    @staticmethod
+    def draw_distributions(original, target, o_wgt, t_wgt, columns):
+        """Draw the distributions of the original and target data. Normalized."""
+        hist_settings = {'bins': 100, 'density': True, 'alpha': 0.7}
+        plt.figure(figsize=[15, 7])
+        for id, column in enumerate(columns, 1):
+            xlim = np.percentile(np.hstack([target[column]]), [0.01, 99.99])
+            plt.subplot(2, 3, id)
+            plt.hist(original[column], weights=o_wgt, range=xlim, **hist_settings)
+            plt.hist(target[column], weights=t_wgt, range=xlim, **hist_settings)
+            plt.title(column)
+            print('KS over ', column, ' = ', ks_2samp_weighted(original[column], target[column], 
+                                            weights1=o_wgt, weights2=t_wgt))
 
 class DataLoader():
     def __init__(self, data:'pd.DataFrame', target_column):
