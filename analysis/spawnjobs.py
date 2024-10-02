@@ -15,7 +15,7 @@ def div_dict(original_dict, chunk_size):
     for _ in range(0, len(original_dict), chunk_size):
         yield dict(islice(it, chunk_size))
 
-def filterExisting(ds: 'str', dsdata: 'dict', tsferP, out_endpattern=".root", prefix=None) -> bool:
+def filterExisting(ds: 'str', dsdata: 'dict', tsferP, out_endpattern=[".root", "cutflow.csv"], prefix=None) -> bool:
     """Update dsdata on files that need to be processed for a MC dataset based on the existing output files and cutflow tables.
     
     Parameters
@@ -28,10 +28,11 @@ def filterExisting(ds: 'str', dsdata: 'dict', tsferP, out_endpattern=".root", pr
     - bool: True if some files need to be processed, False otherwise. 
     """
     helper = FileSysHelper()
-    if not tsferP or helper.checkpath(tsferP, createdir=False) != 0:
+    dir_exist = helper.checkpath(tsferP, createdir=False)
+    if not tsferP or not dir_exist:
         return True
     
-    if isinstance(outputpattern, str):
+    if isinstance(out_endpattern, str):
         outputpattern = [outputpattern]
     
     files_to_remove = [] 
