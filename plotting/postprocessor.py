@@ -37,9 +37,9 @@ class PostProcessor():
         if outputdir is None:
             outputdir = self.tempdir if self.transferP is None else self.transferP
 
-        # self.hadd_cfs()
+        self.hadd_cfs()
         if output_type == 'root': 
-            # self.hadd_roots()
+            self.hadd_roots()
             self.meta_dict = PostProcessor.calc_wgt(outputdir, self.meta_dict, self.cfg.NEWMETA, self.groups)
         elif output_type == 'csv': PostProcessor.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
