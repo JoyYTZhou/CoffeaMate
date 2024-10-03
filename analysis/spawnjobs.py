@@ -120,13 +120,14 @@ class JobLoader():
         self.jobpath = jobpath
         self.helper.checkpath(self.jobpath, createdir=True)
 
-    def writejobs(self) -> None:
+    def writejobs(self, intype='json') -> None:
         """Write job parameters to json file"""
-        datafile = glob.glob(pjoin(self.inpath, '*.json.gz'))
+        if intype == 'json':
+            datafile = glob.glob(pjoin(self.inpath, '*.json.gz'))
         for file in datafile:
-            self.prepjobs(file)
+            self.prepjobs_from_json(file)
         
-    def prepjobs(self, inputdatap, batch_size=15) -> bool:
+    def prepjobs_from_json(self, inputdatap, batch_size=15) -> bool:
         with gzip.open(inputdatap, 'rt') as samplepath:
             grp_name = get_fi_prefix(inputdatap)
             loaded = json.load(samplepath)
