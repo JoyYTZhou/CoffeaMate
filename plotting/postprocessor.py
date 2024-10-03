@@ -35,28 +35,32 @@ class PostProcessor():
         if output_type is None:
             output_type = self.cfg.get("OUTTYPE", 'root')
         if outputdir is None:
-            outputdir = self.tempdir
+            outputdir = self.tempdir if self.transferP is None else self.transferP
 
-        self.hadd_cfs()
+        # self.hadd_cfs()
         if output_type == 'root': 
-            self.hadd_roots()
-            self.meta_dict = PostProcessor.calc_wgt(outputdir, self.meta_dict, self.cfg.NEWMETA)
+            # self.hadd_roots()
+            self.meta_dict = PostProcessor.calc_wgt(outputdir, self.meta_dict, self.cfg.NEWMETA, self.groups)
         elif output_type == 'csv': PostProcessor.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
     
-    @staticmethod
-    def check_roots(inputdir):
+    def check_roots(self):
         helper = FileSysHelper()
-        possible_corrupted = []
-        for root_file in helper.glob_files(inputdir, '*.root'):
-            try: 
-                with uproot.open(root_file) as f:
-                    f.keys()
-            except Exception as e:
-                print(f"Error reading file {root_file}: {e}")
-                possible_corrupted.append(root_file)
-        with open(f'{pbase(inputdir)}_corrupted_files.txt', 'w') as f:
-            f.write('\n'.join(possible_corrupted))
+        for group in self.groups:
+            possible_corrupted = []
+            for root_file in helper.glob_files(pjoin(self.inputdir, group), '*.root'):
+                try: 
+                    with uproot.open(root_file) as f:
+                        f.keys()
+                except Exception as e:
+                    print(f"Error reading file {root_file}: {e}")
+                    possible_corrupted.append(root_file)
+            if possible_corrupted:
+                print(f"There are corrupted files for {group}!")
+                with open(f'{group}_corrupted_files.txt', 'w') as f:
+                    f.write('\n'.join(possible_corrupted))
+            else:
+                print(f"No corrupted files for {group} : > : > : > : >")
     
     @staticmethod
     def delete_corrupted(filelist_path):
@@ -80,7 +84,7 @@ class PostProcessor():
                 if not FileSysHelper.checkpath(dtdir, createdir=False): continue
                 callback(dsname, dtdir, outdir)
                 if transferP is not None:
-                    FileSysHelper.transfer_files(outdir, transferP, remove=True)
+                    FileSysHelper.transfer_files(outdir, transferP, remove=True, overwrite=True)
     
     def hadd_roots(self) -> str:
         """Hadd root files of datasets into appropriate size based on settings"""
@@ -218,13 +222,14 @@ class PostProcessor():
         return df
     
     @staticmethod
-    def calc_wgt(datasrcpath, meta_dict, dict_outpath) -> dict:
+    def calc_wgt(datasrcpath, meta_dict, dict_outpath, groups) -> dict:
         """Calculate the weight per event for each dataset and save to a json file with provided metadata.
         
         Parameters
         - `datasrcpath`: path to the output directory (base level)
         - `meta_dict`: metadata dictionary for all datasets. {group: {dataset: {metadata}}}"""
-        for group, _ in meta_dict.items():
+        for group in groups:
+            print(f"Globbing from {pjoin(datasrcpath, group)}")
             resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0) 
             for ds, dsitems in meta_dict[group].items():
                 nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
