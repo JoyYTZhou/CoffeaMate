@@ -136,6 +136,12 @@ class Object:
         object_lv = self.getfourvec(**kwargs)
         return Object.dRoverlap(vec, object_lv, threshold)
 
+    def OSwSelf(self, threshold, **kwargs):
+        zipped = self.getzipped(**kwargs)
+        leading = zipped[:,0]
+        subleading = zipped[:,1:]
+        return leading['charge']*subleading['charge'] < 0
+        
     def getfourvec(self, **kwargs) -> vec.Array:
         """Get four vector for the object from the currently observed events."""
         return Object.fourvector(self.events, self.name, **kwargs)
