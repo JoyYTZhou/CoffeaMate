@@ -37,21 +37,24 @@ class PostProcessor():
         if outputdir is None:
             outputdir = self.tempdir if self.transferP is None else self.transferP
 
-        # self.hadd_cfs()
+        self.hadd_cfs()
         if output_type == 'root': 
-            # self.hadd_roots()
+            self.hadd_roots()
             self.meta_dict = PostProcessor.calc_wgt(outputdir, self.meta_dict, self.cfg.NEWMETA, self.groups)
         elif output_type == 'csv': PostProcessor.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
     
-    def check_roots(self):
+    def check_roots(self, rq_keys=['Events']):
+        """Check if the root files are corrupted by checking if the required keys are present."""
         helper = FileSysHelper()
         for group in self.groups:
             possible_corrupted = []
             for root_file in helper.glob_files(pjoin(self.inputdir, group), '*.root'):
                 try: 
                     with uproot.open(root_file) as f:
-                        f.keys()
+                        keys = f.keys()
+                        if not all([rq_key in keys for rq_key in rq_keys]):
+                            possible_corrupted.append(root_file)
                 except Exception as e:
                     print(f"Error reading file {root_file}: {e}")
                     possible_corrupted.append(root_file)

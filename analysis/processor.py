@@ -57,7 +57,7 @@ class Processor:
         if self.rtcfg.get("DELAYED_OPEN", True):
             events = uproot.dask(**fileargs)
         else:
-            events = uproot.open(path=fileargs['files'].keys()[0]).arrays()
+            events = uproot.open(fileargs['files'].keys()[0]).arrays()
         return events
 
     def runfiles(self, write_npz=False):
