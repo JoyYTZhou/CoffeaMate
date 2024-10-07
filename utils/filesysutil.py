@@ -231,14 +231,15 @@ class XRootDHelper:
 
 def checkx509():
     """Check if the X509 proxy and certificate directory are set."""
-    proxy_position = os.environ.get("X509_USER_PROXY", default="None")
+    proxy_position = os.environ.get("X509_USER_PROXY", default=None)
     if proxy_position is None:
         raise SystemError("Proxy not found. Immediately check proxy!")
     print(f"Proxy at: {proxy_position}.")
-    proxy_directory = os.environ.get("X509_CERT_DIR", default="None")
+    proxy_directory = os.environ.get("X509_CERT_DIR", default=None)
     if proxy_directory is None:
-        raise SystemError("Certificate directory not set. Immmediately check certificate directory!")
-    print(f"Certificate directory set to be {proxy_directory}.")
+        print(f"Certificate directory not set!")
+    else:
+        print(f"Certificate directory set to be {proxy_directory}.")
 
 def display_top(snapshot, key_type='lineno', limit=10):
     """Display the top lines of a snapshot"""

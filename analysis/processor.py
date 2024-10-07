@@ -57,7 +57,9 @@ class Processor:
         if self.rtcfg.get("DELAYED_OPEN", True):
             events = uproot.dask(**fileargs)
         else:
-            events = uproot.open(path=fileargs['files'].keys()[0]).arrays()
+            print(f"Loading {list(fileargs['files'].keys())[0]}")
+            filename = list(fileargs['files'].keys())[0] 
+            events = uproot.open(filename).arrays(filter_name="*[^n]*")
         return events
 
     def runfiles(self, write_npz=False):
