@@ -5,6 +5,7 @@ import uproot, pickle
 from uproot.writing._dask_write import ak_to_root
 import pandas as pd
 import dask_awkward as dak
+import dask
 import awkward as ak
 import gc
 
@@ -53,7 +54,7 @@ class Processor:
     def loadfile_remote(self, fileargs: dict) -> tuple[ak.Array, bool]:
         """This is a wrapper function around uproot._dask.
         
-        - `fileargs`: {"files": {filename: fileinfo}}"""
+        - `fileargs`: {"files": {filename1: fileinfo1}, ...}"""
         if self.rtcfg.get("DELAYED_OPEN", True):
             events = uproot.dask(**fileargs)
         else:
@@ -62,7 +63,7 @@ class Processor:
             events = uproot.open(filename).arrays()
         return events
 
-    def runfiles(self, write_npz=False):
+    def runfiles(self, write_npz=False, **kwargs):
         """Run test selections on file dictionaries.
 
         Parameters
@@ -82,7 +83,7 @@ class Processor:
                 if events is not None: 
                     events = self.evtsel(events)
                     self.writeCF(suffix, write_npz=write_npz)
-                    self.writeevts(events, suffix)
+                    self.writeevts(events, suffix, **kwargs)
                 else:
                     rc += 1
                 del events
@@ -106,7 +107,7 @@ class Processor:
         return 0
     
     def writeevts(self, passed, suffix, **kwargs) -> int:
-        """Write the events to a file."""
+        """Write the events to a file, filename formated as {dataset}_{suffix}*."""
         if isinstance(passed, dak.lib.core.Array):
             rc = self.writedask(passed, suffix, **kwargs)
         elif isinstance(passed, pd.DataFrame):
@@ -117,12 +118,15 @@ class Processor:
             self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True)
         return rc
 
-    def writedask(self, passed, suffix, fields=None) -> int:
+    def writedask(self, passed, suffix, parquet=False, fields=None) -> int:
         """Wrapper around uproot.dask_write(),
-        transfer all root files generated to a destination location."""
+        transfer all root files generated to a destination location.
+        
+        Parameters:
+        - `parquet`: if True, write to parquet instead of root"""
         rc = 0
         delayed = self.rtcfg.get("DELAYED_WRITE", False)
-        if fields is None:
+        if not parquet:
             if delayed: uproot.dask_write(passed, destination=self.outdir, tree_name="Events", compute=False, prefix=f'{self.dataset}_{suffix}')
             else: 
                 try:
@@ -131,7 +135,7 @@ class Processor:
                     print(f"dask_write encountered error: MemoryError for file index {suffix}.")
                     rc = 1
         else:
-            rc = 1
+            dak.to_parquet(passed, pjoin(self.outdir, f'{self.dataset}_{suffix}.parquet'))
         return rc
     
     def writeak(self, passed: 'ak.Array', suffix, fields=None) -> int:

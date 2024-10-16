@@ -75,13 +75,16 @@ class JobRunner:
             helper = FileSysHelper()
             helper.checkpath(self.transferPBase, createdir=True)
         
-    def submitjobs(self, client) -> int:
+    def submitjobs(self, client, **kwargs) -> int:
         """Run jobs based on client settings.
         If a valid client is found and future mode is true, submit simultaneously run jobs.
         If not, fall back into a loop mode. Note that even in this mode, any dask computations will be managed by client explicitly or implicitly.
+
+        Parameters
+        - `kwargs`: Additional keyword arguments to be passed to the processor.writeevts() method.
         """
         proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass)
-        rc = proc.runfiles()
+        rc = proc.runfiles(**kwargs)
         return 0
     
     def submitfutures(self, client, filelist, indx) -> list:
