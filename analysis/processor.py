@@ -6,6 +6,7 @@ from uproot.writing._dask_write import ak_to_root
 import pandas as pd
 import dask_awkward as dak
 import awkward as ak
+import gc
 
 from src.utils.filesysutil import FileSysHelper, pjoin, checkx509
 from src.analysis.evtselutil import BaseEventSelections
@@ -35,7 +36,6 @@ class Processor:
         self.evtsel_kwargs = kwargs
         self.evtselclass = evtselclass
         self.transfer = transferP
-        checkx509()
         self.filehelper = FileSysHelper()
         self.initdir()
 
@@ -59,7 +59,7 @@ class Processor:
         else:
             print(f"Loading {list(fileargs['files'].keys())[0]}")
             filename = list(fileargs['files'].keys())[0] 
-            events = uproot.open(filename).arrays(filter_name="*[^n]*")
+            events = uproot.open(filename).arrays()
         return events
 
     def runfiles(self, write_npz=False):
@@ -89,6 +89,7 @@ class Processor:
             except Exception as e:
                 print(f"Error encountered for file index {suffix} in {self.dataset}: {e}")
                 rc += 1
+                gc.collect()
         return rc
     
     def writeCF(self, suffix, **kwargs) -> int:
@@ -126,8 +127,8 @@ class Processor:
             else: 
                 try:
                     uproot.dask_write(passed, destination=self.outdir, tree_name="Events", compute=True, prefix=f'{self.dataset}_{suffix}')
-                except Exception as e:
-                    print(f"dask_write encountered error {e} for file index {suffix}.")
+                except MemoryError:
+                    print(f"dask_write encountered error: MemoryError for file index {suffix}.")
                     rc = 1
         else:
             rc = 1
@@ -139,7 +140,6 @@ class Processor:
         if fields is None:
             ak_to_root(pjoin(self.outdir, f'{self.dataset}_{suffix}.root'), passed, treename='Events', 
                        compression="ZLIB", compression_level=1, title="", initial_basket_capacity=50, resize_factor=5)
-
     
     def writedf(self, passed: pd.DataFrame, suffix) -> int:
         """Writes a pandas DataFrame to a csv file.
@@ -152,7 +152,7 @@ class Processor:
         return 0
         
     def writepickle(self, passed, suffix):
-        """Writes results to pkl"""
+        """Writes results to pkl. No constraints on events type."""
         finame = pjoin(self.outdir, f"{self.dataset}_{suffix}.pkl")
         with open(finame, 'wb') as f:
             pickle.dump(passed, f)

@@ -44,7 +44,8 @@ class PostProcessor():
         elif output_type == 'csv': PostProcessor.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
     
-    def check_roots(self):
+    def check_roots(self, rq_keys=['Events']):
+        """Check if the root files are corrupted by checking if the required keys are present."""
         helper = FileSysHelper()
         for group in self.groups:
             possible_corrupted = []
@@ -52,6 +53,8 @@ class PostProcessor():
                 try: 
                     with uproot.open(root_file) as f:
                         f.keys()
+                        if not all(tree in f for tree in rq_keys):
+                            possible_corrupted.append(root_file)
                 except Exception as e:
                     print(f"Error reading file {root_file}: {e}")
                     possible_corrupted.append(root_file)
