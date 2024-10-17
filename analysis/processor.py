@@ -110,6 +110,8 @@ class Processor:
         """Write the events to a file, filename formated as {dataset}_{suffix}*."""
         if isinstance(passed, dak.lib.core.Array):
             rc = self.writedask(passed, suffix, **kwargs)
+        if isinstance(passed, ak.Array):
+            rc = self.writeak(passed, suffix)
         elif isinstance(passed, pd.DataFrame):
             rc = self.writedf(passed, suffix)
         else:
