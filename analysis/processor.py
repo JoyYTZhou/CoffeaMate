@@ -59,7 +59,10 @@ class Processor:
             events = uproot.dask(**fileargs)
         else:
             print(f"Loading {list(fileargs['files'].keys())[0]}")
-            filename = list(fileargs['files'].keys())[0] 
+            filename = list(fileargs['files'].keys())[0]
+            # temporary solution
+            if not filename.endswith(":Events"):
+                filename += ":Events"
             events = uproot.open(filename).arrays()
         return events
 
@@ -144,8 +147,10 @@ class Processor:
         """Writes an awkward array to a root file. Wrapper around ak_to_root."""
         rc = 0
         if fields is None:
-            ak_to_root(pjoin(self.outdir, f'{self.dataset}_{suffix}.root'), passed, treename='Events', 
-                       compression="ZLIB", compression_level=1, title="", initial_basket_capacity=50, resize_factor=5)
+            ak_to_root(pjoin(self.outdir, f'{self.dataset}_{suffix}.root'), passed, tree_name='Events',
+                       counter_name=lambda counted: 'n' + counted, 
+                       field_name=lambda outer, inner: inner if outer == "" else outer + "_" + inner,
+                       storage_options=None, compression="ZLIB", compression_level=1, title="", initial_basket_capacity=50, resize_factor=5)
     
     def writedf(self, passed: pd.DataFrame, suffix) -> int:
         """Writes a pandas DataFrame to a csv file.
