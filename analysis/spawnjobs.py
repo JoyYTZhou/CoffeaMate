@@ -98,7 +98,7 @@ class JobRunner:
         """
         futures = []
         def job(fn, i):
-            proc = Processor(self.rs, filelist, self.grp_name, self.transferPBase) 
+            proc = Processor(filelist, self.grp_name, self.transferPBase) 
             rc = proc.runfile(fn, i)
             return rc
         if indx is None:

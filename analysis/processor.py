@@ -25,13 +25,13 @@ class Processor:
     - `filehelper`: file system helper object
     - `outdir`: output directory
     - `evtsel`: event selection object alive"""
-    def __init__(self, rt_cfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
         """
         Parameters
         - `ds_dict`: Example dictionary should look like this,
         {"files": {"file1.root": {"steps": [...], "uuid": ...}}, "metadata": {"shortname": ...}}
         """
-        self._rtcfg = rt_cfg
+        self.rtcfg = rtcfg
         self.dsdict = dsdict
         self.dataset = dsdict['metadata']['shortname']
         self.evtsel_kwargs = kwargs
@@ -39,10 +39,6 @@ class Processor:
         self.transfer = transferP
         self.filehelper = FileSysHelper()
         self.initdir()
-
-    @property
-    def rtcfg(self):
-        return self._rtcfg
     
     def initdir(self) -> None:
         """Initialize the output directory and copy directory if necessary.
@@ -51,7 +47,7 @@ class Processor:
         self.outdir = pjoin(self.rtcfg.OUTPUTDIR_PATH, self.dataset)
         self.filehelper.checkpath(self.outdir)
     
-    def loadfile_remote(self, fileargs: dict) -> tuple[ak.Array, bool]:
+    def loadfile_remote(self, fileargs: dict) -> ak.Array:
         """This is a wrapper function around uproot._dask.
         
         - `fileargs`: {"files": {filename1: fileinfo1}, ...}"""
@@ -59,10 +55,11 @@ class Processor:
             events = uproot.dask(**fileargs)
         else:
             print(f"Loading {list(fileargs['files'].keys())[0]}")
-            filename = list(fileargs['files'].keys())[0] 
+            filename = list(fileargs['files'].keys())[0]
+            # temporary solution
             if not filename.endswith(":Events"):
                 filename += ":Events"
-            events = uproot.open(filename).arrays()
+            events = uproot.open(filename).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
         return events
 
     def runfiles(self, write_npz=False, **kwargs):
@@ -74,7 +71,7 @@ class Processor:
         Returns
         - number of failed files
         """
-        print(f"Expected to see {len(self.dsdict)} number of outputs")
+        print(f"Expected to see {len(self.dsdict)} outputs")
         rc = 0
         for filename, fileinfo in self.dsdict["files"].items():
             print(filename)
@@ -146,7 +143,7 @@ class Processor:
         """Writes an awkward array to a root file. Wrapper around ak_to_root."""
         rc = 0
         if fields is None:
-            ak_to_root(pjoin(self.outdir, f'{self.dataset}_{suffix}.root'), passed, treename='Events',
+            ak_to_root(pjoin(self.outdir, f'{self.dataset}_{suffix}.root'), passed, tree_name='Events',
                        counter_name=lambda counted: 'n' + counted, 
                        field_name=lambda outer, inner: inner if outer == "" else outer + "_" + inner,
                        storage_options=None, compression="ZLIB", compression_level=1, title="", initial_basket_capacity=50, resize_factor=5)
