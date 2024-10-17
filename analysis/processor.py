@@ -110,6 +110,8 @@ class Processor:
         """Write the events to a file, filename formated as {dataset}_{suffix}*."""
         if isinstance(passed, dak.lib.core.Array):
             rc = self.writedask(passed, suffix, **kwargs)
+        if isinstance(passed, ak.Array):
+            rc = self.writeak(passed, suffix)
         elif isinstance(passed, pd.DataFrame):
             rc = self.writedf(passed, suffix)
         else:
@@ -135,7 +137,7 @@ class Processor:
                     print(f"dask_write encountered error: MemoryError for file index {suffix}.")
                     rc = 1
         else:
-            dak.to_parquet(passed, pjoin(self.outdir, f'{self.dataset}_{suffix}.parquet'))
+            dak.to_parquet(passed, destination=self.outdir, prefix=f'{self.dataset}_{suffix}')
         return rc
     
     def writeak(self, passed: 'ak.Array', suffix, fields=None) -> int:
