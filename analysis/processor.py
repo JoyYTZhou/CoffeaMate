@@ -72,7 +72,7 @@ class Processor:
         Returns
         - number of failed files
         """
-        print(f"Expected to see {len(self.dsdict)} number of outputs")
+        print(f"Expected to see {len(self.dsdict)} outputs")
         rc = 0
         for filename, fileinfo in self.dsdict["files"].items():
             print(filename)
@@ -135,7 +135,7 @@ class Processor:
                     print(f"dask_write encountered error: MemoryError for file index {suffix}.")
                     rc = 1
         else:
-            dak.to_parquet(passed, pjoin(self.outdir, f'{self.dataset}_{suffix}.parquet'))
+            dak.to_parquet(passed, destination=self.outdir, prefix=f'{self.dataset}_{suffix}')
         return rc
     
     def writeak(self, passed: 'ak.Array', suffix, fields=None) -> int:
