@@ -25,13 +25,13 @@ class Processor:
     - `filehelper`: file system helper object
     - `outdir`: output directory
     - `evtsel`: event selection object alive"""
-    def __init__(self, rt_cfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
         """
         Parameters
         - `ds_dict`: Example dictionary should look like this,
         {"files": {"file1.root": {"steps": [...], "uuid": ...}}, "metadata": {"shortname": ...}}
         """
-        self._rtcfg = rt_cfg
+        self.rtcfg = rtcfg
         self.dsdict = dsdict
         self.dataset = dsdict['metadata']['shortname']
         self.evtsel_kwargs = kwargs
@@ -39,10 +39,6 @@ class Processor:
         self.transfer = transferP
         self.filehelper = FileSysHelper()
         self.initdir()
-
-    @property
-    def rtcfg(self):
-        return self._rtcfg
     
     def initdir(self) -> None:
         """Initialize the output directory and copy directory if necessary.
@@ -51,7 +47,7 @@ class Processor:
         self.outdir = pjoin(self.rtcfg.OUTPUTDIR_PATH, self.dataset)
         self.filehelper.checkpath(self.outdir)
     
-    def loadfile_remote(self, fileargs: dict) -> tuple[ak.Array, bool]:
+    def loadfile_remote(self, fileargs: dict) -> ak.Array:
         """This is a wrapper function around uproot._dask.
         
         - `fileargs`: {"files": {filename1: fileinfo1}, ...}"""
@@ -63,7 +59,7 @@ class Processor:
             # temporary solution
             if not filename.endswith(":Events"):
                 filename += ":Events"
-            events = uproot.open(filename).arrays()
+            events = uproot.open(filename).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
         return events
 
     def runfiles(self, write_npz=False, **kwargs):
