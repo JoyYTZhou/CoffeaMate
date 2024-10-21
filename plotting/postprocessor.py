@@ -1,4 +1,4 @@
-import uproot, json, random, subprocess, gzip
+import uproot, json, random, subprocess, re
 import awkward as ak
 import pandas as pd
 
@@ -53,7 +53,7 @@ class PostProcessor():
         helper = FileSysHelper()
         for group in self.groups:
             possible_corrupted = []
-            for root_file in helper.glob_files(pjoin(self.inputdir, group), '*.root'):
+            for root_file in helper.glob_files(pjoin(self.inputdir, group), '*.root', full_path=False):
                 try: 
                     with uproot.open(root_file) as f:
                         f.keys()
@@ -69,11 +69,10 @@ class PostProcessor():
             else:
                 print(f"No corrupted files for {group} : > : > : > : >")
     
-    @staticmethod
-    def delete_corrupted(filelist_path):
-        with open(filelist_path, 'r') as f:
-            filelist = f.read().splitlines()
-        FileSysHelper.remove_filelist(filelist)
+    def clean_roots(self):
+        """Delete the corrupted files in the filelist."""
+        for group in self.groups:
+            self.delete_corrupted(f'{group}_corrupted_files.txt')
 
     def __iterate_meta(self, callback) -> dict:
         """Iterate over datasets in a group over all groups and apply the callback function. Transfer any files in the local output directory to the transfer path (if set). 
@@ -334,6 +333,23 @@ class PostProcessor():
         if resolution == 0:
             df = df.sum(axis=1).to_frame(name=group)
         return df
+
+    @staticmethod
+    def delete_corrupted(filelist_path):
+        """Delete the corrupted files in the filelist."""
+        with open(filelist_path, 'r') as f:
+            filelist = f.read().splitlines()
+
+        filelist = [file.replace('root://cmseos.fnal.gov/', '') for file in filelist]
+        filelist = [re.sub(r'-part\d+\.root', '*.root', file) for file in filelist]
+        filelist = list(set(filelist))
+        csvlist = [file.replace('.root', '.csv') for file in filelist]
+        
+        print(filelist)
+        print(csvlist)
+        
+        # FileSysHelper.remove_filelist(filelist)
+
 
 def check_last_no(df, col_name, rootfiles):
     """Check if the last number in the cutflow table matches the number of events in the root files.
