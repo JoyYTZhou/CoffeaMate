@@ -17,14 +17,14 @@ class CSVPlotter():
     """Plot the histograms and other visualizations from the csv files.
     
     Attributes
-    - `meta_dict`: the metadata dictionary
+    - `meta_dict`: the metadata dictionary, {group: {datasetname: {shortname, per_evt_wgt, ...}}}
     - `data_dict`: the dictionary of dataframes"""
     def __init__(self, outdir):
         self.outdir = outdir
         FileSysHelper.checkpath(self.outdir)
     
     def __set_meta(self, metadata_path):
-        with open(metadata_path, 'r') as f:
+        with open(metadata_path, 'r') as f: 
             self.meta_dict = json.load(f)
         self.data_dict = {}
         self.labels = list(self.meta_dict.keys())
@@ -54,7 +54,7 @@ class CSVPlotter():
         """Post-process the datasets and save the processed dataframes to csv files.
         
         Parameters
-        - `fitype`: the file type to be saved
+        - `datasource`: the directory of the group subdirectories containing different csv output files.
         - `per_evt_wgt`: the weight to be multiplied to the flat weights
         - `extraprocess`: additional processing to be done on the dataframe
         
@@ -75,11 +75,11 @@ class CSVPlotter():
         for group in self.labels:
             load_dir = pjoin(datasource, group) 
             cf_dict = {}
-            cf_df = load_csvs(load_dir, f'{group}_cf')[0]
+            cf_df = load_csvs(load_dir, f'{group}*cf*')[0]
             for ds in self.meta_dict[group].keys():
                 rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor)
                 dsname = self.meta_dict[group][ds]['shortname']
-                df = load_csvs(load_dir, f'{dsname}_out', func=add_wgt, rwfac=rwfac, ds=dsname, group=group)
+                df = load_csvs(load_dir, f'{dsname}*out*', func=add_wgt, rwfac=rwfac, ds=dsname, group=group)
                 FileSysHelper.checkpath(f'{new_outdir}/{group}')
                 if df is not None: 
                     list_of_df.append(df)

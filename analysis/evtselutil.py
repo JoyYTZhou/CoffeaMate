@@ -101,11 +101,12 @@ class BaseEventSelections:
         return df_cf
 
     def objcollect_to_df(self) -> pd.DataFrame:
+        """Return a dataframe for the collected objects."""
         listofdf = [Object.object_to_df(zipped, prefix+'_') for prefix, zipped in self.objcollect.items()]
         return pd.concat(listofdf, axis=1)
     
     def selobjhelper(self, events: ak.Array, name, obj: Object, mask: 'ak.Array') -> tuple[Object, ak.Array]:
-        """Update event level and object level.
+        """Update event level and object level. Apply the reducing mask on the objects already booked as well as the events.
         
         - `mask`: event-shaped array."""
         print(f"Trying to add {name} mask!")
@@ -121,6 +122,7 @@ class BaseEventSelections:
         return obj, events
     
     def saveWeights(self, events: ak.Array, weights=['Generator_weight', 'LHEReweightingWeight']) -> None:
+        """Save weights to the collected objects."""
         self.objcollect.update({weight: events[weight] for weight in weights})
     
     def getObj(self, name, events, **kwargs) -> Object:

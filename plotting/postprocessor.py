@@ -114,6 +114,7 @@ class PostProcessor():
         self.__iterate_meta(process_ds)
 
     def hadd_csvouts(self) -> None:
+        """Hadd csv output files of datasets into one csv file"""
         def process_csv(dsname, dtdir, outdir):
             concat = lambda dfs: pd.concat(dfs, axis=0)
             try:
