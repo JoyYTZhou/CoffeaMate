@@ -131,6 +131,7 @@ class PostProcessor():
             try:
                 df = combine_cf(inputdir=dtdir, dsname=dsname, output=False)
                 df.to_csv(pjoin(outdir, f"{dsname}_cf.csv"))
+                return df
             except Exception as e:
                 print(f"Error combining cutflow tables for {dsname}: {e}")
         
