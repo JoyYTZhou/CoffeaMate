@@ -77,7 +77,7 @@ class PostProcessor():
         """Iterate over datasets and apply the callback function. Transfer any files in the local output directory to the transfer path (if set)
         
         Parameters
-        - `callback`: the function to apply to each dataset. Expects output in the temp directory."""
+        - `callback`: the function to apply to each dataset. Expects output in the temp directory. """
         for group in self.groups:
             datasets = self.meta_dict[group]
             transferP = f"{self.transferP}/{group}" if self.transferP else None
@@ -129,7 +129,7 @@ class PostProcessor():
                 print(f"Error combining cutflow tables for {dsname}: {e}")
         
         self.__iterate_meta(process_cf)
-
+    
     # not usable for now
     # @staticmethod
     # def check_cf(groupnames, base_dir) -> None:
