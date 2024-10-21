@@ -154,6 +154,8 @@ def load_csvs(dirname, filepattern, func=None, *args, **kwargs) -> pd.DataFrame:
     """
     file_names = FileSysHelper.glob_files(dirname, filepattern=filepattern)
     dfs = [pd.read_csv(file_name, index_col=0, header=0) for file_name in file_names] 
+    if not dfs:
+        print(f"No files found with filepattern {filepattern} in {dirname}, please double check if your output files match the input filepattern to glob.")
     if func is None:
         return dfs
     else:

@@ -36,12 +36,14 @@ class PostProcessor():
             output_type = self.cfg.get("OUTTYPE", 'root')
         if outputdir is None:
             outputdir = self.tempdir if self.transferP is None else self.transferP
+        
+        FileSysHelper.checkpath(outputdir)
 
         self.hadd_cfs()
         if output_type == 'root': 
             self.hadd_roots()
             self.meta_dict = PostProcessor.calc_wgt(outputdir, self.meta_dict, self.cfg.NEWMETA, self.groups)
-        elif output_type == 'csv': PostProcessor.hadd_csvouts()
+        elif output_type == 'csv': self.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
     
     def check_roots(self, rq_keys=['Events']):
@@ -109,7 +111,7 @@ class PostProcessor():
         def process_csv(dsname, dtdir, outdir):
             concat = lambda dfs: pd.concat(dfs, axis=0)
             try:
-                df = load_csvs(dtdir, f'{dsname}_output', func=concat)
+                df = load_csvs(dtdir, f'{dsname}*output*csv', func=concat)
                 df.to_csv(pjoin(outdir, f"{dsname}_out.csv"))
             except Exception as e:
                 print(f"Error loading csv files for {dsname}: {e}")
