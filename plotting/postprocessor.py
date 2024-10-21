@@ -45,7 +45,7 @@ class PostProcessor():
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
     
     def check_roots(self, rq_keys=['Events']):
-        """Check if the root files are corrupted by checking if the required keys are present."""
+        """Check if the root files are corrupted by checking if the required keys are present. Save the corrupted files to a text file."""
         helper = FileSysHelper()
         for group in self.groups:
             possible_corrupted = []
@@ -72,7 +72,7 @@ class PostProcessor():
         FileSysHelper.remove_filelist(filelist)
 
     def __iterate_meta(self, callback):
-        """Iterate over datasets and apply the callback function.
+        """Iterate over datasets and apply the callback function. Transfer any files in the local output directory to the transfer path (if set)
         
         Parameters
         - `callback`: the function to apply to each dataset. Expects output in the temp directory."""

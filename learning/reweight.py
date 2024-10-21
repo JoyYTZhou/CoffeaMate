@@ -4,7 +4,7 @@ from src.plotting.visutil import CSVPlotter
 import pandas as pd
 import numpy as np
 from hep_ml import reweight 
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler
 from matplotlib import pyplot as plt
 import torch
 import torch.nn as nn

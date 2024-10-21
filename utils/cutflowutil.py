@@ -160,7 +160,7 @@ def load_csvs(dirname, filepattern, func=None, *args, **kwargs) -> pd.DataFrame:
         return func(dfs, *args, **kwargs)
 
 def combine_cf(inputdir, dsname, keyword='cutflow', output=True, outpath=None):
-    """Combines all cutflow tables in a source directory belonging to one datset and output them into output directory.
+    """Combines(sums) all cutflow tables in a source directory belonging to one datset and output them into output directory.
     Essentially this will grep files of pattern "{dsname}*{keyword}*.csv" and combine them to one csv file.
     
     Parameters
