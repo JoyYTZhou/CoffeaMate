@@ -109,7 +109,7 @@ class JobRunner:
 
 class JobLoader():
     """Load meta job files and prepare for processing by slicing the files into smaller jobs."""
-    def __init__(self, datapath, jobpath, transferPBase) -> None:
+    def __init__(self, datapath, jobpath, transferPBase, out_endpattern) -> None:
         """Initialize the job loader.
         
         Parameters
@@ -122,6 +122,7 @@ class JobLoader():
         self.tsferP = transferPBase
         self.jobpath = jobpath
         self.helper.checkpath(self.jobpath, createdir=True)
+        self.out_endpattern = out_endpattern
 
     def writejobs(self, intype='json.gz') -> None:
         """Write job parameters to json file"""
@@ -129,14 +130,14 @@ class JobLoader():
         for file in datafile:
             self.prepjobs_from_dict(file)
     
-    def prepjobs_from_dict(self, inputdatap, batch_size=15) -> bool:
+    def prepjobs_from_dict(self, inputdatap, batch_size=10, **kwargs) -> bool:
         with gzip.open(inputdatap, 'rt') as samplepath:
             grp_name = get_fi_prefix(inputdatap)
             loaded = json.load(samplepath)
         for ds, dsdata in loaded.items():
             shortname = dsdata['metadata']['shortname']
             print(f"===============Preparing job files for {ds}========================")
-            need_process = filterExisting(shortname, dsdata, tsferP=pjoin(self.tsferP, grp_name))
+            need_process = filterExisting(shortname, dsdata, tsferP=pjoin(self.tsferP, grp_name), out_endpattern=self.out_endpattern)
             if need_process:
                 for j, sliced in enumerate(div_dict(dsdata['files'], batch_size)):
                     baby_job = {'metadata': dsdata['metadata'], 'files': sliced}
