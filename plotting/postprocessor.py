@@ -1,4 +1,4 @@
-import uproot, json, random, subprocess, gzip
+import uproot, json, random, subprocess
 import awkward as ak
 import pandas as pd
 
