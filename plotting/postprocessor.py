@@ -12,7 +12,9 @@ class PostProcessor():
     Attributes
     - `cfg`: the configuration file for post processing of datasets
     - `inputdir`: the directory where the input files are stored
-    - `meta_dict`: the metadata dictionary for all datasets. {Groupname: {Datasetname: {metadata}}}"""
+    - `meta_dict`: the metadata dictionary for all datasets. {Groupname: {Datasetname: {metadata}}}
+    - `groups`: list of group names to process
+    - `lumi`: the luminosity of the dataset, in pb^-1"""
     def __init__(self, ppcfg, groups=None) -> None:
         """Parameters
         - `ppcfg`: the configuration file for post processing of datasets"""
@@ -71,12 +73,15 @@ class PostProcessor():
             filelist = f.read().splitlines()
         FileSysHelper.remove_filelist(filelist)
 
-    def __iterate_meta(self, callback):
-        """Iterate over datasets and apply the callback function. Transfer any files in the local output directory to the transfer path (if set)
+    def __iterate_meta(self, callback) -> dict:
+        """Iterate over datasets in a group over all groups and apply the callback function. Transfer any files in the local output directory to the transfer path (if set). 
+        Collect the returns of the callback function in a dictionary.
         
         Parameters
-        - `callback`: the function to apply to each dataset. Expects output in the temp directory."""
+        - `callback`: the function to apply to each dataset. Expects output in the temp directory. Callback has the signature (dsname, dtdir, outdir)."""
+        results = {}
         for group in self.groups:
+            results[group] = {}
             datasets = self.meta_dict[group]
             transferP = f"{self.transferP}/{group}" if self.transferP else None
             for _, dsitems in datasets.items():
@@ -85,9 +90,10 @@ class PostProcessor():
                 outdir = pjoin(self.tempdir, group)
                 FileSysHelper.checkpath(outdir, createdir=True)
                 if not FileSysHelper.checkpath(dtdir, createdir=False): continue
-                callback(dsname, dtdir, outdir)
+                results[group][dsname] = callback(dsname, dtdir, outdir)
                 if transferP is not None:
                     FileSysHelper.transfer_files(outdir, transferP, remove=True, overwrite=True)
+        return results
     
     def hadd_roots(self) -> str:
         """Hadd root files of datasets into appropriate size based on settings"""
@@ -126,7 +132,13 @@ class PostProcessor():
             except Exception as e:
                 print(f"Error combining cutflow tables for {dsname}: {e}")
         
-        self.__iterate_meta(process_cf)
+        group_dfs = self.__iterate_meta(process_cf)
+        for group, nested in group_dfs.items():
+            total_df = pd.concat(nested.values(), axis=1)
+            total_df.to_csv(pjoin(self.tempdir, f"{group}_cf.csv"))
+            transferP = f"{self.transferP}/{group}" if self.transferP else None
+            if transferP is not None:
+                FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
 
     # not usable for now
     # @staticmethod
@@ -168,6 +180,9 @@ class PostProcessor():
         wgtpEff.filter(like='eff', axis=1).to_csv(pjoin(outputdir, "ResolvedEffOnly.csv"))
 
         return wgt_resolved
+    
+    def get_yield(self):
+        pass
     
     @staticmethod
     def present_yield(wgt_resolved, signals, outputdir, regroup_dict=None) -> pd.DataFrame:
