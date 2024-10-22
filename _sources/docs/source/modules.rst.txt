@@ -1,0 +1,7 @@
+CoffeaMate
+==========
+
+.. toctree::
+   :maxdepth: 4
+
+   CoffeaMate
