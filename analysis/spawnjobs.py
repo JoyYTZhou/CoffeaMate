@@ -110,14 +110,16 @@ class JobRunner:
 class JobLoader():
     """Load meta job files and prepare for processing by slicing the files into smaller jobs. 
     Job files are created in the jobpath, which can be passed into main.py."""
-    def __init__(self, datapath, jobpath, transferPBase, out_endpattern) -> None:
+    def __init__(self, datapath, groupname, jobpath, transferPBase, out_endpattern) -> None:
         """Initialize the job loader.
         
         Parameters
-        - `datapath`: Path to the data file in json.gz format
+        - `datapath`: directory path from which the json.zp files containing dataset information will be grepped.
+        - `groupname`: Name of the group of datasets
         - `jobpath`: Path to one job file in json format
         - `transferPBase`: Path to which root/cutflow output files of the selections will be ultimately transferred."""
         self.inpath = datapath
+        self.groupname = groupname
         self.helper = FileSysHelper()
         self.helper.checkpath(self.inpath, createdir=False, raiseError=True)
         self.tsferP = transferPBase
@@ -125,9 +127,9 @@ class JobLoader():
         self.helper.checkpath(self.jobpath, createdir=True)
         self.out_endpattern = out_endpattern
 
-    def writejobs(self, intype='json.gz') -> None:
-        """Write job parameters to json file."""
-        datafile = glob.glob(pjoin(self.inpath, f'*{intype}'))
+    def writejobs(self) -> None:
+        """Write job parameters to json file"""
+        datafile = glob.glob(pjoin(self.inpath, f'{self.groupname}*json.gz'))
         for file in datafile:
             self.prepjobs_from_dict(file)
     
