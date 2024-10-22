@@ -3,7 +3,7 @@ import awkward as ak
 import pandas as pd
 
 from src.analysis.objutil import Object
-from src.utils.filesysutil import FileSysHelper, pjoin, pbase
+from src.utils.filesysutil import FileSysHelper, pjoin, pbase, pdir
 from src.utils.cutflowutil import combine_cf, calc_eff, load_csvs
 
 class PostProcessor():
@@ -339,18 +339,15 @@ class PostProcessor():
         """Delete the corrupted files in the filelist."""
         with open(filelist_path, 'r') as f:
             filelist = f.read().splitlines()
-
-        filelist = [file.replace('root://cmseos.fnal.gov/', '') for file in filelist]
-        filelist = [re.sub(r'-part\d+\.root', '*.root', file) for file in filelist]
+        
+        dirname = pdir(filelist[0]).replace('root://cmseos.fnal.gov/', '')
+        
+        filelist = [file.rsplit('/', 1)[-1] for file in filelist]
+        filelist = [re.sub(r'-part\d+\.root', '*', delfile) for delfile in filelist]
         filelist = list(set(filelist))
-        csvlist = [file.replace('.root', '.csv') for file in filelist]
-        
-        print(filelist)
-        print(csvlist)
-        
-        # FileSysHelper.remove_filelist(filelist)
 
-
+        for file in filelist: FileSysHelper.remove_files(dirname, file)
+        
 def check_last_no(df, col_name, rootfiles):
     """Check if the last number in the cutflow table matches the number of events in the root files.
     

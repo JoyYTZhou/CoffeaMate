@@ -4,6 +4,7 @@ from pathlib import Path
 
 runcom = subprocess.run
 pjoin = os.path.join
+pdir = os.path.dirname
 DEBUG_ON = os.environ.get("DEBUG_MODE", default=False)
 PREFIX = "root://cmseos.fnal.gov"
 
@@ -103,9 +104,10 @@ class FileSysHelper:
         """
         if filelist[0].startswith('/store/user'):
             xrdhelper = XRootDHelper(prefix)
-            status, _ = xrdhelper.xrdfs_client.rm(file)
-            if not status.ok:
-                raise Exception(f"Failed to remove {file}: {status.message}")
+            for file in filelist:
+                status, _ = xrdhelper.xrdfs_client.rm(file)
+                if not status.ok:
+                    raise Exception(f"Failed to remove {file}: {status.message}")
         else:
             for file in filelist:
                 os.remove(file)
@@ -182,11 +184,12 @@ class XRootDHelper:
         exist = self.check_path(dirname, createdir=False, raiseError=False)
         if exist == False:
             return
-        files = self.glob_files(dirname, pattern)
+        files = self.glob_files(dirname, pattern, full_path=False)
         for file in files:
             status, _ = self.xrdfs_client.rm(pjoin(dirname, file))
             if not status.ok:
                 raise Exception(f"Failed to remove {file}: {status.message}")
+
     @staticmethod 
     def call_xrdcp(src_file, dest_file, prefix=PREFIX):
         status = runcom(f'xrdcp {src_file} {prefix}/{dest_file}', shell=True, capture_output=True)
