@@ -9,11 +9,11 @@ CoffeaMate documentation
 Contents:
 ---------
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
 
 
-   src.analysis.objutil
-   src.learning.rst
-   src.plotting.rst
-   src.utils.rst
+   CoffeaMate.analysis.rst
+   CoffeaMate.learning.rst
+   CoffeaMate.plotting.rst
+   CoffeaMate.utils.rst

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.plotting.visutil &mdash; CoffeaMate 0.0.1 documentation</title>
+  <title>CoffeaMate.plotting.visutil &mdash; CoffeaMate 0.0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
 
@@ -41,9 +41,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.learning.html">src.learning package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.plotting.html">src.plotting package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.utils.html">src.utils package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
 </ul>
 
         </div>
@@ -61,7 +62,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
-      <li class="breadcrumb-item active">src.plotting.visutil</li>
+      <li class="breadcrumb-item active">CoffeaMate.plotting.visutil</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -70,7 +71,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for src.plotting.visutil</h1><div class="highlight"><pre>
+  <h1>Source code for CoffeaMate.plotting.visutil</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">mplhep</span> <span class="k">as</span> <span class="nn">hep</span>
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="kn">import</span> <span class="nn">matplotlib</span> <span class="k">as</span> <span class="nn">mpl</span>
@@ -79,15 +80,15 @@
 <span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">from</span> <span class="nn">matplotlib.ticker</span> <span class="kn">import</span> <span class="n">ScalarFormatter</span>
 
-<span class="kn">from</span> <span class="nn">src.utils.datautil</span> <span class="kn">import</span> <span class="n">arr_handler</span><span class="p">,</span> <span class="n">iterwgt</span>
-<span class="kn">from</span> <span class="nn">src.analysis.objutil</span> <span class="kn">import</span> <span class="n">Object</span>
-<span class="kn">from</span> <span class="nn">src.utils.filesysutil</span> <span class="kn">import</span> <span class="n">FileSysHelper</span><span class="p">,</span> <span class="n">pjoin</span>
-<span class="kn">from</span> <span class="nn">src.utils.cutflowutil</span> <span class="kn">import</span> <span class="n">load_csvs</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.datautil</span> <span class="kn">import</span> <span class="n">arr_handler</span><span class="p">,</span> <span class="n">iterwgt</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.analysis.objutil</span> <span class="kn">import</span> <span class="n">Object</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.filesysutil</span> <span class="kn">import</span> <span class="n">FileSysHelper</span><span class="p">,</span> <span class="n">pjoin</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.cutflowutil</span> <span class="kn">import</span> <span class="n">load_csvs</span>
 
 <span class="n">colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">mpl</span><span class="o">.</span><span class="n">colormaps</span><span class="p">[</span><span class="s1">&#39;Set2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">colors</span><span class="p">)</span>
 
 <div class="viewcode-block" id="CSVPlotter">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.CSVPlotter">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.CSVPlotter">[docs]</a>
 <span class="k">class</span> <span class="nc">CSVPlotter</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Plot the histograms and other visualizations from the csv files.</span>
 <span class="sd">    </span>
@@ -126,7 +127,7 @@
         <span class="k">return</span> <span class="n">flat_wgt</span>
     
 <div class="viewcode-block" id="CSVPlotter.postprocess_csv">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.CSVPlotter.postprocess_csv">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.CSVPlotter.postprocess_csv">[docs]</a>
     <span class="k">def</span> <span class="nf">postprocess_csv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">datasource</span><span class="p">,</span> <span class="n">metadata_path</span><span class="p">,</span> <span class="n">per_evt_wgt</span><span class="o">=</span><span class="s1">&#39;Generator_weight&#39;</span><span class="p">,</span> <span class="n">extraprocess</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">selname</span><span class="o">=</span><span class="s1">&#39;Pass&#39;</span><span class="p">,</span> <span class="n">signals</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;ggF&#39;</span><span class="p">],</span> <span class="n">sig_factor</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Post-process the datasets and save the processed dataframes to csv files.</span>
 <span class="sd">        </span>
@@ -171,7 +172,7 @@
 
 
 <div class="viewcode-block" id="CSVPlotter.getdata">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.CSVPlotter.getdata">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.CSVPlotter.getdata">[docs]</a>
     <span class="nd">@iterwgt</span>
     <span class="k">def</span> <span class="nf">getdata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">process</span><span class="p">,</span> <span class="n">ds</span><span class="p">,</span> <span class="n">file_type</span><span class="o">=</span><span class="s1">&#39;.root&#39;</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the root files for the datasets.&quot;&quot;&quot;</span>
@@ -186,7 +187,7 @@
 
    
 <div class="viewcode-block" id="CSVPlotter.get_hist">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.CSVPlotter.get_hist">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.CSVPlotter.get_hist">[docs]</a>
     <span class="k">def</span> <span class="nf">get_hist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">evts</span><span class="p">:</span> <span class="s1">&#39;pd.DataFrame&#39;</span><span class="p">,</span> <span class="n">att</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="s1">&#39;dict&#39;</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">list</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="nb">list</span><span class="p">,</span> <span class="nb">list</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Histogram an attribute of the object for the given dataframe for groups of datasets. </span>
 <span class="sd">        Return sorted histograms based on the total counts.</span>
@@ -220,7 +221,7 @@
 
     
 <div class="viewcode-block" id="CSVPlotter.get_order">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.CSVPlotter.get_order">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.CSVPlotter.get_order">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">get_order</span><span class="p">(</span><span class="n">hist_list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Order the histograms based on the total counts.&quot;&quot;&quot;</span>
@@ -230,7 +231,7 @@
 
     
 <div class="viewcode-block" id="CSVPlotter.order_list">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.CSVPlotter.order_list">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.CSVPlotter.order_list">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">order_list</span><span class="p">(</span><span class="n">list_of_obj</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Order the list of lists based on the order.&quot;&quot;&quot;</span>
@@ -238,7 +239,7 @@
 
 
 <div class="viewcode-block" id="CSVPlotter.plot_shape">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.CSVPlotter.plot_shape">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.CSVPlotter.plot_shape">[docs]</a>
     <span class="k">def</span> <span class="nf">plot_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">list_of_evts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">],</span> <span class="n">labels</span><span class="p">,</span> <span class="n">attridict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">ratio_ylabel</span><span class="p">,</span> <span class="n">hist_ylabel</span><span class="o">=</span><span class="s1">&#39;Normalized&#39;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">save_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Compare the (normalized) shape of the object attribute for two different dataframes, with ratio panel attached.</span>
 <span class="sd">        </span>
@@ -265,7 +266,7 @@
 
     
 <div class="viewcode-block" id="CSVPlotter.plot_SvBHist">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.CSVPlotter.plot_SvBHist">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.CSVPlotter.plot_SvBHist">[docs]</a>
     <span class="k">def</span> <span class="nf">plot_SvBHist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">evts</span><span class="p">,</span> <span class="n">att</span><span class="p">,</span> <span class="n">attoptions</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Plot the signal and background histograms.</span>
 <span class="sd">        </span>
@@ -288,7 +289,7 @@
 
 
 <div class="viewcode-block" id="CSVPlotter.plot_fourRegions">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.CSVPlotter.plot_fourRegions">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.CSVPlotter.plot_fourRegions">[docs]</a>
     <span class="k">def</span> <span class="nf">plot_fourRegions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regionA</span><span class="p">,</span> <span class="n">regionB</span><span class="p">,</span> <span class="n">regionC</span><span class="p">,</span> <span class="n">regionD</span><span class="p">,</span> <span class="n">attridict</span><span class="p">,</span> <span class="n">bgroup</span><span class="p">,</span> <span class="n">sgroup</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">save_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Plot the signal and background histograms for the four regions.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">__set_group</span><span class="p">(</span><span class="n">sgroup</span><span class="p">,</span> <span class="n">bgroup</span><span class="p">)</span>
@@ -306,13 +307,13 @@
 
         
 <div class="viewcode-block" id="ObjectPlotter">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.ObjectPlotter">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.ObjectPlotter">[docs]</a>
 <span class="k">class</span> <span class="nc">ObjectPlotter</span><span class="p">():</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">pass</span>
     
 <div class="viewcode-block" id="ObjectPlotter.set_style_with_ratio">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.ObjectPlotter.set_style_with_ratio">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.ObjectPlotter.set_style_with_ratio">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">set_style_with_ratio</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">x_label</span><span class="p">,</span> <span class="n">top_ylabel</span><span class="p">,</span> <span class="n">bottom_ylabel</span><span class="p">,</span> <span class="n">set_log</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">lumi</span><span class="o">=</span><span class="mi">220</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the style of the plot to CMS HEP with ratio plot as bottom panel.</span>
@@ -342,7 +343,7 @@
 
 
 <div class="viewcode-block" id="ObjectPlotter.set_style">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.ObjectPlotter.set_style">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.ObjectPlotter.set_style">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">set_style</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">n_row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_col</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lumi</span><span class="o">=</span><span class="mi">220</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the style of the plot to CMS HEP.</span>
@@ -370,7 +371,7 @@
 
 
 <div class="viewcode-block" id="ObjectPlotter.plot_var">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.ObjectPlotter.plot_var">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.ObjectPlotter.plot_var">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">plot_var</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">hist</span><span class="p">,</span> <span class="n">bin_edges</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">xrange</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;A wrapper around the histplot function in mplhep to plot the histograms.</span>
@@ -385,7 +386,7 @@
 
     
 <div class="viewcode-block" id="ObjectPlotter.plot_var_with_err">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.ObjectPlotter.plot_var_with_err">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.ObjectPlotter.plot_var_with_err">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">plot_var_with_err</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">ax2</span><span class="p">,</span> <span class="n">hist_list</span><span class="p">,</span> <span class="n">wgt_list</span><span class="p">,</span> <span class="n">bins</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">xrange</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Plot the histograms with error bars in a second panel.</span>
@@ -411,7 +412,7 @@
 
     
 <div class="viewcode-block" id="ObjectPlotter.plotSigVBkg">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.ObjectPlotter.plotSigVBkg">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.ObjectPlotter.plotSigVBkg">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">plotSigVBkg</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">sig_hists</span><span class="p">,</span> <span class="n">bkg_hists</span><span class="p">,</span> <span class="n">bin_edges</span><span class="p">,</span> <span class="n">sig_label</span><span class="p">,</span> <span class="n">bkg_label</span><span class="p">,</span> <span class="n">xrange</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Plot the signal and background histograms.</span>
@@ -433,7 +434,7 @@
 
         
 <div class="viewcode-block" id="ObjectPlotter.hist_arr">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.ObjectPlotter.hist_arr">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.ObjectPlotter.hist_arr">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">hist_arr</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">bins</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">range</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">keep_overflow</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Wrapper around numpy histogram function to deal with overflow.</span>
@@ -457,7 +458,7 @@
 
             
 <div class="viewcode-block" id="ObjectPlotter.sortobj">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.visutil.ObjectPlotter.sortobj">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.visutil.ObjectPlotter.sortobj">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">sortobj</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">sort_by</span><span class="p">,</span> <span class="n">sort_what</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return an awkward array representation of the sorted attribute in data.</span>

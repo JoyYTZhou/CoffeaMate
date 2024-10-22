@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.utils.dsmethods &mdash; CoffeaMate 0.0.1 documentation</title>
+  <title>CoffeaMate.utils.dsmethods &mdash; CoffeaMate 0.0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
 
@@ -41,9 +41,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.learning.html">src.learning package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.plotting.html">src.plotting package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.utils.html">src.utils package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
 </ul>
 
         </div>
@@ -61,7 +62,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
-      <li class="breadcrumb-item active">src.utils.dsmethods</li>
+      <li class="breadcrumb-item active">CoffeaMate.utils.dsmethods</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -70,7 +71,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for src.utils.dsmethods</h1><div class="highlight"><pre>
+  <h1>Source code for CoffeaMate.utils.dsmethods</h1><div class="highlight"><pre>
 <span></span><span class="c1"># adapted from https://github.com/bu-cms/projectcoffea/blob/master/projectcoffea/helpers/dataset.py</span>
 <span class="c1">###############################################################################</span>
 <span class="c1"># This file contains methods </span>
@@ -83,7 +84,7 @@
 <span class="n">pjoin</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span>
 
 <div class="viewcode-block" id="extract_items">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.extract_items">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.extract_items">[docs]</a>
 <span class="k">def</span> <span class="nf">extract_items</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">start_string</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract items from a dictionary where the keys start with a certain string.</span>
 
@@ -98,7 +99,7 @@
 
 
 <div class="viewcode-block" id="extract_process">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.extract_process">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.extract_process">[docs]</a>
 <span class="k">def</span> <span class="nf">extract_process</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract process name from a filename.</span>
 
@@ -133,7 +134,7 @@
 
 
 <div class="viewcode-block" id="short_name">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.short_name">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.short_name">[docs]</a>
 <span class="k">def</span> <span class="nf">short_name</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Shorten name for NANOAOD datasets for better extractability.</span>
 
@@ -175,7 +176,7 @@
 
 
 <div class="viewcode-block" id="find_files">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.find_files">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.find_files">[docs]</a>
 <span class="k">def</span> <span class="nf">find_files</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">regex</span><span class="p">):</span>
     <span class="n">fileset</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
@@ -192,20 +193,20 @@
 
 
 <div class="viewcode-block" id="eosls">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.eosls">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.eosls">[docs]</a>
 <span class="k">def</span> <span class="nf">eosls</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">([</span><span class="s1">&#39;xrdfs&#39;</span><span class="p">,</span> <span class="s1">&#39;root://cmseos.fnal.gov&#39;</span><span class="p">,</span><span class="s1">&#39;ls&#39;</span><span class="p">,</span><span class="s1">&#39;-l&#39;</span><span class="p">,</span><span class="n">path</span><span class="p">])</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="eosfind">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.eosfind">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.eosfind">[docs]</a>
 <span class="k">def</span> <span class="nf">eosfind</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
     <span class="n">cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;eos&#39;</span><span class="p">,</span> <span class="s1">&#39;root://cmseos.fnal.gov/&#39;</span><span class="p">,</span> <span class="s1">&#39;find&#39;</span><span class="p">,</span>  <span class="s1">&#39;--size&#39;</span><span class="p">,</span> <span class="n">path</span><span class="p">]</span>
     <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="find_files_eos">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.find_files_eos">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.find_files_eos">[docs]</a>
 <span class="k">def</span> <span class="nf">find_files_eos</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">regex</span><span class="p">):</span>
     <span class="n">fileset</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
     <span class="n">lines</span> <span class="o">=</span> <span class="n">eosfind</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;.*/store/&#39;</span><span class="p">,</span><span class="s1">&#39;/store/&#39;</span><span class="p">,</span><span class="n">directory</span><span class="p">))</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
@@ -235,7 +236,7 @@
 
 
 <div class="viewcode-block" id="files_from_eos">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.files_from_eos">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.files_from_eos">[docs]</a>
 <span class="k">def</span> <span class="nf">files_from_eos</span><span class="p">(</span><span class="n">regex</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate file list per dataset from EOS</span>
 
@@ -273,7 +274,7 @@
 
 
 <div class="viewcode-block" id="is_data">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.is_data">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.is_data">[docs]</a>
 <span class="k">def</span> <span class="nf">is_data</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
     <span class="n">tags</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;EGamma&#39;</span><span class="p">,</span><span class="s1">&#39;MET&#39;</span><span class="p">,</span><span class="s1">&#39;SingleElectron&#39;</span><span class="p">,</span><span class="s1">&#39;SingleMuon&#39;</span><span class="p">,</span><span class="s1">&#39;SinglePhoton&#39;</span><span class="p">,</span><span class="s1">&#39;JetHT&#39;</span><span class="p">]</span>
     <span class="k">if</span> <span class="nb">any</span><span class="p">([</span><span class="n">dataset</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">itag</span><span class="p">)</span> <span class="k">for</span> <span class="n">itag</span> <span class="ow">in</span> <span class="n">tags</span> <span class="p">]):</span>
@@ -284,7 +285,7 @@
 
 
 <div class="viewcode-block" id="extract_year">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.extract_year">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.extract_year">[docs]</a>
 <span class="k">def</span> <span class="nf">extract_year</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract the year from a dataset name</span>
 
@@ -300,7 +301,7 @@
 
 
 <div class="viewcode-block" id="rand_dataset_dict">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.dsmethods.rand_dataset_dict">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.dsmethods.rand_dataset_dict">[docs]</a>
 <span class="k">def</span> <span class="nf">rand_dataset_dict</span><span class="p">(</span><span class="n">keys</span><span class="p">,</span> <span class="n">year</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Creates a map of dataset names -&gt; short dataset names for randomized parameter samples</span>

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.plotting.postprocessor &mdash; CoffeaMate 0.0.1 documentation</title>
+  <title>CoffeaMate.plotting.postprocessor &mdash; CoffeaMate 0.0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
 
@@ -41,9 +41,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.learning.html">src.learning package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.plotting.html">src.plotting package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.utils.html">src.utils package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
 </ul>
 
         </div>
@@ -61,7 +62,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
-      <li class="breadcrumb-item active">src.plotting.postprocessor</li>
+      <li class="breadcrumb-item active">CoffeaMate.plotting.postprocessor</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -70,17 +71,17 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for src.plotting.postprocessor</h1><div class="highlight"><pre>
+  <h1>Source code for CoffeaMate.plotting.postprocessor</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">uproot</span><span class="o">,</span> <span class="nn">json</span><span class="o">,</span> <span class="nn">random</span><span class="o">,</span> <span class="nn">subprocess</span><span class="o">,</span> <span class="nn">re</span>
 <span class="kn">import</span> <span class="nn">awkward</span> <span class="k">as</span> <span class="nn">ak</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
 
-<span class="kn">from</span> <span class="nn">src.analysis.objutil</span> <span class="kn">import</span> <span class="n">Object</span>
-<span class="kn">from</span> <span class="nn">src.utils.filesysutil</span> <span class="kn">import</span> <span class="n">FileSysHelper</span><span class="p">,</span> <span class="n">pjoin</span><span class="p">,</span> <span class="n">pbase</span>
-<span class="kn">from</span> <span class="nn">src.utils.cutflowutil</span> <span class="kn">import</span> <span class="n">combine_cf</span><span class="p">,</span> <span class="n">calc_eff</span><span class="p">,</span> <span class="n">load_csvs</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.analysis.objutil</span> <span class="kn">import</span> <span class="n">Object</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.filesysutil</span> <span class="kn">import</span> <span class="n">FileSysHelper</span><span class="p">,</span> <span class="n">pjoin</span><span class="p">,</span> <span class="n">pbase</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.cutflowutil</span> <span class="kn">import</span> <span class="n">combine_cf</span><span class="p">,</span> <span class="n">calc_eff</span><span class="p">,</span> <span class="n">load_csvs</span>
 
 <div class="viewcode-block" id="PostProcessor">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor">[docs]</a>
 <span class="k">class</span> <span class="nc">PostProcessor</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Class for loading and hadding data from skims/predefined selections produced directly by Processor.</span>
 <span class="sd">    </span>
@@ -124,7 +125,7 @@
         <span class="k">else</span><span class="p">:</span> <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Invalid output type. Please choose either &#39;root&#39; or &#39;csv&#39;.&quot;</span><span class="p">)</span>
     
 <div class="viewcode-block" id="PostProcessor.check_roots">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.check_roots">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.check_roots">[docs]</a>
     <span class="k">def</span> <span class="nf">check_roots</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rq_keys</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Events&#39;</span><span class="p">]):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if the root files are corrupted by checking if the required keys are present. Save the corrupted files to a text file.&quot;&quot;&quot;</span>
         <span class="n">helper</span> <span class="o">=</span> <span class="n">FileSysHelper</span><span class="p">()</span>
@@ -148,7 +149,7 @@
 
     
 <div class="viewcode-block" id="PostProcessor.clean_roots">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.clean_roots">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.clean_roots">[docs]</a>
     <span class="k">def</span> <span class="nf">clean_roots</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Delete the corrupted files in the filelist.&quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">groups</span><span class="p">:</span>
@@ -178,7 +179,7 @@
         <span class="k">return</span> <span class="n">results</span>
     
 <div class="viewcode-block" id="PostProcessor.hadd_roots">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.hadd_roots">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.hadd_roots">[docs]</a>
     <span class="k">def</span> <span class="nf">hadd_roots</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Hadd root files of datasets into appropriate size based on settings&quot;&quot;&quot;</span>
         <span class="k">def</span> <span class="nf">process_ds</span><span class="p">(</span><span class="n">dsname</span><span class="p">,</span> <span class="n">dtdir</span><span class="p">,</span> <span class="n">outdir</span><span class="p">):</span>
@@ -197,7 +198,7 @@
 
 
 <div class="viewcode-block" id="PostProcessor.hadd_csvouts">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.hadd_csvouts">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.hadd_csvouts">[docs]</a>
     <span class="k">def</span> <span class="nf">hadd_csvouts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Hadd csv output files of datasets into one csv file&quot;&quot;&quot;</span>
         <span class="k">def</span> <span class="nf">process_csv</span><span class="p">(</span><span class="n">dsname</span><span class="p">,</span> <span class="n">dtdir</span><span class="p">,</span> <span class="n">outdir</span><span class="p">):</span>
@@ -212,7 +213,7 @@
 
         
 <div class="viewcode-block" id="PostProcessor.hadd_cfs">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.hadd_cfs">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.hadd_cfs">[docs]</a>
     <span class="k">def</span> <span class="nf">hadd_cfs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Hadd cutflow table output from processor&quot;&quot;&quot;</span>
         <span class="k">def</span> <span class="nf">process_cf</span><span class="p">(</span><span class="n">dsname</span><span class="p">,</span> <span class="n">dtdir</span><span class="p">,</span> <span class="n">outdir</span><span class="p">):</span>
@@ -246,7 +247,7 @@
     <span class="c1">#             print(f&quot;Discrepancies between cutflow numbers and output number exist for {process}. Please double check selections.&quot;)</span>
                 
 <div class="viewcode-block" id="PostProcessor.merge_cf">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.merge_cf">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.merge_cf">[docs]</a>
     <span class="k">def</span> <span class="nf">merge_cf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputdir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">outputdir</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Merge all cutflow tables for all processes into one. Save to LOCALOUTPUT.</span>
 <span class="sd">        Output formatted cutflow table as well.</span>
@@ -278,13 +279,13 @@
 
     
 <div class="viewcode-block" id="PostProcessor.get_yield">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.get_yield">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.get_yield">[docs]</a>
     <span class="k">def</span> <span class="nf">get_yield</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">pass</span></div>
 
     
 <div class="viewcode-block" id="PostProcessor.present_yield">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.present_yield">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.present_yield">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">present_yield</span><span class="p">(</span><span class="n">wgt_resolved</span><span class="p">,</span> <span class="n">signals</span><span class="p">,</span> <span class="n">outputdir</span><span class="p">,</span> <span class="n">regroup_dict</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Present the yield dataframe with grouped datasets. Regroup if necessary.</span>
@@ -303,7 +304,7 @@
 
     
 <div class="viewcode-block" id="PostProcessor.process_yield">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.process_yield">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.process_yield">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">process_yield</span><span class="p">(</span><span class="n">yield_df</span><span class="p">,</span> <span class="n">signals</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;group the yield dataframe to include signal and background efficiencies.</span>
@@ -332,7 +333,7 @@
 
     
 <div class="viewcode-block" id="PostProcessor.categorize">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.categorize">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.categorize">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">categorize</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">group_kwd</span><span class="p">:</span><span class="s1">&#39;dict&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Recalculate/categorize a table by the group keyword.</span>
@@ -348,7 +349,7 @@
 
     
 <div class="viewcode-block" id="PostProcessor.calc_wgt">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.calc_wgt">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.calc_wgt">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">calc_wgt</span><span class="p">(</span><span class="n">datasrcpath</span><span class="p">,</span> <span class="n">meta_dict</span><span class="p">,</span> <span class="n">dict_outpath</span><span class="p">,</span> <span class="n">groups</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate the weight per event for each dataset and save to a json file with provided metadata.</span>
@@ -371,7 +372,7 @@
 
 
 <div class="viewcode-block" id="PostProcessor.load_cf">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.load_cf">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.load_cf">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">load_cf</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="n">meta_dict</span><span class="p">,</span> <span class="n">datasrcpath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Load cutflow tables for one group containing datasets to be grouped tgt and scale it by xsection </span>
@@ -393,7 +394,7 @@
 
 
 <div class="viewcode-block" id="PostProcessor.sum_kwd">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.sum_kwd">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.sum_kwd">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">sum_kwd</span><span class="p">(</span><span class="n">cfdf</span><span class="p">,</span> <span class="n">keyword</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Add a column to the cutflow table by summing up all columns with the keyword.</span>
@@ -413,7 +414,7 @@
 
 
 <div class="viewcode-block" id="PostProcessor.write_obj">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.write_obj">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.write_obj">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">write_obj</span><span class="p">(</span><span class="n">writable</span><span class="p">,</span> <span class="n">filelist</span><span class="p">,</span> <span class="n">objnames</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="p">[])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Writes the selected, concated objects to root files.</span>
@@ -444,7 +445,7 @@
 
     
 <div class="viewcode-block" id="PostProcessor.process_file">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.process_file">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.process_file">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">process_file</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">group</span><span class="p">,</span> <span class="n">resolution</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Read and group a file based on resolution.&quot;&quot;&quot;</span>
@@ -455,7 +456,7 @@
 
 
 <div class="viewcode-block" id="PostProcessor.delete_corrupted">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.PostProcessor.delete_corrupted">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.PostProcessor.delete_corrupted">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">delete_corrupted</span><span class="p">(</span><span class="n">filelist_path</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Delete the corrupted files in the filelist.&quot;&quot;&quot;</span>
@@ -476,7 +477,7 @@
 
 
 <div class="viewcode-block" id="check_last_no">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.check_last_no">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.check_last_no">[docs]</a>
 <span class="k">def</span> <span class="nf">check_last_no</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">col_name</span><span class="p">,</span> <span class="n">rootfiles</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if the last number in the cutflow table matches the number of events in the root files.</span>
 <span class="sd">    </span>
@@ -501,7 +502,7 @@
 
 
 <div class="viewcode-block" id="find_branches">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.find_branches">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.find_branches">[docs]</a>
 <span class="k">def</span> <span class="nf">find_branches</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">object_list</span><span class="p">,</span> <span class="n">tree_name</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="p">[])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a list of branches for objects in object_list</span>
 
@@ -526,7 +527,7 @@
 
 
 <div class="viewcode-block" id="load_fields">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.load_fields">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.load_fields">[docs]</a>
 <span class="k">def</span> <span class="nf">load_fields</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="n">branch_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tree_name</span><span class="o">=</span><span class="s1">&#39;Events&#39;</span><span class="p">,</span> <span class="n">lib</span><span class="o">=</span><span class="s1">&#39;ak&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="nb">list</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Load specific fields if any. Otherwise load all. If the file is a list, concatenate the data from all files.</span>
 <span class="sd">    </span>
@@ -561,7 +562,7 @@
 
 
 <div class="viewcode-block" id="write_root">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.write_root">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.write_root">[docs]</a>
 <span class="k">def</span> <span class="nf">write_root</span><span class="p">(</span><span class="n">evts</span><span class="p">:</span> <span class="s1">&#39;ak.Array | pd.DataFrame&#39;</span><span class="p">,</span> <span class="n">destination</span><span class="p">,</span> <span class="n">outputtree</span><span class="o">=</span><span class="s2">&quot;Events&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Events&quot;</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Write arrays to root file. Highly inefficient methods in terms of data storage.</span>
 
@@ -577,7 +578,7 @@
 
 
 <div class="viewcode-block" id="call_hadd">
-<a class="viewcode-back" href="../../../src.plotting.html#src.plotting.postprocessor.call_hadd">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.plotting.html#CoffeaMate.plotting.postprocessor.call_hadd">[docs]</a>
 <span class="k">def</span> <span class="nf">call_hadd</span><span class="p">(</span><span class="n">output_file</span><span class="p">,</span> <span class="n">input_files</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Merge ROOT files using hadd.</span>
 <span class="sd">    Parameters</span>

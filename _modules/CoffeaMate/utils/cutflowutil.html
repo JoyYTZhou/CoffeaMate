@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.utils.cutflowutil &mdash; CoffeaMate 0.0.1 documentation</title>
+  <title>CoffeaMate.utils.cutflowutil &mdash; CoffeaMate 0.0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
 
@@ -41,9 +41,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.learning.html">src.learning package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.plotting.html">src.plotting package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.utils.html">src.utils package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
 </ul>
 
         </div>
@@ -61,7 +62,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
-      <li class="breadcrumb-item active">src.utils.cutflowutil</li>
+      <li class="breadcrumb-item active">CoffeaMate.utils.cutflowutil</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -70,7 +71,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for src.utils.cutflowutil</h1><div class="highlight"><pre>
+  <h1>Source code for CoffeaMate.utils.cutflowutil</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">subprocess</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
@@ -80,13 +81,13 @@
 <span class="kn">import</span> <span class="nn">dask_awkward</span><span class="o">,</span> <span class="nn">dask</span>
 <span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">namedtuple</span>
 
-<span class="kn">from</span> <span class="nn">src.utils.filesysutil</span> <span class="kn">import</span> <span class="n">FileSysHelper</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.filesysutil</span> <span class="kn">import</span> <span class="n">FileSysHelper</span>
 
 <span class="n">pjoin</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span>
 <span class="n">runcom</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span>
 
 <div class="viewcode-block" id="weightedCutflow">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.weightedCutflow">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weightedCutflow">[docs]</a>
 <span class="k">class</span> <span class="nc">weightedCutflow</span><span class="p">(</span><span class="n">Cutflow</span><span class="p">):</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">names</span><span class="p">,</span> <span class="n">nevonecut</span><span class="p">,</span> <span class="n">nevcutflow</span><span class="p">,</span> <span class="n">wgtevcutflow</span><span class="p">,</span> <span class="n">masksonecut</span><span class="p">,</span> <span class="n">maskscutflow</span><span class="p">,</span> <span class="n">delayed_mode</span>
@@ -112,7 +113,7 @@
         <span class="k">return</span> <span class="n">weightedCutflow</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="n">nevonecut</span><span class="p">,</span> <span class="n">nevcutflow</span><span class="p">,</span> <span class="n">wgtevcutflow</span><span class="p">,</span> <span class="n">masksonecut</span><span class="p">,</span> <span class="n">maskscutflow</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_delayed_mode</span><span class="p">)</span>
 
 <div class="viewcode-block" id="weightedCutflow.result">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.weightedCutflow.result">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weightedCutflow.result">[docs]</a>
     <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the results of the cutflow as a namedtuple</span>
 
@@ -149,7 +150,7 @@
 
 
 <div class="viewcode-block" id="weightedSelection">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.weightedSelection">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weightedSelection">[docs]</a>
 <span class="k">class</span> <span class="nc">weightedSelection</span><span class="p">(</span><span class="n">PackedSelection</span><span class="p">):</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">perevtwgt</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;uint32&quot;</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;An inherited class that represents a set of selections on a set of events with weights</span>
@@ -160,7 +161,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_perevtwgt</span> <span class="o">=</span> <span class="n">perevtwgt</span>
     
 <div class="viewcode-block" id="weightedSelection.add_sequential">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.weightedSelection.add_sequential">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weightedSelection.add_sequential">[docs]</a>
     <span class="k">def</span> <span class="nf">add_sequential</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">thissel</span><span class="p">,</span> <span class="n">lastsel</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">thissel</span><span class="p">,</span> <span class="n">dask</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">lastsel</span><span class="p">,</span> <span class="n">dask</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -179,7 +180,7 @@
 
     
 <div class="viewcode-block" id="weightedSelection.cutflow">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.weightedSelection.cutflow">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weightedSelection.cutflow">[docs]</a>
     <span class="k">def</span> <span class="nf">cutflow</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">names</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">weightedCutflow</span><span class="p">:</span>
         <span class="k">for</span> <span class="n">cut</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cut</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="n">cut</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_names</span><span class="p">:</span>
@@ -232,7 +233,7 @@
 
 
 <div class="viewcode-block" id="load_csvs">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.load_csvs">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.load_csvs">[docs]</a>
 <span class="k">def</span> <span class="nf">load_csvs</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">filepattern</span><span class="p">,</span> <span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Load csv files matching a pattern into a list of DataFrames. Post process if func is provided.</span>
 <span class="sd">    </span>
@@ -253,7 +254,7 @@
 
 
 <div class="viewcode-block" id="combine_cf">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.combine_cf">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.combine_cf">[docs]</a>
 <span class="k">def</span> <span class="nf">combine_cf</span><span class="p">(</span><span class="n">inputdir</span><span class="p">,</span> <span class="n">dsname</span><span class="p">,</span> <span class="n">keyword</span><span class="o">=</span><span class="s1">&#39;cutflow&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">outpath</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Combines(sums) all cutflow tables in a source directory belonging to one datset and output them into output directory.</span>
 <span class="sd">    Essentially this will grep files of pattern &quot;{dsname}*{keyword}*.csv&quot; and combine them to one csv file.</span>
@@ -277,7 +278,7 @@
 
 
 <div class="viewcode-block" id="add_selcutflow">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.add_selcutflow">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.add_selcutflow">[docs]</a>
 <span class="k">def</span> <span class="nf">add_selcutflow</span><span class="p">(</span><span class="n">cutflowlist</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">outpath</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Add cutflows sequentially.</span>
 <span class="sd">    </span>
@@ -296,7 +297,7 @@
 
 
 <div class="viewcode-block" id="weight_cf">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.weight_cf">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weight_cf">[docs]</a>
 <span class="k">def</span> <span class="nf">weight_cf</span><span class="p">(</span><span class="n">wgt_dict</span><span class="p">,</span> <span class="n">raw_cf</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">outname</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lumi</span><span class="o">=</span><span class="mi">50</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate weighted table based on raw table.</span>
 <span class="sd">    </span>
@@ -315,7 +316,7 @@
 
 
 <div class="viewcode-block" id="calc_eff">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.calc_eff">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.calc_eff">[docs]</a>
 <span class="k">def</span> <span class="nf">calc_eff</span><span class="p">(</span><span class="n">cfdf</span><span class="p">,</span> <span class="n">column_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;incremental&#39;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return efficiency for each column in the DataFrame right after the column itself.</span>
 <span class="sd">    </span>
@@ -348,7 +349,7 @@
     
 
 <div class="viewcode-block" id="sort_cf">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.cutflowutil.sort_cf">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.sort_cf">[docs]</a>
 <span class="k">def</span> <span class="nf">sort_cf</span><span class="p">(</span><span class="n">ds_list</span><span class="p">,</span> <span class="n">srcdir</span><span class="p">,</span> <span class="n">outdir</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a multi index table that contains all channel cutflows for all datasets.</span>
 

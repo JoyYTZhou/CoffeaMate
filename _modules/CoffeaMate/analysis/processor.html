@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.analysis.processor &mdash; CoffeaMate 0.0.1 documentation</title>
+  <title>CoffeaMate.analysis.processor &mdash; CoffeaMate 0.0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
 
@@ -41,9 +41,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.learning.html">src.learning package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.plotting.html">src.plotting package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.utils.html">src.utils package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
 </ul>
 
         </div>
@@ -61,7 +62,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
-      <li class="breadcrumb-item active">src.analysis.processor</li>
+      <li class="breadcrumb-item active">CoffeaMate.analysis.processor</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -70,7 +71,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for src.analysis.processor</h1><div class="highlight"><pre>
+  <h1>Source code for CoffeaMate.analysis.processor</h1><div class="highlight"><pre>
 <span></span><span class="c1"># This file contains the Processor class, which is used to process individual files or filesets.</span>
 <span class="c1"># The behavior of the Processor class is highly dependent on run time configurations and the event selection class used.</span>
 <span class="kn">import</span> <span class="nn">uproot._util</span>
@@ -82,11 +83,11 @@
 <span class="kn">import</span> <span class="nn">awkward</span> <span class="k">as</span> <span class="nn">ak</span>
 <span class="kn">import</span> <span class="nn">gc</span>
 
-<span class="kn">from</span> <span class="nn">src.utils.filesysutil</span> <span class="kn">import</span> <span class="n">FileSysHelper</span><span class="p">,</span> <span class="n">pjoin</span><span class="p">,</span> <span class="n">checkx509</span>
-<span class="kn">from</span> <span class="nn">src.analysis.evtselutil</span> <span class="kn">import</span> <span class="n">BaseEventSelections</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.filesysutil</span> <span class="kn">import</span> <span class="n">FileSysHelper</span><span class="p">,</span> <span class="n">pjoin</span><span class="p">,</span> <span class="n">checkx509</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.analysis.evtselutil</span> <span class="kn">import</span> <span class="n">BaseEventSelections</span>
 
 <div class="viewcode-block" id="Processor">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.processor.Processor">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.processor.Processor">[docs]</a>
 <span class="k">class</span> <span class="nc">Processor</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Process individual file or filesets given strings/dicts belonging to one dataset.</span>
 <span class="sd">    </span>
@@ -116,7 +117,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">initdir</span><span class="p">()</span>
     
 <div class="viewcode-block" id="Processor.initdir">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.processor.Processor.initdir">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.processor.Processor.initdir">[docs]</a>
     <span class="k">def</span> <span class="nf">initdir</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the output directory and copy directory if necessary.</span>
 <span class="sd">        If the copy directory is specified, it will be created and checked.</span>
@@ -126,7 +127,7 @@
 
     
 <div class="viewcode-block" id="Processor.loadfile_remote">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.processor.Processor.loadfile_remote">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.processor.Processor.loadfile_remote">[docs]</a>
     <span class="k">def</span> <span class="nf">loadfile_remote</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fileargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;This is a wrapper function around uproot._dask.</span>
 <span class="sd">        </span>
@@ -144,7 +145,7 @@
 
 
 <div class="viewcode-block" id="Processor.runfiles">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.processor.Processor.runfiles">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.processor.Processor.runfiles">[docs]</a>
     <span class="k">def</span> <span class="nf">runfiles</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">write_npz</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Run test selections on file dictionaries.</span>
 
@@ -177,7 +178,7 @@
 
     
 <div class="viewcode-block" id="Processor.writeCF">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.processor.Processor.writeCF">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.processor.Processor.writeCF">[docs]</a>
     <span class="k">def</span> <span class="nf">writeCF</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">suffix</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Write the cutflow to a file. Transfer the file if necessary&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;write_npz&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
@@ -193,7 +194,7 @@
 
     
 <div class="viewcode-block" id="Processor.writeevts">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.processor.Processor.writeevts">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.processor.Processor.writeevts">[docs]</a>
     <span class="k">def</span> <span class="nf">writeevts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">passed</span><span class="p">,</span> <span class="n">suffix</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Write the events to a file, filename formated as {dataset}_{suffix}*.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">passed</span><span class="p">,</span> <span class="n">dak</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
@@ -210,7 +211,7 @@
 
 
 <div class="viewcode-block" id="Processor.writedask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.processor.Processor.writedask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.processor.Processor.writedask">[docs]</a>
     <span class="k">def</span> <span class="nf">writedask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">passed</span><span class="p">,</span> <span class="n">suffix</span><span class="p">,</span> <span class="n">parquet</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fields</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Wrapper around uproot.dask_write(),</span>
 <span class="sd">        transfer all root files generated to a destination location.</span>
@@ -233,7 +234,7 @@
 
     
 <div class="viewcode-block" id="Processor.writeak">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.processor.Processor.writeak">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.processor.Processor.writeak">[docs]</a>
     <span class="k">def</span> <span class="nf">writeak</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">passed</span><span class="p">:</span> <span class="s1">&#39;ak.Array&#39;</span><span class="p">,</span> <span class="n">suffix</span><span class="p">,</span> <span class="n">fields</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Writes an awkward array to a root file. Wrapper around ak_to_root.&quot;&quot;&quot;</span>
         <span class="n">rc</span> <span class="o">=</span> <span class="mi">0</span>
@@ -245,7 +246,7 @@
 
     
 <div class="viewcode-block" id="Processor.writedf">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.processor.Processor.writedf">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.processor.Processor.writedf">[docs]</a>
     <span class="k">def</span> <span class="nf">writedf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">passed</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">suffix</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Writes a pandas DataFrame to a csv file.</span>
 <span class="sd">        </span>
@@ -258,7 +259,7 @@
 
         
 <div class="viewcode-block" id="Processor.writepickle">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.processor.Processor.writepickle">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.processor.Processor.writepickle">[docs]</a>
     <span class="k">def</span> <span class="nf">writepickle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">passed</span><span class="p">,</span> <span class="n">suffix</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Writes results to pkl. No constraints on events type.&quot;&quot;&quot;</span>
         <span class="n">finame</span> <span class="o">=</span> <span class="n">pjoin</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">outdir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dataset</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">suffix</span><span class="si">}</span><span class="s2">.pkl&quot;</span><span class="p">)</span>

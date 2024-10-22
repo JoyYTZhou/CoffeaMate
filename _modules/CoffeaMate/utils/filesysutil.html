@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.utils.filesysutil &mdash; CoffeaMate 0.0.1 documentation</title>
+  <title>CoffeaMate.utils.filesysutil &mdash; CoffeaMate 0.0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
 
@@ -41,9 +41,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.learning.html">src.learning package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.plotting.html">src.plotting package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.utils.html">src.utils package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
 </ul>
 
         </div>
@@ -61,7 +62,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
-      <li class="breadcrumb-item active">src.utils.filesysutil</li>
+      <li class="breadcrumb-item active">CoffeaMate.utils.filesysutil</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -70,7 +71,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for src.utils.filesysutil</h1><div class="highlight"><pre>
+  <h1>Source code for CoffeaMate.utils.filesysutil</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">glob</span><span class="o">,</span> <span class="nn">shutil</span><span class="o">,</span> <span class="nn">tracemalloc</span><span class="o">,</span> <span class="nn">linecache</span><span class="o">,</span> <span class="nn">subprocess</span><span class="o">,</span> <span class="nn">fnmatch</span>
 <span class="kn">from</span> <span class="nn">XRootD</span> <span class="kn">import</span> <span class="n">client</span>
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
@@ -81,28 +82,28 @@
 <span class="n">PREFIX</span> <span class="o">=</span> <span class="s2">&quot;root://cmseos.fnal.gov&quot;</span>
 
 <div class="viewcode-block" id="pbase">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.pbase">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.pbase">[docs]</a>
 <span class="k">def</span> <span class="nf">pbase</span><span class="p">(</span><span class="n">pathstr</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the base name of a path.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">pathstr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="match">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.match">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.match">[docs]</a>
 <span class="k">def</span> <span class="nf">match</span><span class="p">(</span><span class="n">pathstr</span><span class="p">,</span> <span class="n">pattern</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Match a path with a pattern. Returns True if the path matches the pattern.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">fnmatch</span><span class="o">.</span><span class="n">fnmatch</span><span class="p">(</span><span class="n">pbase</span><span class="p">(</span><span class="n">pathstr</span><span class="p">),</span> <span class="n">pattern</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="FileSysHelper">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.FileSysHelper">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.FileSysHelper">[docs]</a>
 <span class="k">class</span> <span class="nc">FileSysHelper</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper class for file system operations. Can be used for both local and remote file systems.&quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">pass</span>
 
 <div class="viewcode-block" id="FileSysHelper.cross_check">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.FileSysHelper.cross_check">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.FileSysHelper.cross_check">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">cross_check</span><span class="p">(</span><span class="n">filepattern</span><span class="p">,</span> <span class="n">existentfiles</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if a file pattern exists in a list of files.</span>
@@ -122,7 +123,7 @@
 
 
 <div class="viewcode-block" id="FileSysHelper.glob_files">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.FileSysHelper.glob_files">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.FileSysHelper.glob_files">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">glob_files</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">filepattern</span><span class="o">=</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="n">full_path</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a SORTED list of files matching a pattern in a directory. By default will return all files.</span>
@@ -148,7 +149,7 @@
 
     
 <div class="viewcode-block" id="FileSysHelper.checkpath">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.FileSysHelper.checkpath">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.FileSysHelper.checkpath">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">checkpath</span><span class="p">(</span><span class="n">pathstr</span><span class="p">,</span> <span class="n">createdir</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">raiseError</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">PREFIX</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if a path exists. If not will create one.</span>
@@ -170,7 +171,7 @@
 
     
 <div class="viewcode-block" id="FileSysHelper.remove_files">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.FileSysHelper.remove_files">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.FileSysHelper.remove_files">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">remove_files</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">pattern</span><span class="o">=</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">PREFIX</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Delete all files in a directory with a specific pattern.</span>
@@ -189,7 +190,7 @@
 
         
 <div class="viewcode-block" id="FileSysHelper.remove_filelist">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.FileSysHelper.remove_filelist">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.FileSysHelper.remove_filelist">[docs]</a>
     <span class="k">def</span> <span class="nf">remove_filelist</span><span class="p">(</span><span class="n">filelist</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">PREFIX</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Delete a list of files.</span>
 <span class="sd">        </span>
@@ -207,7 +208,7 @@
 
 
 <div class="viewcode-block" id="FileSysHelper.transfer_files">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.FileSysHelper.transfer_files">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.FileSysHelper.transfer_files">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">transfer_files</span><span class="p">(</span><span class="n">srcpath</span><span class="p">,</span> <span class="n">destpath</span><span class="p">,</span> <span class="n">filepattern</span><span class="o">=</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="n">remove</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Transfer all files matching filepattern from srcpath to destpath. Will create the destpath if it doesn&#39;t exist.</span>
@@ -238,14 +239,14 @@
 
     
 <div class="viewcode-block" id="XRootDHelper">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.XRootDHelper">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.XRootDHelper">[docs]</a>
 <span class="k">class</span> <span class="nc">XRootDHelper</span><span class="p">:</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">PREFIX</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">xrdfs_client</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">FileSystem</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span>
 
 <div class="viewcode-block" id="XRootDHelper.glob_files">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.XRootDHelper.glob_files">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.XRootDHelper.glob_files">[docs]</a>
     <span class="k">def</span> <span class="nf">glob_files</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">filepattern</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">full_path</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a list of files matching a pattern in a directory. By default will return all files.&quot;&quot;&quot;</span>
         <span class="n">exist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_path</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">createdir</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">raiseError</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -264,7 +265,7 @@
 
     
 <div class="viewcode-block" id="XRootDHelper.check_path">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.XRootDHelper.check_path">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.XRootDHelper.check_path">[docs]</a>
     <span class="k">def</span> <span class="nf">check_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">createdir</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">raiseError</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if a directory exists. If not will create one.</span>
 <span class="sd">        </span>
@@ -286,7 +287,7 @@
 
     
 <div class="viewcode-block" id="XRootDHelper.remove_files">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.XRootDHelper.remove_files">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.XRootDHelper.remove_files">[docs]</a>
     <span class="k">def</span> <span class="nf">remove_files</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">pattern</span><span class="o">=</span><span class="s1">&#39;*&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Delete all files in an xrd directory with a specific pattern.&quot;&quot;&quot;</span>
         <span class="n">exist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_path</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">createdir</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">raiseError</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -299,7 +300,7 @@
                 <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to remove </span><span class="si">{</span><span class="n">file</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="XRootDHelper.call_xrdcp">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.XRootDHelper.call_xrdcp">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.XRootDHelper.call_xrdcp">[docs]</a>
     <span class="nd">@staticmethod</span> 
     <span class="k">def</span> <span class="nf">call_xrdcp</span><span class="p">(</span><span class="n">src_file</span><span class="p">,</span> <span class="n">dest_file</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">PREFIX</span><span class="p">):</span>
         <span class="n">status</span> <span class="o">=</span> <span class="n">runcom</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;xrdcp </span><span class="si">{</span><span class="n">src_file</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="n">dest_file</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -308,7 +309,7 @@
 
     
 <div class="viewcode-block" id="XRootDHelper.transfer_files">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.XRootDHelper.transfer_files">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.XRootDHelper.transfer_files">[docs]</a>
     <span class="k">def</span> <span class="nf">transfer_files</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">srcpath</span><span class="p">,</span> <span class="n">destpath</span><span class="p">,</span> <span class="n">filepattern</span><span class="o">=</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="n">remove</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Transfer all files matching filepattern from srcpath to destpath. Will create the destpath if it doesn&#39;t exist.</span>
 <span class="sd">        This is only meant for transferring files from local to xrdfs.</span>
@@ -348,7 +349,7 @@
 
 
 <div class="viewcode-block" id="checkx509">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.checkx509">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.checkx509">[docs]</a>
 <span class="k">def</span> <span class="nf">checkx509</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if the X509 proxy and certificate directory are set.&quot;&quot;&quot;</span>
     <span class="n">proxy_position</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;X509_USER_PROXY&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
@@ -363,7 +364,7 @@
 
 
 <div class="viewcode-block" id="display_top">
-<a class="viewcode-back" href="../../../src.utils.html#src.utils.filesysutil.display_top">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.filesysutil.display_top">[docs]</a>
 <span class="k">def</span> <span class="nf">display_top</span><span class="p">(</span><span class="n">snapshot</span><span class="p">,</span> <span class="n">key_type</span><span class="o">=</span><span class="s1">&#39;lineno&#39;</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Display the top lines of a snapshot&quot;&quot;&quot;</span>
     <span class="n">snapshot</span> <span class="o">=</span> <span class="n">snapshot</span><span class="o">.</span><span class="n">filter_traces</span><span class="p">((</span>

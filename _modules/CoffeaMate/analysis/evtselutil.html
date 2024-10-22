@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.analysis.evtselutil &mdash; CoffeaMate 0.0.1 documentation</title>
+  <title>CoffeaMate.analysis.evtselutil &mdash; CoffeaMate 0.0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
 
@@ -41,9 +41,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.learning.html">src.learning package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.plotting.html">src.plotting package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.utils.html">src.utils package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
 </ul>
 
         </div>
@@ -61,7 +62,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
-      <li class="breadcrumb-item active">src.analysis.evtselutil</li>
+      <li class="breadcrumb-item active">CoffeaMate.analysis.evtselutil</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -70,17 +71,17 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for src.analysis.evtselutil</h1><div class="highlight"><pre>
+  <h1>Source code for CoffeaMate.analysis.evtselutil</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python</span>
 <span class="kn">import</span> <span class="nn">dask</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
 <span class="kn">import</span> <span class="nn">awkward</span> <span class="k">as</span> <span class="nn">ak</span>
 
-<span class="kn">from</span> <span class="nn">src.utils.cutflowutil</span> <span class="kn">import</span> <span class="n">weightedSelection</span>
-<span class="kn">from</span> <span class="nn">src.analysis.objutil</span> <span class="kn">import</span> <span class="n">Object</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.cutflowutil</span> <span class="kn">import</span> <span class="n">weightedSelection</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.analysis.objutil</span> <span class="kn">import</span> <span class="n">Object</span>
 
 <div class="viewcode-block" id="BaseEventSelections">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.evtselutil.BaseEventSelections">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.evtselutil.BaseEventSelections">[docs]</a>
 <span class="k">class</span> <span class="nc">BaseEventSelections</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for event selections.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -121,7 +122,7 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapcfg</span>
     
 <div class="viewcode-block" id="BaseEventSelections.triggersel">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.evtselutil.BaseEventSelections.triggersel">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.evtselutil.BaseEventSelections.triggersel">[docs]</a>
     <span class="k">def</span> <span class="nf">triggersel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Custom function to set the object selections on event levels based on config.</span>
 <span class="sd">        Mask should be N*bool 1-D array.</span>
@@ -130,7 +131,7 @@
 
 
 <div class="viewcode-block" id="BaseEventSelections.setevtsel">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.evtselutil.BaseEventSelections.setevtsel">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.evtselutil.BaseEventSelections.setevtsel">[docs]</a>
     <span class="k">def</span> <span class="nf">setevtsel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Custom function to set the object selections based on config.</span>
 <span class="sd">        Mask should be N*bool 1-D array.</span>
@@ -141,7 +142,7 @@
 
 
 <div class="viewcode-block" id="BaseEventSelections.callevtsel">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.evtselutil.BaseEventSelections.callevtsel">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.evtselutil.BaseEventSelections.callevtsel">[docs]</a>
     <span class="k">def</span> <span class="nf">callevtsel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">,</span> <span class="n">wgtname</span><span class="p">,</span> <span class="n">compute</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply all the selections in line on the events</span>
 <span class="sd">        Parameters</span>
@@ -169,7 +170,7 @@
 
 
 <div class="viewcode-block" id="BaseEventSelections.cf_to_df">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.evtselutil.BaseEventSelections.cf_to_df">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.evtselutil.BaseEventSelections.cf_to_df">[docs]</a>
     <span class="k">def</span> <span class="nf">cf_to_df</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a dataframe for a single EventSelections.cutflow object.</span>
 <span class="sd">        DASK GETS COMPUTED!</span>
@@ -188,7 +189,7 @@
 
 
 <div class="viewcode-block" id="BaseEventSelections.objcollect_to_df">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.evtselutil.BaseEventSelections.objcollect_to_df">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.evtselutil.BaseEventSelections.objcollect_to_df">[docs]</a>
     <span class="k">def</span> <span class="nf">objcollect_to_df</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a dataframe for the collected objects.&quot;&quot;&quot;</span>
         <span class="n">listofdf</span> <span class="o">=</span> <span class="p">[</span><span class="n">Object</span><span class="o">.</span><span class="n">object_to_df</span><span class="p">(</span><span class="n">zipped</span><span class="p">,</span> <span class="n">prefix</span><span class="o">+</span><span class="s1">&#39;_&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">prefix</span><span class="p">,</span> <span class="n">zipped</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">objcollect</span><span class="o">.</span><span class="n">items</span><span class="p">()]</span>
@@ -196,7 +197,7 @@
 
     
 <div class="viewcode-block" id="BaseEventSelections.selobjhelper">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.evtselutil.BaseEventSelections.selobjhelper">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.evtselutil.BaseEventSelections.selobjhelper">[docs]</a>
     <span class="k">def</span> <span class="nf">selobjhelper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">:</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">Object</span><span class="p">,</span> <span class="n">mask</span><span class="p">:</span> <span class="s1">&#39;ak.Array&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Object</span><span class="p">,</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Update event level and object level. Apply the reducing mask on the objects already booked as well as the events.</span>
 <span class="sd">        </span>
@@ -215,14 +216,14 @@
 
     
 <div class="viewcode-block" id="BaseEventSelections.saveWeights">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.evtselutil.BaseEventSelections.saveWeights">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.evtselutil.BaseEventSelections.saveWeights">[docs]</a>
     <span class="k">def</span> <span class="nf">saveWeights</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">:</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Generator_weight&#39;</span><span class="p">,</span> <span class="s1">&#39;LHEReweightingWeight&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Save weights to the collected objects.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">objcollect</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">weight</span><span class="p">:</span> <span class="n">events</span><span class="p">[</span><span class="n">weight</span><span class="p">]</span> <span class="k">for</span> <span class="n">weight</span> <span class="ow">in</span> <span class="n">weights</span><span class="p">})</span></div>
 
     
 <div class="viewcode-block" id="BaseEventSelections.getObj">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.evtselutil.BaseEventSelections.getObj">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.evtselutil.BaseEventSelections.getObj">[docs]</a>
     <span class="k">def</span> <span class="nf">getObj</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">events</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Object</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">Object</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objselcfg</span><span class="p">[</span><span class="n">name</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapcfg</span><span class="p">[</span><span class="n">name</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 </div>

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.analysis.objutil &mdash; CoffeaMate 0.0.1 documentation</title>
+  <title>CoffeaMate.analysis.objutil &mdash; CoffeaMate 0.0.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
 
@@ -41,9 +41,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.learning.html">src.learning package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.plotting.html">src.plotting package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../src.utils.html">src.utils package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
 </ul>
 
         </div>
@@ -61,7 +62,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
-      <li class="breadcrumb-item active">src.analysis.objutil</li>
+      <li class="breadcrumb-item active">CoffeaMate.analysis.objutil</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -70,7 +71,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for src.analysis.objutil</h1><div class="highlight"><pre>
+  <h1>Source code for CoffeaMate.analysis.objutil</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">weakref</span>
 <span class="kn">import</span> <span class="nn">vector</span> <span class="k">as</span> <span class="nn">vec</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
@@ -78,10 +79,10 @@
 <span class="kn">import</span> <span class="nn">dask_awkward</span> <span class="k">as</span> <span class="nn">dak</span>
 <span class="kn">import</span> <span class="nn">awkward</span> <span class="k">as</span> <span class="nn">ak</span>
 
-<span class="kn">from</span> <span class="nn">src.utils.datautil</span> <span class="kn">import</span> <span class="n">arr_handler</span>
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.datautil</span> <span class="kn">import</span> <span class="n">arr_handler</span>
 
 <div class="viewcode-block" id="Object">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object">[docs]</a>
 <span class="k">class</span> <span class="nc">Object</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Object class for handling object selections, meant as an observer of the events.</span>
 
@@ -138,7 +139,7 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapcfg</span>
         
 <div class="viewcode-block" id="Object.custommask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.custommask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.custommask">[docs]</a>
     <span class="k">def</span> <span class="nf">custommask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">propname</span><span class="p">:</span> <span class="s1">&#39;str&#39;</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create custom mask based on input.</span>
 <span class="sd">        </span>
@@ -169,49 +170,49 @@
 
 
 <div class="viewcode-block" id="Object.ptmask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.ptmask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.ptmask">[docs]</a>
     <span class="k">def</span> <span class="nf">ptmask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Object Level mask for pt.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">custommask</span><span class="p">(</span><span class="s1">&#39;pt&#39;</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Object.absetamask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.absetamask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.absetamask">[docs]</a>
     <span class="k">def</span> <span class="nf">absetamask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Object Level mask for |eta|.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">custommask</span><span class="p">(</span><span class="s1">&#39;eta&#39;</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="nb">abs</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Object.absdxymask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.absdxymask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.absdxymask">[docs]</a>
     <span class="k">def</span> <span class="nf">absdxymask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Object Level mask for |dxy|.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">custommask</span><span class="p">(</span><span class="s1">&#39;dxy&#39;</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="nb">abs</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Object.absdzmask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.absdzmask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.absdzmask">[docs]</a>
     <span class="k">def</span> <span class="nf">absdzmask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Object Level mask for |dz|.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">custommask</span><span class="p">(</span><span class="s1">&#39;dz&#39;</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="nb">abs</span><span class="p">)</span></div>
 
     
 <div class="viewcode-block" id="Object.numselmask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.numselmask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.numselmask">[docs]</a>
     <span class="k">def</span> <span class="nf">numselmask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mask</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns event-level boolean mask.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">Object</span><span class="o">.</span><span class="n">maskredmask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">selcfg</span><span class="o">.</span><span class="n">count</span><span class="p">)</span></div>
 
     
 <div class="viewcode-block" id="Object.vetomask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.vetomask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.vetomask">[docs]</a>
     <span class="k">def</span> <span class="nf">vetomask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mask</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the veto mask for events.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">Object</span><span class="o">.</span><span class="n">maskredmask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">opr</span><span class="o">.</span><span class="n">eq</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Object.evtosmask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.evtosmask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.evtosmask">[docs]</a>
     <span class="k">def</span> <span class="nf">evtosmask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">selmask</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create mask on events with OS objects.</span>
 <span class="sd">        !!! Note that this mask is applied per event, not per object.</span>
@@ -224,7 +225,7 @@
 
     
 <div class="viewcode-block" id="Object.dRwSelf">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.dRwSelf">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.dRwSelf">[docs]</a>
     <span class="k">def</span> <span class="nf">dRwSelf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Haphazard way to select pairs of objects&quot;&quot;&quot;</span>
         <span class="n">object_lv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getfourvec</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
@@ -235,14 +236,14 @@
 
     
 <div class="viewcode-block" id="Object.dRwOther">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.dRwOther">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.dRwOther">[docs]</a>
     <span class="k">def</span> <span class="nf">dRwOther</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vec</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="n">object_lv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getfourvec</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">Object</span><span class="o">.</span><span class="n">dRoverlap</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span> <span class="n">object_lv</span><span class="p">,</span> <span class="n">threshold</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Object.OSwSelf">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.OSwSelf">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.OSwSelf">[docs]</a>
     <span class="k">def</span> <span class="nf">OSwSelf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="n">zipped</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getzipped</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="n">leading</span> <span class="o">=</span> <span class="n">zipped</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span>
@@ -251,14 +252,14 @@
 
         
 <div class="viewcode-block" id="Object.getfourvec">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.getfourvec">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.getfourvec">[docs]</a>
     <span class="k">def</span> <span class="nf">getfourvec</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">vec</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get four vector for the object from the currently observed events.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">Object</span><span class="o">.</span><span class="n">fourvector</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
     
 <div class="viewcode-block" id="Object.getzipped">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.getzipped">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.getzipped">[docs]</a>
     <span class="k">def</span> <span class="nf">getzipped</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sort_by</span><span class="o">=</span><span class="s1">&#39;pt&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get zipped object.</span>
 <span class="sd">        </span>
@@ -271,7 +272,7 @@
 
     
 <div class="viewcode-block" id="Object.getldsd">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.getldsd">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.getldsd">[docs]</a>
     <span class="k">def</span> <span class="nf">getldsd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the zipped leading object and the rest of the objects (aka subleading candidates).</span>
 <span class="sd">        All properties in obj setting included.&quot;&quot;&quot;</span>
@@ -280,14 +281,14 @@
 
     
 <div class="viewcode-block" id="Object.getld">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.getld">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.getld">[docs]</a>
     <span class="k">def</span> <span class="nf">getld</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
         <span class="n">objs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getzipped</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> 
         <span class="k">return</span> <span class="n">objs</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="Object.sortmask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.sortmask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.sortmask">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">sortmask</span><span class="p">(</span><span class="n">dfarr</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Wrapper around awkward argsort function.</span>
@@ -307,7 +308,7 @@
 
     
 <div class="viewcode-block" id="Object.fourvector">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.fourvector">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.fourvector">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">fourvector</span><span class="p">(</span><span class="n">events</span><span class="p">:</span> <span class="s1">&#39;ak.Array&#39;</span><span class="p">,</span> <span class="n">objname</span><span class="p">:</span> <span class="s1">&#39;str&#39;</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sortname</span><span class="o">=</span><span class="s1">&#39;pt&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">vec</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a fourvector from the events.</span>
@@ -331,7 +332,7 @@
 
 
 <div class="viewcode-block" id="Object.set_zipped">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.set_zipped">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.set_zipped">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">set_zipped</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">objname</span><span class="p">,</span> <span class="n">namemap</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Given events, read only object-related observables and zip them into ak. </span>
@@ -347,7 +348,7 @@
 
 
 <div class="viewcode-block" id="Object.object_to_df">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.object_to_df">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.object_to_df">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">object_to_df</span><span class="p">(</span><span class="n">zipped</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Take a zipped object, compute it if needed, turn it into a dataframe&quot;&quot;&quot;</span>
@@ -357,7 +358,7 @@
 
 
 <div class="viewcode-block" id="Object.maskredmask">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.maskredmask">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.maskredmask">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">maskredmask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Reduces the mask to event level selections.</span>
@@ -372,7 +373,7 @@
 
 
 <div class="viewcode-block" id="Object.dRoverlap">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.dRoverlap">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.dRoverlap">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">dRoverlap</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span> <span class="n">veclist</span><span class="p">:</span> <span class="s1">&#39;vec.Array&#39;</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">opr</span><span class="o">.</span><span class="n">ge</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">highlevel</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return deltaR mask. Default comparison threshold is 0.4. Default comparison is &gt;=. </span>
@@ -388,7 +389,7 @@
 
 
 <div class="viewcode-block" id="Object.get_namemap">
-<a class="viewcode-back" href="../../../src.analysis.html#src.analysis.objutil.Object.get_namemap">[docs]</a>
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.get_namemap">[docs]</a>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">get_namemap</span><span class="p">(</span><span class="n">events</span><span class="p">:</span> <span class="s1">&#39;ak.Array&#39;</span><span class="p">,</span> <span class="n">col_name</span><span class="p">:</span> <span class="s1">&#39;str&#39;</span><span class="p">,</span> <span class="n">namemap</span><span class="p">:</span> <span class="s1">&#39;dict&#39;</span> <span class="o">=</span> <span class="p">{}):</span>
         <span class="n">vec_type</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;pt&#39;</span><span class="p">,</span> <span class="s1">&#39;eta&#39;</span><span class="p">,</span> <span class="s1">&#39;phi&#39;</span><span class="p">,</span> <span class="s1">&#39;mass&#39;</span><span class="p">]</span>
