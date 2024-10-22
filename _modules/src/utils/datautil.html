@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>src.utils.datautil &#8212; CoffeaMate 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for src.utils.datautil</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">awkward</span> <span class="k">as</span> <span class="nn">ak</span>
+<span class="kn">import</span> <span class="nn">uproot</span><span class="o">,</span> <span class="nn">pickle</span><span class="o">,</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
+<span class="kn">import</span> <span class="nn">dask_awkward</span> <span class="k">as</span> <span class="nn">dak</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">src.utils.filesysutil</span> <span class="kn">import</span> <span class="n">pjoin</span>
+
+<span class="n">parent_directory</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)))</span>
+<span class="n">datadir</span> <span class="o">=</span> <span class="n">pjoin</span><span class="p">(</span><span class="n">parent_directory</span><span class="p">,</span> <span class="s1">&#39;data&#39;</span><span class="p">,</span> <span class="s1">&#39;preprocessed&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="iterwgt">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.datautil.iterwgt">[docs]</a>
+<span class="k">def</span> <span class="nf">iterwgt</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">process</span><span class="p">,</span> <span class="n">dsinfo</span> <span class="ow">in</span> <span class="n">instance</span><span class="o">.</span><span class="n">wgt_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">ds</span> <span class="ow">in</span> <span class="n">dsinfo</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="n">func</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">process</span><span class="p">,</span> <span class="n">ds</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">wrapper</span></div>
+
+    
+<div class="viewcode-block" id="get_compression">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.datautil.get_compression">[docs]</a>
+<span class="k">def</span> <span class="nf">get_compression</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the compression algorithm to use for writing root files.&quot;&quot;&quot;</span>
+    <span class="n">compression</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;compression&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">compression_level</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;compression_level&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">compression</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;LZMA&quot;</span><span class="p">,</span> <span class="s2">&quot;lzma&quot;</span><span class="p">):</span>
+        <span class="n">compression_code</span> <span class="o">=</span> <span class="n">uproot</span><span class="o">.</span><span class="n">const</span><span class="o">.</span><span class="n">kLZMA</span>
+    <span class="k">elif</span> <span class="n">compression</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;ZLIB&quot;</span><span class="p">,</span> <span class="s2">&quot;zlib&quot;</span><span class="p">):</span>
+        <span class="n">compression_code</span> <span class="o">=</span> <span class="n">uproot</span><span class="o">.</span><span class="n">const</span><span class="o">.</span><span class="n">kZLIB</span>
+    <span class="k">elif</span> <span class="n">compression</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;LZ4&quot;</span><span class="p">,</span> <span class="s2">&quot;lz4&quot;</span><span class="p">):</span>
+        <span class="n">compression_code</span> <span class="o">=</span> <span class="n">uproot</span><span class="o">.</span><span class="n">const</span><span class="o">.</span><span class="n">kLZ4</span>
+    <span class="k">elif</span> <span class="n">compression</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;ZSTD&quot;</span><span class="p">,</span> <span class="s2">&quot;zstd&quot;</span><span class="p">):</span>
+        <span class="n">compression_code</span> <span class="o">=</span> <span class="n">uproot</span><span class="o">.</span><span class="n">const</span><span class="o">.</span><span class="n">kZSTD</span>
+    <span class="k">elif</span> <span class="n">compression</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">UserWarning</span><span class="p">(</span><span class="s2">&quot;Not sure if this option is supported, should be...&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;unrecognized compression algorithm: </span><span class="si">{</span><span class="n">compression</span><span class="si">}</span><span class="s2">. Only ZLIB, LZMA, LZ4, and ZSTD are accepted.&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">compression</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span> 
+        <span class="n">compression</span> <span class="o">=</span> <span class="n">uproot</span><span class="o">.</span><span class="n">compression</span><span class="o">.</span><span class="n">Compression</span><span class="o">.</span><span class="n">from_code_pair</span><span class="p">(</span><span class="n">compression_code</span><span class="p">,</span> <span class="n">compression_level</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">compression</span></div>
+
+
+<div class="viewcode-block" id="load_pkl">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.datautil.load_pkl">[docs]</a>
+<span class="k">def</span> <span class="nf">load_pkl</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load a pickle file and return the data.&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="load_data">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.datautil.load_data">[docs]</a>
+<span class="k">def</span> <span class="nf">load_data</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load a data file and return the data.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">source</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.csv&#39;</span><span class="p">):</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">source</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.root&#39;</span><span class="p">):</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">uproot</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">source</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.parquet&#39;</span><span class="p">):</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;This is not a valid file type.&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">checkevents</span><span class="p">(</span><span class="n">source</span><span class="p">):</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">source</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">source</span>
+        <span class="k">raise</span> <span class="ne">UserWarning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;This might not be a valid source. The data type is </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">source</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="arr_handler">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.datautil.arr_handler">[docs]</a>
+<span class="k">def</span> <span class="nf">arr_handler</span><span class="p">(</span><span class="n">dfarr</span><span class="p">,</span> <span class="n">allow_delayed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle different types of data arrays to convert them to awkward arrays.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dfarr</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">series</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span> 
+            <span class="n">ak_arr</span> <span class="o">=</span> <span class="n">dfarr</span><span class="o">.</span><span class="n">ak</span><span class="o">.</span><span class="n">array</span>
+            <span class="k">return</span> <span class="n">ak_arr</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dfarr</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dfarr</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;specify a column. This is a dataframe.&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dfarr</span><span class="p">,</span> <span class="n">ak</span><span class="o">.</span><span class="n">highlevel</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">dfarr</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dfarr</span><span class="p">,</span> <span class="n">dak</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">allow_delayed</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dfarr</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dfarr</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;This is of type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">dfarr</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="checkevents">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.datautil.checkevents">[docs]</a>
+<span class="k">def</span> <span class="nf">checkevents</span><span class="p">(</span><span class="n">events</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns True if the events are in the right format, False otherwise.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="s1">&#39;keys&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">callable</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="s1">&#39;keys&#39;</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="s1">&#39;fields&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Invalid type for events. Must be an awkward object or a DataFrame&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="findfields">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.datautil.findfields">[docs]</a>
+<span class="k">def</span> <span class="nf">findfields</span><span class="p">(</span><span class="n">dframe</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Find all fields in a dataframe.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dframe</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">dframe</span><span class="o">.</span><span class="n">columns</span>
+    <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">dframe</span><span class="p">,</span> <span class="s1">&#39;keys&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">callable</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">dframe</span><span class="p">,</span> <span class="s1">&#39;keys&#39;</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="n">dframe</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;Not supported yet...&quot;</span></div>
+
+
+<div class="viewcode-block" id="find_branches">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.datautil.find_branches">[docs]</a>
+<span class="k">def</span> <span class="nf">find_branches</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">object_list</span><span class="p">,</span> <span class="n">tree_name</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="p">[])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return a list of branches for objects in object_list</span>
+
+<span class="sd">    Paremters</span>
+<span class="sd">    - `file_path`: path to the root file</span>
+<span class="sd">    - `object_list`: list of objects to find branches for</span>
+<span class="sd">    - `tree_name`: name of the tree in the root file</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    - list of branches</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">file</span> <span class="o">=</span> <span class="n">uproot</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+    <span class="n">tree</span> <span class="o">=</span> <span class="n">file</span><span class="p">[</span><span class="n">tree_name</span><span class="p">]</span>
+    <span class="n">branch_names</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="n">branches</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="nb">object</span> <span class="ow">in</span> <span class="n">object_list</span><span class="p">:</span>
+        <span class="n">branches</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">branch_names</span> <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="nb">object</span><span class="p">)])</span>
+    <span class="k">if</span> <span class="n">extra</span> <span class="o">!=</span> <span class="p">[]:</span>
+        <span class="n">branches</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">extra</span> <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">branch_names</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">branches</span></div>
+
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">CoffeaMate</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../src.learning.html">src.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../src.plotting.html">src.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../src.utils.html">src.utils package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024, Joy Zhou.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

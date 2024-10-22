@@ -1,0 +1,29 @@
+src.plotting package
+====================
+
+Submodules
+----------
+
+src.plotting.postprocessor module
+---------------------------------
+
+.. automodule:: src.plotting.postprocessor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+src.plotting.visutil module
+---------------------------
+
+.. automodule:: src.plotting.visutil
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: src.plotting
+   :members:
+   :undoc-members:
+   :show-inheritance:

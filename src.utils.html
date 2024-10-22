@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>src.utils package &#8212; CoffeaMate 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="src.plotting package" href="src.plotting.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="src-utils-package">
+<h1>src.utils package<a class="headerlink" href="#src-utils-package" title="Link to this heading">¶</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-src.utils.cutflowutil">
+<span id="src-utils-cutflowutil-module"></span><h2>src.utils.cutflowutil module<a class="headerlink" href="#module-src.utils.cutflowutil" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.weightedCutflow">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.utils.cutflowutil.</span></span><span class="sig-name descname"><span class="pre">weightedCutflow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nevonecut</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nevcutflow</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wgtevcutflow</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">masksonecut</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maskscutflow</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delayed_mode</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#weightedCutflow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.weightedCutflow" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cutflow</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.weightedCutflow.result">
+<span class="sig-name descname"><span class="pre">result</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#weightedCutflow.result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.weightedCutflow.result" title="Link to this definition">¶</a></dt>
+<dd><p>Returns the results of the cutflow as a namedtuple</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><p><strong>result</strong> – A namedtuple with the following attributes:</p>
+<dl class="simple">
+<dt>nevonecut<span class="classifier">list of integers or dask_awkward.lib.core.Scalar objects</span></dt><dd><p>The number of events that survive each cut alone as a list of integers or delayed integers</p>
+</dd>
+<dt>nevcutflow<span class="classifier">list of integers or dask_awkward.lib.core.Scalar objects</span></dt><dd><p>The number of events that survive the cumulative cutflow as a list of integers or delayed integers</p>
+</dd>
+<dt>wgtevcutflow: list of integers or dask_awesome.lib.core.Scalar objects</dt><dd><p>The number of events that survive the weighted cutflow as a list of integers or delayed integers</p>
+</dd>
+<dt>masksonecut<span class="classifier">list of boolean numpy.ndarray or dask_awkward.lib.core.Array objects</span></dt><dd><p>The boolean mask vectors of which events pass each cut alone as a list of materialized or delayed boolean arrays</p>
+</dd>
+<dt>maskscutflow<span class="classifier">list of boolean numpy.ndarray or dask_awkward.lib.core.Array objects</span></dt><dd><p>The boolean mask vectors of which events pass the cumulative cutflow a list of materialized or delayed boolean arrays</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>CutflowResult</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.weightedSelection">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.utils.cutflowutil.</span></span><span class="sig-name descname"><span class="pre">weightedSelection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">perevtwgt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'uint32'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#weightedSelection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.weightedSelection" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PackedSelection</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.weightedSelection.add_sequential">
+<span class="sig-name descname"><span class="pre">add_sequential</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thissel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lastsel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill_value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#weightedSelection.add_sequential"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.weightedSelection.add_sequential" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.weightedSelection.cutflow">
+<span class="sig-name descname"><span class="pre">cutflow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">names</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#src.utils.cutflowutil.weightedCutflow" title="src.utils.cutflowutil.weightedCutflow"><span class="pre">weightedCutflow</span></a></span></span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#weightedSelection.cutflow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.weightedSelection.cutflow" title="Link to this definition">¶</a></dt>
+<dd><p>Compute the cutflow for a set of selections</p>
+<p>Returns an object which can return a list of the number of events that pass all the previous selections including the current one
+after each named selection is applied consecutively. The first element
+of the returned list is the total number of events before any selections are applied.
+The last element is the final number of events that pass after all the selections are applied.
+Can also return a cutflow histogram as a <code class="docutils literal notranslate"><span class="pre">hist.Hist</span></code> object where the bin heights are the number of events of the cutflow list.
+If the PackedSelection is in delayed mode, the elements of the list will be dask_awkward Arrays that can be computed whenever the user wants.
+If the histogram is requested, those delayed arrays will be computed in the process in order to set the bin heights.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>*names</strong> (<em>args</em>) – The named selections to use, need to be a subset of the selections already added</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>res</strong> – A wrapper class for the results, see the documentation for that class for more details</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>coffea.analysis_tools.Cutflow</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.load_csvs">
+<span class="sig-prename descclassname"><span class="pre">src.utils.cutflowutil.</span></span><span class="sig-name descname"><span class="pre">load_csvs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dirname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filepattern</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#load_csvs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.load_csvs" title="Link to this definition">¶</a></dt>
+<dd><p>Load csv files matching a pattern into a list of DataFrames. Post process if func is provided.</p>
+<p>Parameters
+- <cite>dirname</cite>: directory name to search for
+- <cite>startpattern</cite>: pattern to match the file names
+- <cite>func</cite>: function to apply to the list of DataFrames. Must return an Pandas object.
+- <cite>*args</cite>, <cite>**kwargs</cite>: additional arguments to pass to the function</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.combine_cf">
+<span class="sig-prename descclassname"><span class="pre">src.utils.cutflowutil.</span></span><span class="sig-name descname"><span class="pre">combine_cf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dsname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keyword</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cutflow'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outpath</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#combine_cf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.combine_cf" title="Link to this definition">¶</a></dt>
+<dd><p>Combines(sums) all cutflow tables in a source directory belonging to one datset and output them into output directory.
+Essentially this will grep files of pattern “{dsname}*{keyword}*.csv” and combine them to one csv file.</p>
+<p>Parameters
+- <cite>inputdir</cite>: source directory
+- <cite>dsname</cite>: dataset name.
+- <cite>keyword</cite>: keyword to search for
+- <cite>output</cite>: whether to save the combined table into a csv file
+- <cite>outpath</cite>: path to the output</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.add_selcutflow">
+<span class="sig-prename descclassname"><span class="pre">src.utils.cutflowutil.</span></span><span class="sig-name descname"><span class="pre">add_selcutflow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cutflowlist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outpath</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#add_selcutflow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.add_selcutflow" title="Link to this definition">¶</a></dt>
+<dd><p>Add cutflows sequentially.</p>
+<p>Parameters
+- <cite>cutflowlist</cite>: list of cutflow csv files
+- <cite>save</cite>: whether to save the combined table into a csv file
+- <cite>outpath</cite>: path to the output</p>
+<p>Return
+- combined cutflow table</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.weight_cf">
+<span class="sig-prename descclassname"><span class="pre">src.utils.cutflowutil.</span></span><span class="sig-name descname"><span class="pre">weight_cf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wgt_dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raw_cf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lumi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#weight_cf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.weight_cf" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate weighted table based on raw table.</p>
+<p>Parameters
+- <cite>wgt_dict</cite>: dictionary of weights
+- <cite>raw_cf</cite>: raw cutflow table
+- <cite>lumi</cite>: luminosity (pb^-1)</p>
+<p>Return
+- <cite>wgt_df</cite>: weighted cutflow table</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.calc_eff">
+<span class="sig-prename descclassname"><span class="pre">src.utils.cutflowutil.</span></span><span class="sig-name descname"><span class="pre">calc_eff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cfdf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'incremental'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#calc_eff"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.calc_eff" title="Link to this definition">¶</a></dt>
+<dd><p>Return efficiency for each column in the DataFrame right after the column itself.</p>
+<p>Parameters:
+- <cite>cfdf</cite>: DataFrame to calculate efficiency on
+- <cite>column_name</cite>: specific column to calculate efficiency on (optional)
+- <cite>type</cite>: type of efficiency calculation. ‘incremental’ or ‘overall’</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.cutflowutil.sort_cf">
+<span class="sig-prename descclassname"><span class="pre">src.utils.cutflowutil.</span></span><span class="sig-name descname"><span class="pre">sort_cf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ds_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">srcdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/cutflowutil.html#sort_cf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.cutflowutil.sort_cf" title="Link to this definition">¶</a></dt>
+<dd><p>Create a multi index table that contains all channel cutflows for all datasets.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ds_list</strong> – list of strings of dataset</p></li>
+<li><p><strong>srcdir</strong> – output cutflow source directory</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-src.utils.datautil">
+<span id="src-utils-datautil-module"></span><h2>src.utils.datautil module<a class="headerlink" href="#module-src.utils.datautil" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.datautil.iterwgt">
+<span class="sig-prename descclassname"><span class="pre">src.utils.datautil.</span></span><span class="sig-name descname"><span class="pre">iterwgt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/datautil.html#iterwgt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.datautil.iterwgt" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.datautil.get_compression">
+<span class="sig-prename descclassname"><span class="pre">src.utils.datautil.</span></span><span class="sig-name descname"><span class="pre">get_compression</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/datautil.html#get_compression"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.datautil.get_compression" title="Link to this definition">¶</a></dt>
+<dd><p>Returns the compression algorithm to use for writing root files.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.datautil.load_pkl">
+<span class="sig-prename descclassname"><span class="pre">src.utils.datautil.</span></span><span class="sig-name descname"><span class="pre">load_pkl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/datautil.html#load_pkl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.datautil.load_pkl" title="Link to this definition">¶</a></dt>
+<dd><p>Load a pickle file and return the data.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.datautil.load_data">
+<span class="sig-prename descclassname"><span class="pre">src.utils.datautil.</span></span><span class="sig-name descname"><span class="pre">load_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/datautil.html#load_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.datautil.load_data" title="Link to this definition">¶</a></dt>
+<dd><p>Load a data file and return the data.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.datautil.arr_handler">
+<span class="sig-prename descclassname"><span class="pre">src.utils.datautil.</span></span><span class="sig-name descname"><span class="pre">arr_handler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dfarr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_delayed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="reference internal" href="_modules/src/utils/datautil.html#arr_handler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.datautil.arr_handler" title="Link to this definition">¶</a></dt>
+<dd><p>Handle different types of data arrays to convert them to awkward arrays.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.datautil.checkevents">
+<span class="sig-prename descclassname"><span class="pre">src.utils.datautil.</span></span><span class="sig-name descname"><span class="pre">checkevents</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/datautil.html#checkevents"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.datautil.checkevents" title="Link to this definition">¶</a></dt>
+<dd><p>Returns True if the events are in the right format, False otherwise.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.datautil.findfields">
+<span class="sig-prename descclassname"><span class="pre">src.utils.datautil.</span></span><span class="sig-name descname"><span class="pre">findfields</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dframe</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/datautil.html#findfields"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.datautil.findfields" title="Link to this definition">¶</a></dt>
+<dd><p>Find all fields in a dataframe.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.datautil.find_branches">
+<span class="sig-prename descclassname"><span class="pre">src.utils.datautil.</span></span><span class="sig-name descname"><span class="pre">find_branches</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">object_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tree_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/src/utils/datautil.html#find_branches"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.datautil.find_branches" title="Link to this definition">¶</a></dt>
+<dd><p>Return a list of branches for objects in object_list</p>
+<p>Paremters
+- <cite>file_path</cite>: path to the root file
+- <cite>object_list</cite>: list of objects to find branches for
+- <cite>tree_name</cite>: name of the tree in the root file</p>
+<p>Returns
+- list of branches</p>
+</dd></dl>
+
+</section>
+<section id="module-src.utils.dsmethods">
+<span id="src-utils-dsmethods-module"></span><h2>src.utils.dsmethods module<a class="headerlink" href="#module-src.utils.dsmethods" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.extract_items">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">extract_items</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ds</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_string</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#extract_items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.extract_items" title="Link to this definition">¶</a></dt>
+<dd><p>Extract items from a dictionary where the keys start with a certain string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ds</strong> (<em>dict</em>) – The original dictionary.</p></li>
+<li><p><strong>start_string</strong> (<em>str</em>) – The string that the keys should start with.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new dictionary with the extracted items.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.extract_process">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">extract_process</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#extract_process"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.extract_process" title="Link to this definition">¶</a></dt>
+<dd><p>Extract process name from a filename.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<em>string</em>) – path to the root file</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>process name</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>string</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.short_name">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">short_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#short_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.short_name" title="Link to this definition">¶</a></dt>
+<dd><p>Shorten name for NANOAOD datasets for better extractability.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>str</em>) – name of the dataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.find_files">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">find_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">directory</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regex</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#find_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.find_files" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.eosls">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">eosls</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#eosls"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.eosls" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.eosfind">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">eosfind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#eosfind"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.eosfind" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.find_files_eos">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">find_files_eos</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">directory</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regex</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#find_files_eos"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.find_files_eos" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.files_from_eos">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">files_from_eos</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">regex</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#files_from_eos"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.files_from_eos" title="Link to this definition">¶</a></dt>
+<dd><p>Generate file list per dataset from EOS</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>regex</strong> (<em>string</em>) – Regular expression to match datasets</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Mapping of dataset : [files]</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.is_data">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">is_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#is_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.is_data" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.extract_year">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">extract_year</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#extract_year"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.extract_year" title="Link to this definition">¶</a></dt>
+<dd><p>Extract the year from a dataset name</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>regex</strong> (<em>string</em>) – dataset</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Name of the year</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.dsmethods.rand_dataset_dict">
+<span class="sig-prename descclassname"><span class="pre">src.utils.dsmethods.</span></span><span class="sig-name descname"><span class="pre">rand_dataset_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">keys</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">year</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/dsmethods.html#rand_dataset_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.dsmethods.rand_dataset_dict" title="Link to this definition">¶</a></dt>
+<dd><p>Creates a map of dataset names -&gt; short dataset names for randomized parameter samples</p>
+</dd></dl>
+
+</section>
+<section id="module-src.utils.filesysutil">
+<span id="src-utils-filesysutil-module"></span><h2>src.utils.filesysutil module<a class="headerlink" href="#module-src.utils.filesysutil" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.filesysutil.pbase">
+<span class="sig-prename descclassname"><span class="pre">src.utils.filesysutil.</span></span><span class="sig-name descname"><span class="pre">pbase</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pathstr</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#pbase"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.pbase" title="Link to this definition">¶</a></dt>
+<dd><p>Get the base name of a path.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.filesysutil.match">
+<span class="sig-prename descclassname"><span class="pre">src.utils.filesysutil.</span></span><span class="sig-name descname"><span class="pre">match</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pathstr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pattern</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#match"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.match" title="Link to this definition">¶</a></dt>
+<dd><p>Match a path with a pattern. Returns True if the path matches the pattern.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.utils.filesysutil.FileSysHelper">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.utils.filesysutil.</span></span><span class="sig-name descname"><span class="pre">FileSysHelper</span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#FileSysHelper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.FileSysHelper" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Helper class for file system operations. Can be used for both local and remote file systems.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.FileSysHelper.cross_check">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cross_check</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepattern</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">existentfiles</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#FileSysHelper.cross_check"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.FileSysHelper.cross_check" title="Link to this definition">¶</a></dt>
+<dd><p>Check if a file pattern exists in a list of files.</p>
+<p>Parameters
+- <cite>filepattern</cite>: pattern to match the file name
+- <cite>existentfiles</cite>: list of files to check</p>
+<p>Return
+- bool: True if the file pattern exists in the list of files</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.FileSysHelper.glob_files">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">glob_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dirname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filepattern</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'*'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">full_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#FileSysHelper.glob_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.FileSysHelper.glob_files" title="Link to this definition">¶</a></dt>
+<dd><p>Returns a SORTED list of files matching a pattern in a directory. By default will return all files.</p>
+<p>Parameters
+- <cite>dirname</cite>: directory path (remote/local)
+- <cite>filepattern</cite>: pattern to match the file name. Wildcards allowed
+- <cite>kwargs</cite>: additional arguments for filtering files</p>
+<p>Return
+- A SORTED list of files (str)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.FileSysHelper.checkpath">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">checkpath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pathstr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">createdir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raiseError</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'root://cmseos.fnal.gov'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#FileSysHelper.checkpath"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.FileSysHelper.checkpath" title="Link to this definition">¶</a></dt>
+<dd><p>Check if a path exists. If not will create one.</p>
+<p>Return
+- True if the path exists, False otherwise</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.FileSysHelper.remove_files">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">remove_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dirname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pattern</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'*'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'root://cmseos.fnal.gov'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#FileSysHelper.remove_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.FileSysHelper.remove_files" title="Link to this definition">¶</a></dt>
+<dd><p>Delete all files in a directory with a specific pattern.</p>
+<p>Parameters
+- <cite>dirname</cite>: directory path (remote/local)
+- <cite>pattern</cite>: pattern to match the file name. Wildcards allowed</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.FileSysHelper.remove_filelist">
+<span class="sig-name descname"><span class="pre">remove_filelist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'root://cmseos.fnal.gov'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#FileSysHelper.remove_filelist"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.FileSysHelper.remove_filelist" title="Link to this definition">¶</a></dt>
+<dd><p>Delete a list of files.</p>
+<p>Parameters
+- <cite>filelist</cite>: list of files to delete</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.FileSysHelper.transfer_files">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">transfer_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">srcpath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">destpath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filepattern</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'*'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#FileSysHelper.transfer_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.FileSysHelper.transfer_files" title="Link to this definition">¶</a></dt>
+<dd><p>Transfer all files matching filepattern from srcpath to destpath. Will create the destpath if it doesn’t exist.</p>
+<p>Parameters
+- <cite>srcpath</cite>: source path (local), a directory
+- <cite>destpath</cite>: destination path (remote), a directory
+- <cite>filepattern</cite>: pattern to match the file name. Passed into glob.glob(filepattern)
+- <cite>remove</cite>: whether to remove the files from srcpath after transferring
+- <cite>overwrite</cite>: whether to overwrite the files in the destination</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.utils.filesysutil.XRootDHelper">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.utils.filesysutil.</span></span><span class="sig-name descname"><span class="pre">XRootDHelper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'root://cmseos.fnal.gov'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/filesysutil.html#XRootDHelper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.XRootDHelper" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.XRootDHelper.glob_files">
+<span class="sig-name descname"><span class="pre">glob_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dirname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filepattern</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'*'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">full_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#XRootDHelper.glob_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.XRootDHelper.glob_files" title="Link to this definition">¶</a></dt>
+<dd><p>Returns a list of files matching a pattern in a directory. By default will return all files.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.XRootDHelper.check_path">
+<span class="sig-name descname"><span class="pre">check_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dirname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">createdir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raiseError</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#XRootDHelper.check_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.XRootDHelper.check_path" title="Link to this definition">¶</a></dt>
+<dd><p>Check if a directory exists. If not will create one.</p>
+<p>Return
+- True if the path exists, False otherwise</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.XRootDHelper.remove_files">
+<span class="sig-name descname"><span class="pre">remove_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dirname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pattern</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'*'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#XRootDHelper.remove_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.XRootDHelper.remove_files" title="Link to this definition">¶</a></dt>
+<dd><p>Delete all files in an xrd directory with a specific pattern.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.XRootDHelper.call_xrdcp">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">call_xrdcp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dest_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'root://cmseos.fnal.gov'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/filesysutil.html#XRootDHelper.call_xrdcp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.XRootDHelper.call_xrdcp" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.utils.filesysutil.XRootDHelper.transfer_files">
+<span class="sig-name descname"><span class="pre">transfer_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">srcpath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">destpath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filepattern</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'*'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/src/utils/filesysutil.html#XRootDHelper.transfer_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.XRootDHelper.transfer_files" title="Link to this definition">¶</a></dt>
+<dd><p>Transfer all files matching filepattern from srcpath to destpath. Will create the destpath if it doesn’t exist.
+This is only meant for transferring files from local to xrdfs.</p>
+<p>Parameters
+- <cite>srcpath</cite>: source path (local), a directory
+- <cite>destpath</cite>: destination path (remote), a directory
+- <cite>filepattern</cite>: pattern to match the file name. Passed into glob.glob(filepattern)
+- <cite>remove</cite>: whether to remove the files from srcpath after transferring</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.filesysutil.checkx509">
+<span class="sig-prename descclassname"><span class="pre">src.utils.filesysutil.</span></span><span class="sig-name descname"><span class="pre">checkx509</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/filesysutil.html#checkx509"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.checkx509" title="Link to this definition">¶</a></dt>
+<dd><p>Check if the X509 proxy and certificate directory are set.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.filesysutil.display_top">
+<span class="sig-prename descclassname"><span class="pre">src.utils.filesysutil.</span></span><span class="sig-name descname"><span class="pre">display_top</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'lineno'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/filesysutil.html#display_top"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.filesysutil.display_top" title="Link to this definition">¶</a></dt>
+<dd><p>Display the top lines of a snapshot</p>
+</dd></dl>
+
+</section>
+<section id="module-src.utils.mathutil">
+<span id="src-utils-mathutil-module"></span><h2>src.utils.mathutil module<a class="headerlink" href="#module-src.utils.mathutil" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.clopper_pearson_error">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">clopper_pearson_error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">passed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6827</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#clopper_pearson_error"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.clopper_pearson_error" title="Link to this definition">¶</a></dt>
+<dd><p>matching TEfficiency::ClopperPearson(),
+&gt;&gt;&gt; ROOT.TEfficiency.ClopperPearson(total, passed, level, is_upper)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.poisson_errors">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">poisson_errors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.3173</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/src/utils/mathutil.html#poisson_errors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.poisson_errors" title="Link to this definition">¶</a></dt>
+<dd><p>Taken from <a class="reference external" href="https://github.com/aminnj/yahist/blob/master/yahist/utils.py">https://github.com/aminnj/yahist/blob/master/yahist/utils.py</a>
+Return poisson low and high values for a series of data observations</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.simplifyError">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">simplifyError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">passed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6827</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#simplifyError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.simplifyError" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.dphi">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">dphi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phi1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#dphi"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.dphi" title="Link to this definition">¶</a></dt>
+<dd><p>Calculates delta phi between objects</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.min_dphi_jet_met">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">min_dphi_jet_met</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">jets</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">met_phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">njet</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ptmin</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">etamax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.4</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#min_dphi_jet_met"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.min_dphi_jet_met" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate minimal delta phi between jets and met</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>jets</strong> (<em>JaggedCandidateArray</em>) – Jet candidates to use, must be sorted by pT</p></li>
+<li><p><strong>met_phi</strong> (<em>array</em>) – MET phi values, one per event</p></li>
+<li><p><strong>njet</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of leading jets to consider, defaults to 4</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.mt">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">mt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pt1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pt2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#mt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.mt" title="Link to this definition">¶</a></dt>
+<dd><p>Calculates MT of two objects</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.pt_phi_to_px_py">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">pt_phi_to_px_py</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#pt_phi_to_px_py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.pt_phi_to_px_py" title="Link to this definition">¶</a></dt>
+<dd><p>Convert pt and phi to px and py.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.recoil">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">recoil</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">met_pt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">met_phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eles</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">photons</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#recoil"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.recoil" title="Link to this definition">¶</a></dt>
+<dd><p>Calculates hadronic recoil by removing leptons from MET</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>met_pt</strong> (<em>array</em>) – MET pt values</p></li>
+<li><p><strong>met_phi</strong> (<em>array</em>) – MET phi values</p></li>
+<li><p><strong>eles</strong> (<em>JaggedCandidateArray</em>) – Electron candidates</p></li>
+<li><p><strong>mus</strong> (<em>JaggedCandidateArray</em>) – Muon candidates</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Pt and phi of the recoil</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple of arrays (pt, phi)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.weight_shape">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">weight_shape</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#weight_shape"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.weight_shape" title="Link to this definition">¶</a></dt>
+<dd><p>Broadcasts weight array to right shape for given values</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.object_overlap">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">object_overlap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">toclean</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cleanagainst</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.4</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#object_overlap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.object_overlap" title="Link to this definition">¶</a></dt>
+<dd><p>Generate a mask to use for overlap removal</p>
+<p>Parameters
+- <cite>toclean</cite>: Candidates that should be cleaned (lower priority candidats)
+- <cite>cleanagainst</cite>: Candidate that should be cleaned against (higher priority)
+- <cite>dr</cite>: Delta R parameter, defaults to 0.4</p>
+<p>Return
+Mask to select non-overlapping candidates in the collection to be cleaned</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.sigmoid">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">sigmoid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">c</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#sigmoid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.sigmoid" title="Link to this definition">¶</a></dt>
+<dd><p>Sigmoid function for trigger turn-on fits.</p>
+<p>f(x) = c + (d-c) / (1 + np.exp(-a * (x-b)))</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.sigmoid3">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">sigmoid3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">c</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#sigmoid3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.sigmoid3" title="Link to this definition">¶</a></dt>
+<dd><p>Sigmoid function with three parameters.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.exponential">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">exponential</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">c</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#exponential"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.exponential" title="Link to this definition">¶</a></dt>
+<dd><p>Exponential function for scale factor fits.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.candidates_in_hem">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">candidates_in_hem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">candidates</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#candidates_in_hem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.candidates_in_hem" title="Link to this definition">¶</a></dt>
+<dd><p>Returns a mask telling you which candidates are in the HEM region</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.electrons_in_hem">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">electrons_in_hem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">electrons</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#electrons_in_hem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.electrons_in_hem" title="Link to this definition">¶</a></dt>
+<dd><p>Returns a mask telling you which electrons (different region def compared to jets) are in the HEM region</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.calculate_vecB">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">calculate_vecB</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ak4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">met_pt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">met_phi</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#calculate_vecB"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.calculate_vecB" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate vecB (balance) quantity, based on jets and MET.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.mathutil.calculate_vecDPhi">
+<span class="sig-prename descclassname"><span class="pre">src.utils.mathutil.</span></span><span class="sig-name descname"><span class="pre">calculate_vecDPhi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ak4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">met_pt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">met_phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tk_met_phi</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/mathutil.html#calculate_vecDPhi"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.mathutil.calculate_vecDPhi" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate vecDPhi quantitity.</p>
+</dd></dl>
+
+</section>
+<section id="module-src.utils.plotutil">
+<span id="src-utils-plotutil-module"></span><h2>src.utils.plotutil module<a class="headerlink" href="#module-src.utils.plotutil" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.plotutil.corr_heatmap">
+<span class="sig-prename descclassname"><span class="pre">src.utils.plotutil.</span></span><span class="sig-name descname"><span class="pre">corr_heatmap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/plotutil.html#corr_heatmap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.plotutil.corr_heatmap" title="Link to this definition">¶</a></dt>
+<dd><p>Plot a heatmap of the correlation matrix of the dataframe.</p>
+</dd></dl>
+
+</section>
+<section id="src-utils-rootutil-module">
+<h2>src.utils.rootutil module<a class="headerlink" href="#src-utils-rootutil-module" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-src.utils.statsutil">
+<span id="src-utils-statsutil-module"></span><h2>src.utils.statsutil module<a class="headerlink" href="#module-src.utils.statsutil" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.utils.statsutil.calculate_rates">
+<span class="sig-prename descclassname"><span class="pre">src.utils.statsutil.</span></span><span class="sig-name descname"><span class="pre">calculate_rates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">true_labels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">predicted_labels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/statsutil.html#calculate_rates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.statsutil.calculate_rates" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate FPR, FNR, TPR, TNR.</p>
+<p>Parameters:
+- true_labels: Boolean array where True represents a positive label.
+- predicted_labels: Boolean array where True represents a positive prediction.</p>
+<p>Returns:
+- Dictionary with FPR, FNR, TPR, TNR.</p>
+</dd></dl>
+
+</section>
+<section id="module-src.utils">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-src.utils" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">CoffeaMate</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="src.learning.html">src.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="src.plotting.html">src.plotting package</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">src.utils package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-src.utils.cutflowutil">src.utils.cutflowutil module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-src.utils.datautil">src.utils.datautil module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-src.utils.dsmethods">src.utils.dsmethods module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-src.utils.filesysutil">src.utils.filesysutil module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-src.utils.mathutil">src.utils.mathutil module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-src.utils.plotutil">src.utils.plotutil module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#src-utils-rootutil-module">src.utils.rootutil module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-src.utils.statsutil">src.utils.statsutil module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-src.utils">Module contents</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="src.plotting.html" title="previous chapter">src.plotting package</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024, Joy Zhou.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/src.utils.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,45 @@
+src.analysis package
+====================
+
+Submodules
+----------
+
+src.analysis.evtselutil module
+------------------------------
+
+.. automodule:: src.analysis.evtselutil
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+src.analysis.objutil module
+---------------------------
+
+.. automodule:: src.analysis.objutil
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+src.analysis.processor module
+-----------------------------
+
+.. automodule:: src.analysis.processor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+src.analysis.spawnjobs module
+-----------------------------
+
+.. automodule:: src.analysis.spawnjobs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: src.analysis
+   :members:
+   :undoc-members:
+   :show-inheritance:
