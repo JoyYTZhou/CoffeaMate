@@ -1,0 +1,406 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CoffeaMate.utils.cutflowutil &mdash; CoffeaMate 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            CoffeaMate
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CoffeaMate</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">CoffeaMate.utils.cutflowutil</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for CoffeaMate.utils.cutflowutil</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">awkward</span> <span class="k">as</span> <span class="nn">ak</span>
+<span class="kn">from</span> <span class="nn">coffea.analysis_tools</span> <span class="kn">import</span> <span class="n">PackedSelection</span><span class="p">,</span> <span class="n">Cutflow</span>
+<span class="kn">import</span> <span class="nn">coffea.util</span>
+<span class="kn">import</span> <span class="nn">dask_awkward</span><span class="o">,</span> <span class="nn">dask</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">namedtuple</span>
+
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.filesysutil</span> <span class="kn">import</span> <span class="n">FileSysHelper</span>
+
+<span class="n">pjoin</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span>
+<span class="n">runcom</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span>
+
+<div class="viewcode-block" id="weightedCutflow">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weightedCutflow">[docs]</a>
+<span class="k">class</span> <span class="nc">weightedCutflow</span><span class="p">(</span><span class="n">Cutflow</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">names</span><span class="p">,</span> <span class="n">nevonecut</span><span class="p">,</span> <span class="n">nevcutflow</span><span class="p">,</span> <span class="n">wgtevcutflow</span><span class="p">,</span> <span class="n">masksonecut</span><span class="p">,</span> <span class="n">maskscutflow</span><span class="p">,</span> <span class="n">delayed_mode</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_names</span> <span class="o">=</span> <span class="n">names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nevonecut</span> <span class="o">=</span> <span class="n">nevonecut</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nevcutflow</span> <span class="o">=</span> <span class="n">nevcutflow</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_wgtevcutflow</span> <span class="o">=</span> <span class="n">wgtevcutflow</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_masksonecut</span> <span class="o">=</span> <span class="n">masksonecut</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_maskscutflow</span> <span class="o">=</span> <span class="n">maskscutflow</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_delayed_mode</span> <span class="o">=</span> <span class="n">delayed_mode</span>
+    
+    <span class="k">def</span> <span class="fm">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cutflow2</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_delayed_mode</span> <span class="o">!=</span> <span class="n">cutflow2</span><span class="o">.</span><span class="n">_delayed_mode</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Concatenation of delayed and computed cutflows are not supported now!&quot;</span><span class="p">)</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_names</span> <span class="o">+</span> <span class="n">cutflow2</span><span class="o">.</span><span class="n">_names</span>
+        <span class="n">nevonecut</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nevonecut</span> <span class="o">+</span> <span class="n">cutflow2</span><span class="o">.</span><span class="n">_nevonecut</span>
+        <span class="n">nevcutflow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nevcutflow</span> <span class="o">+</span> <span class="n">cutflow2</span><span class="o">.</span><span class="n">_nevcutflow</span>
+        <span class="n">wgtevcutflow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wgtevcutflow</span> <span class="o">+</span> <span class="n">cutflow2</span><span class="o">.</span><span class="n">_wgtevcutflow</span>
+        <span class="n">masksonecut</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_masksonecut</span> <span class="o">+</span> <span class="n">cutflow2</span><span class="o">.</span><span class="n">_masksonecut</span>
+        <span class="n">maskscutflow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_maskscutflow</span> <span class="o">+</span> <span class="n">cutflow2</span><span class="o">.</span><span class="n">_maskscutflow</span>
+
+        <span class="k">return</span> <span class="n">weightedCutflow</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="n">nevonecut</span><span class="p">,</span> <span class="n">nevcutflow</span><span class="p">,</span> <span class="n">wgtevcutflow</span><span class="p">,</span> <span class="n">masksonecut</span><span class="p">,</span> <span class="n">maskscutflow</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_delayed_mode</span><span class="p">)</span>
+
+<div class="viewcode-block" id="weightedCutflow.result">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weightedCutflow.result">[docs]</a>
+    <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the results of the cutflow as a namedtuple</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">            result : CutflowResult</span>
+<span class="sd">                A namedtuple with the following attributes:</span>
+
+<span class="sd">                nevonecut : list of integers or dask_awkward.lib.core.Scalar objects</span>
+<span class="sd">                    The number of events that survive each cut alone as a list of integers or delayed integers</span>
+<span class="sd">                nevcutflow : list of integers or dask_awkward.lib.core.Scalar objects</span>
+<span class="sd">                    The number of events that survive the cumulative cutflow as a list of integers or delayed integers</span>
+<span class="sd">                wgtevcutflow: list of integers or dask_awesome.lib.core.Scalar objects</span>
+<span class="sd">                    The number of events that survive the weighted cutflow as a list of integers or delayed integers</span>
+<span class="sd">                masksonecut : list of boolean numpy.ndarray or dask_awkward.lib.core.Array objects</span>
+<span class="sd">                    The boolean mask vectors of which events pass each cut alone as a list of materialized or delayed boolean arrays</span>
+<span class="sd">                maskscutflow : list of boolean numpy.ndarray or dask_awkward.lib.core.Array objects</span>
+<span class="sd">                    The boolean mask vectors of which events pass the cumulative cutflow a list of materialized or delayed boolean arrays</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">CutflowResult</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span>
+            <span class="s2">&quot;CutflowResult&quot;</span><span class="p">,</span>
+            <span class="p">[</span><span class="s2">&quot;labels&quot;</span><span class="p">,</span> <span class="s2">&quot;nevonecut&quot;</span><span class="p">,</span> <span class="s2">&quot;nevcutflow&quot;</span><span class="p">,</span> <span class="s2">&quot;wgtevcutflow&quot;</span><span class="p">,</span> <span class="s2">&quot;masksonecut&quot;</span><span class="p">,</span> <span class="s2">&quot;maskscutflow&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;initial&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_names</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">CutflowResult</span><span class="p">(</span>
+            <span class="n">labels</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_nevonecut</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_nevcutflow</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_wgtevcutflow</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_masksonecut</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_maskscutflow</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="weightedSelection">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weightedSelection">[docs]</a>
+<span class="k">class</span> <span class="nc">weightedSelection</span><span class="p">(</span><span class="n">PackedSelection</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">perevtwgt</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;uint32&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;An inherited class that represents a set of selections on a set of events with weights</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        - ``perevtwgt`` : dask.array.Array that represents the weights of the events</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_perevtwgt</span> <span class="o">=</span> <span class="n">perevtwgt</span>
+    
+<div class="viewcode-block" id="weightedSelection.add_sequential">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weightedSelection.add_sequential">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_sequential</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">thissel</span><span class="p">,</span> <span class="n">lastsel</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">thissel</span><span class="p">,</span> <span class="n">dask</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">lastsel</span><span class="p">,</span> <span class="n">dask</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Dask arrays are not supported, please convert them to dask_awkward.Array by using dask_awkward.from_dask_array()&quot;</span>
+            <span class="p">)</span>
+        <span class="n">thissel</span> <span class="o">=</span> <span class="n">coffea</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">_ensure_flat</span><span class="p">(</span><span class="n">thissel</span><span class="p">,</span> <span class="n">allow_missing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">lastsel</span> <span class="o">=</span> <span class="n">coffea</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">_ensure_flat</span><span class="p">(</span><span class="n">lastsel</span><span class="p">,</span> <span class="n">allow_missing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">last1</span> <span class="o">=</span> <span class="n">lastsel</span><span class="p">[</span><span class="n">lastsel</span><span class="o">==</span><span class="kc">True</span><span class="p">]</span>
+        <span class="n">result1</span> <span class="o">=</span> <span class="n">last1</span> <span class="o">&amp;</span> <span class="n">thissel</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">lastsel</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">result</span><span class="p">[</span><span class="n">lastsel</span><span class="o">==</span><span class="kc">True</span><span class="p">]</span> <span class="o">=</span> <span class="n">result1</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_PackedSelection__add_eager</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">dask_awkward</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_PackedSelection__add_delayed</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="weightedSelection.cutflow">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weightedSelection.cutflow">[docs]</a>
+    <span class="k">def</span> <span class="nf">cutflow</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">names</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">weightedCutflow</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">cut</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cut</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="n">cut</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_names</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;All arguments must be strings that refer to the names of existing selections&quot;</span>
+                <span class="p">)</span>
+        <span class="n">masksonecut</span><span class="p">,</span> <span class="n">maskscutflow</span><span class="p">,</span> <span class="n">maskwgtcutflow</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">cut</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">names</span><span class="p">):</span>
+            <span class="n">mask1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">cut</span><span class="p">)</span>
+            <span class="n">mask2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">names</span><span class="p">[:</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]))</span>
+            <span class="n">maskwgt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_perevtwgt</span><span class="p">[</span><span class="n">mask2</span><span class="p">]</span>
+            <span class="n">masksonecut</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mask1</span><span class="p">)</span>
+            <span class="n">maskscutflow</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mask2</span><span class="p">)</span>
+            <span class="n">maskwgtcutflow</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">maskwgt</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">delayed_mode</span><span class="p">:</span>
+            <span class="n">nevonecut</span> <span class="o">=</span> <span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">)]</span>
+            <span class="n">nevcutflow</span> <span class="o">=</span> <span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">)]</span>
+            <span class="n">nevonecut</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">masksonecut</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+            <span class="n">nevcutflow</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">maskscutflow</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_perevtwgt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">wgtevcutflow</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_perevtwgt</span><span class="p">)]</span>
+                <span class="n">wgtevcutflow</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ak</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">maskwgt</span><span class="p">),</span> <span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">maskwgt</span> <span class="ow">in</span> <span class="n">maskwgtcutflow</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">wgtevcutflow</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">nevonecut</span> <span class="o">=</span> <span class="p">[</span><span class="n">dask_awkward</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+            <span class="n">nevcutflow</span> <span class="o">=</span> <span class="p">[</span><span class="n">dask_awkward</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+            
+            <span class="k">def</span> <span class="nf">catchZeroArr</span><span class="p">(</span><span class="n">mask</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dask_awkward</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span>
+                <span class="k">except</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mask</span><span class="o">.</span><span class="n">compute</span><span class="p">(),</span> <span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+            <span class="n">nevonecut</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">catchZeroArr</span><span class="p">(</span><span class="n">mask1</span><span class="p">)</span> <span class="k">for</span> <span class="n">mask1</span> <span class="ow">in</span> <span class="n">masksonecut</span><span class="p">])</span>
+            <span class="n">nevcutflow</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">catchZeroArr</span><span class="p">(</span><span class="n">mask2</span><span class="p">)</span> <span class="k">for</span> <span class="n">mask2</span> <span class="ow">in</span> <span class="n">maskscutflow</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_perevtwgt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">wgtevcutflow</span> <span class="o">=</span> <span class="p">[</span><span class="n">catchZeroArr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_perevtwgt</span><span class="p">)]</span> 
+                <span class="n">wgtevcutflow</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">catchZeroArr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_perevtwgt</span><span class="p">[</span><span class="n">mask2</span><span class="p">])</span> <span class="k">for</span> <span class="n">mask2</span> <span class="ow">in</span> <span class="n">maskscutflow</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">wgtevcutflow</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">weightedCutflow</span><span class="p">(</span>
+            <span class="n">names</span><span class="p">,</span> <span class="n">nevonecut</span><span class="p">,</span> <span class="n">nevcutflow</span><span class="p">,</span> <span class="n">wgtevcutflow</span><span class="p">,</span> <span class="n">masksonecut</span><span class="p">,</span> <span class="n">maskscutflow</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">delayed_mode</span>
+        <span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="load_csvs">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.load_csvs">[docs]</a>
+<span class="k">def</span> <span class="nf">load_csvs</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">filepattern</span><span class="p">,</span> <span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load csv files matching a pattern into a list of DataFrames. Post process if func is provided.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    - `dirname`: directory name to search for</span>
+<span class="sd">    - `startpattern`: pattern to match the file names</span>
+<span class="sd">    - `func`: function to apply to the list of DataFrames. Must return an Pandas object.</span>
+<span class="sd">    - `*args`, `**kwargs`: additional arguments to pass to the function</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">file_names</span> <span class="o">=</span> <span class="n">FileSysHelper</span><span class="o">.</span><span class="n">glob_files</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">filepattern</span><span class="o">=</span><span class="n">filepattern</span><span class="p">)</span>
+    <span class="n">dfs</span> <span class="o">=</span> <span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">file_name</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">file_name</span> <span class="ow">in</span> <span class="n">file_names</span><span class="p">]</span> 
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">dfs</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No files found with filepattern </span><span class="si">{</span><span class="n">filepattern</span><span class="si">}</span><span class="s2"> in </span><span class="si">{</span><span class="n">dirname</span><span class="si">}</span><span class="s2">, please double check if your output files match the input filepattern to glob.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">func</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">dfs</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="n">dfs</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="combine_cf">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.combine_cf">[docs]</a>
+<span class="k">def</span> <span class="nf">combine_cf</span><span class="p">(</span><span class="n">inputdir</span><span class="p">,</span> <span class="n">dsname</span><span class="p">,</span> <span class="n">keyword</span><span class="o">=</span><span class="s1">&#39;cutflow&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">outpath</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Combines(sums) all cutflow tables in a source directory belonging to one datset and output them into output directory.</span>
+<span class="sd">    Essentially this will grep files of pattern &quot;{dsname}*{keyword}*.csv&quot; and combine them to one csv file.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    - `inputdir`: source directory</span>
+<span class="sd">    - `dsname`: dataset name. </span>
+<span class="sd">    - `keyword`: keyword to search for </span>
+<span class="sd">    - `output`: whether to save the combined table into a csv file</span>
+<span class="sd">    - `outpath`: path to the output</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">concat_df</span> <span class="o">=</span> <span class="n">load_csvs</span><span class="p">(</span><span class="n">dirname</span><span class="o">=</span><span class="n">inputdir</span><span class="p">,</span> <span class="n">filepattern</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">dsname</span><span class="si">}</span><span class="s1">*</span><span class="si">{</span><span class="n">keyword</span><span class="si">}</span><span class="s1">*.csv&#39;</span><span class="p">,</span> 
+                          <span class="n">func</span><span class="o">=</span><span class="k">lambda</span> <span class="n">dfs</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">dfs</span><span class="p">))</span>
+    <span class="n">combined</span> <span class="o">=</span> <span class="n">concat_df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">concat_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">combined</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">combined</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">dsname</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">combined</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">combined</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">dsname</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">output</span> <span class="ow">and</span> <span class="n">outpath</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span> <span class="n">combined</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">outpath</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">combined</span></div>
+
+
+<div class="viewcode-block" id="add_selcutflow">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.add_selcutflow">[docs]</a>
+<span class="k">def</span> <span class="nf">add_selcutflow</span><span class="p">(</span><span class="n">cutflowlist</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">outpath</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add cutflows sequentially.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    - `cutflowlist`: list of cutflow csv files</span>
+<span class="sd">    - `save`: whether to save the combined table into a csv file</span>
+<span class="sd">    - `outpath`: path to the output</span>
+<span class="sd">    </span>
+<span class="sd">    Return</span>
+<span class="sd">    - combined cutflow table&quot;&quot;&quot;</span>
+    <span class="n">dfs</span> <span class="o">=</span> <span class="n">load_csvs</span><span class="p">(</span><span class="n">cutflowlist</span><span class="p">)</span>
+    <span class="n">dfs</span> <span class="o">=</span> <span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">df</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">dfs</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">dfs</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">save</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">outpath</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="weight_cf">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.weight_cf">[docs]</a>
+<span class="k">def</span> <span class="nf">weight_cf</span><span class="p">(</span><span class="n">wgt_dict</span><span class="p">,</span> <span class="n">raw_cf</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">outname</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lumi</span><span class="o">=</span><span class="mi">50</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate weighted table based on raw table.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    - `wgt_dict`: dictionary of weights</span>
+<span class="sd">    - `raw_cf`: raw cutflow table</span>
+<span class="sd">    - `lumi`: luminosity (pb^-1)</span>
+
+<span class="sd">    Return</span>
+<span class="sd">    - `wgt_df`: weighted cutflow table</span>
+<span class="sd">    &quot;&quot;&quot;</span> 
+    <span class="n">weights</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">wgt</span><span class="o">*</span><span class="n">lumi</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">wgt</span> <span class="ow">in</span> <span class="n">wgt_dict</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="n">wgt_df</span> <span class="o">=</span> <span class="n">raw_cf</span><span class="o">.</span><span class="n">mul</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">save</span> <span class="ow">and</span> <span class="n">outname</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span> <span class="n">wgt_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">outname</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">wgt_df</span></div>
+
+
+<div class="viewcode-block" id="calc_eff">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.calc_eff">[docs]</a>
+<span class="k">def</span> <span class="nf">calc_eff</span><span class="p">(</span><span class="n">cfdf</span><span class="p">,</span> <span class="n">column_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;incremental&#39;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return efficiency for each column in the DataFrame right after the column itself.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    - `cfdf`: DataFrame to calculate efficiency on</span>
+<span class="sd">    - `column_name`: specific column to calculate efficiency on (optional)</span>
+<span class="sd">    - `type`: type of efficiency calculation. &#39;incremental&#39; or &#39;overall&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">calculate_efficiency</span><span class="p">(</span><span class="n">series</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">type</span> <span class="o">==</span> <span class="s1">&#39;incremental&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">series</span><span class="o">.</span><span class="n">div</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">shift</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">type</span> <span class="o">==</span> <span class="s1">&#39;overall&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">series</span><span class="o">.</span><span class="n">div</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid type. Expected &#39;incremental&#39; or &#39;overall&#39;.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">column_name</span><span class="p">:</span>
+        <span class="n">eff_series</span> <span class="o">=</span> <span class="n">calculate_efficiency</span><span class="p">(</span><span class="n">cfdf</span><span class="p">[</span><span class="n">column_name</span><span class="p">])</span>
+        <span class="n">eff_series</span><span class="o">.</span><span class="n">replace</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">eff_series</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span> <span class="k">if</span> <span class="nb">type</span> <span class="o">==</span> <span class="s1">&#39;incremental&#39;</span> <span class="k">else</span> <span class="mi">1</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">cfdf</span><span class="o">.</span><span class="n">columns</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>  <span class="c1"># Iterate in reverse to avoid column shifting issues</span>
+            <span class="n">eff_series</span> <span class="o">=</span> <span class="n">calculate_efficiency</span><span class="p">(</span><span class="n">cfdf</span><span class="p">[</span><span class="n">col</span><span class="p">])</span>
+            <span class="n">eff_series</span><span class="o">.</span><span class="n">replace</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">eff_series</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span> <span class="k">if</span> <span class="nb">type</span> <span class="o">==</span> <span class="s1">&#39;incremental&#39;</span> <span class="k">else</span> <span class="mi">1</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">cfdf</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">cfdf</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">get_loc</span><span class="p">(</span><span class="n">col</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">_eff&quot;</span><span class="p">,</span> <span class="n">eff_series</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">inplace</span><span class="p">:</span> <span class="k">return</span> <span class="n">cfdf</span>
+    <span class="k">else</span><span class="p">:</span> <span class="k">return</span> <span class="n">eff_series</span></div>
+
+    
+
+<div class="viewcode-block" id="sort_cf">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.cutflowutil.sort_cf">[docs]</a>
+<span class="k">def</span> <span class="nf">sort_cf</span><span class="p">(</span><span class="n">ds_list</span><span class="p">,</span> <span class="n">srcdir</span><span class="p">,</span> <span class="n">outdir</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a multi index table that contains all channel cutflows for all datasets.</span>
+
+<span class="sd">    :param ds_list: list of strings of dataset</span>
+<span class="sd">    :param srcdir: output cutflow source directory</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">multi_indx</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">df_list</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">ds_list</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ds</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ds_list</span><span class="p">):</span>
+        <span class="n">ds_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">srcdir</span><span class="p">,</span> <span class="n">ds</span><span class="p">)</span>
+        <span class="n">ds_cf</span> <span class="o">=</span> <span class="n">combine_cf</span><span class="p">(</span><span class="n">ds_dir</span><span class="p">,</span> <span class="n">ds</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">outpath</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">efficiency</span><span class="p">(</span><span class="n">outdir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cfdf</span><span class="o">=</span><span class="n">ds_cf</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">df_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">ds_cf</span>
+        <span class="n">multi_indx</span> <span class="o">+=</span> <span class="p">[(</span><span class="n">ds</span><span class="p">,</span> <span class="n">indx</span><span class="p">)</span> <span class="k">for</span> <span class="n">indx</span> <span class="ow">in</span> <span class="n">ds_cf</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
+    
+    <span class="n">allds_cf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">df_list</span><span class="p">)</span>
+    <span class="n">allds_cf</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_tuples</span><span class="p">(</span><span class="n">multi_indx</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Process&#39;</span><span class="p">,</span> <span class="s1">&#39;Selection&#39;</span><span class="p">])</span>
+
+    <span class="k">if</span> <span class="n">save</span><span class="p">:</span> 
+        <span class="n">finame</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">outdir</span><span class="p">,</span> <span class="s1">&#39;cutflow_table.csv&#39;</span><span class="p">)</span>
+        <span class="n">allds_cf</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">finame</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">allds_cf</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Joy Zhou.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

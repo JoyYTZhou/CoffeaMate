@@ -1,0 +1,432 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CoffeaMate.analysis.objutil &mdash; CoffeaMate 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            CoffeaMate
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CoffeaMate</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">CoffeaMate.analysis.objutil</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for CoffeaMate.analysis.objutil</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">weakref</span>
+<span class="kn">import</span> <span class="nn">vector</span> <span class="k">as</span> <span class="nn">vec</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">operator</span> <span class="k">as</span> <span class="nn">opr</span>
+<span class="kn">import</span> <span class="nn">dask_awkward</span> <span class="k">as</span> <span class="nn">dak</span>
+<span class="kn">import</span> <span class="nn">awkward</span> <span class="k">as</span> <span class="nn">ak</span>
+
+<span class="kn">from</span> <span class="nn">CoffeaMate.utils.datautil</span> <span class="kn">import</span> <span class="n">arr_handler</span>
+
+<div class="viewcode-block" id="Object">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object">[docs]</a>
+<span class="k">class</span> <span class="nc">Object</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Object class for handling object selections, meant as an observer of the events.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    - `name`: name of the object</span>
+<span class="sd">    - `events`: a weak proxy of the events </span>
+<span class="sd">    - `selcfg`: selection configuration for the object, {key=abbreviation, value=threshold}</span>
+<span class="sd">    - `mapcfg`: mapping configuration for the object</span>
+<span class="sd">    - `fields`: list of fields in the object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">events</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">selcfg</span><span class="p">,</span> <span class="n">mapcfg</span><span class="p">,</span> <span class="n">weakrefEvt</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct an object from provided events with given selection configuration.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        - `name`: AOD prefix name of the object, e.g. Electron, Muon, Jet</span>
+
+<span class="sd">        kwargs: </span>
+<span class="sd">        - `selcfg`: selection configuration for the object</span>
+<span class="sd">        - `mapcfg`: mapping configuration for the object</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__weakref</span> <span class="o">=</span> <span class="n">weakrefEvt</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">events</span> <span class="o">=</span> <span class="n">events</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_selcfg</span> <span class="o">=</span> <span class="n">selcfg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mapcfg</span> <span class="o">=</span> <span class="n">mapcfg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mapcfg</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">events</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_events</span>
+
+    <span class="nd">@events</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_events</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">proxy</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">__weakref</span> <span class="k">else</span> <span class="n">value</span>
+    
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">selcfg</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_selcfg</span>
+    <span class="nd">@selcfg</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">selcfg</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_selcfg</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">proxy</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">selcfg</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_selcfg</span>
+    
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">mapcfg</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapcfg</span>
+        
+<div class="viewcode-block" id="Object.custommask">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.custommask">[docs]</a>
+    <span class="k">def</span> <span class="nf">custommask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">propname</span><span class="p">:</span> <span class="s1">&#39;str&#39;</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create custom mask based on input.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        - `events`: events to apply the mask on</span>
+<span class="sd">        - `propname`: name of the property mask is based on</span>
+<span class="sd">        - `op`: operator to use for the mask</span>
+<span class="sd">        - `func`: function to apply to the data. Defaults to None.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        - `mask`: mask based on input</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">selcfg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">propname</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;threshold value </span><span class="si">{</span><span class="n">propname</span><span class="si">}</span><span class="s2"> is not given for object </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">propname</span><span class="si">}</span><span class="s1">&#39;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapcfg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">propname</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Nanoaodname is not given for </span><span class="si">{</span><span class="n">propname</span><span class="si">}</span><span class="s2"> of object </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">aodname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapcfg</span><span class="p">[</span><span class="n">propname</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">aodname</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">propname</span><span class="si">}</span><span class="s1">&#39;</span> 
+        <span class="n">selval</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">selcfg</span><span class="p">[</span><span class="n">propname</span><span class="p">]</span>
+        <span class="n">aodarr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">[</span><span class="n">aodname</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">func</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="n">func</span><span class="p">(</span><span class="n">aodarr</span><span class="p">),</span> <span class="n">selval</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="n">aodarr</span><span class="p">,</span> <span class="n">selval</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Object.ptmask">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.ptmask">[docs]</a>
+    <span class="k">def</span> <span class="nf">ptmask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Object Level mask for pt.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">custommask</span><span class="p">(</span><span class="s1">&#39;pt&#39;</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Object.absetamask">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.absetamask">[docs]</a>
+    <span class="k">def</span> <span class="nf">absetamask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Object Level mask for |eta|.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">custommask</span><span class="p">(</span><span class="s1">&#39;eta&#39;</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="nb">abs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Object.absdxymask">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.absdxymask">[docs]</a>
+    <span class="k">def</span> <span class="nf">absdxymask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Object Level mask for |dxy|.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">custommask</span><span class="p">(</span><span class="s1">&#39;dxy&#39;</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="nb">abs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Object.absdzmask">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.absdzmask">[docs]</a>
+    <span class="k">def</span> <span class="nf">absdzmask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Object Level mask for |dz|.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">custommask</span><span class="p">(</span><span class="s1">&#39;dz&#39;</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="nb">abs</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Object.numselmask">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.numselmask">[docs]</a>
+    <span class="k">def</span> <span class="nf">numselmask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mask</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns event-level boolean mask.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Object</span><span class="o">.</span><span class="n">maskredmask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">selcfg</span><span class="o">.</span><span class="n">count</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Object.vetomask">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.vetomask">[docs]</a>
+    <span class="k">def</span> <span class="nf">vetomask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mask</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the veto mask for events.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Object</span><span class="o">.</span><span class="n">maskredmask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">opr</span><span class="o">.</span><span class="n">eq</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Object.evtosmask">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.evtosmask">[docs]</a>
+    <span class="k">def</span> <span class="nf">evtosmask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">selmask</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create mask on events with OS objects.</span>
+<span class="sd">        !!! Note that this mask is applied per event, not per object.</span>
+<span class="sd">        1 for events with 2 OS objects that pass selmask&quot;&quot;&quot;</span>
+        <span class="n">aodname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapcfg</span><span class="p">[</span><span class="s1">&#39;charge&#39;</span><span class="p">]</span>
+        <span class="n">aodarr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">[</span><span class="n">aodname</span><span class="p">][</span><span class="n">selmask</span><span class="p">]</span>
+        <span class="n">sum_charge</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">ak</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">aodarr</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="p">(</span><span class="n">sum_charge</span> <span class="o">&lt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">num</span><span class="p">(</span><span class="n">aodarr</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">mask</span></div>
+
+    
+<div class="viewcode-block" id="Object.dRwSelf">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.dRwSelf">[docs]</a>
+    <span class="k">def</span> <span class="nf">dRwSelf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Haphazard way to select pairs of objects&quot;&quot;&quot;</span>
+        <span class="n">object_lv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getfourvec</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">leading_lv</span> <span class="o">=</span> <span class="n">object_lv</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">subleading_lvs</span> <span class="o">=</span> <span class="n">object_lv</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="n">dR_mask</span> <span class="o">=</span> <span class="n">Object</span><span class="o">.</span><span class="n">dRoverlap</span><span class="p">(</span><span class="n">leading_lv</span><span class="p">,</span> <span class="n">subleading_lvs</span><span class="p">,</span> <span class="n">threshold</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dR_mask</span></div>
+
+    
+<div class="viewcode-block" id="Object.dRwOther">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.dRwOther">[docs]</a>
+    <span class="k">def</span> <span class="nf">dRwOther</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vec</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">object_lv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getfourvec</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Object</span><span class="o">.</span><span class="n">dRoverlap</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span> <span class="n">object_lv</span><span class="p">,</span> <span class="n">threshold</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Object.OSwSelf">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.OSwSelf">[docs]</a>
+    <span class="k">def</span> <span class="nf">OSwSelf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">zipped</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getzipped</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">leading</span> <span class="o">=</span> <span class="n">zipped</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">subleading</span> <span class="o">=</span> <span class="n">zipped</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="k">return</span> <span class="n">leading</span><span class="p">[</span><span class="s1">&#39;charge&#39;</span><span class="p">]</span><span class="o">*</span><span class="n">subleading</span><span class="p">[</span><span class="s1">&#39;charge&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span></div>
+
+        
+<div class="viewcode-block" id="Object.getfourvec">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.getfourvec">[docs]</a>
+    <span class="k">def</span> <span class="nf">getfourvec</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">vec</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get four vector for the object from the currently observed events.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Object</span><span class="o">.</span><span class="n">fourvector</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Object.getzipped">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.getzipped">[docs]</a>
+    <span class="k">def</span> <span class="nf">getzipped</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sort_by</span><span class="o">=</span><span class="s1">&#39;pt&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get zipped object.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        - `mask`: mask must be same dimension as any object attributes.&quot;&quot;&quot;</span>
+        <span class="n">zipped</span> <span class="o">=</span> <span class="n">Object</span><span class="o">.</span><span class="n">set_zipped</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapcfg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mask</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span> <span class="n">zipped</span> <span class="o">=</span> <span class="n">zipped</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">sort</span><span class="p">:</span> <span class="n">zipped</span> <span class="o">=</span> <span class="n">zipped</span><span class="p">[</span><span class="n">Object</span><span class="o">.</span><span class="n">sortmask</span><span class="p">(</span><span class="n">zipped</span><span class="p">[</span><span class="n">sort_by</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">zipped</span> </div>
+
+    
+<div class="viewcode-block" id="Object.getldsd">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.getldsd">[docs]</a>
+    <span class="k">def</span> <span class="nf">getldsd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the zipped leading object and the rest of the objects (aka subleading candidates).</span>
+<span class="sd">        All properties in obj setting included.&quot;&quot;&quot;</span>
+        <span class="n">objs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getzipped</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> 
+        <span class="k">return</span> <span class="p">(</span><span class="n">objs</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span> <span class="n">objs</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:])</span></div>
+
+    
+<div class="viewcode-block" id="Object.getld">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.getld">[docs]</a>
+    <span class="k">def</span> <span class="nf">getld</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+        <span class="n">objs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getzipped</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> 
+        <span class="k">return</span> <span class="n">objs</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="Object.sortmask">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.sortmask">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">sortmask</span><span class="p">(</span><span class="n">dfarr</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Wrapper around awkward argsort function.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        - `dfarr`: the data arr to be sorted</span>
+
+<span class="sd">        kwargs: see ak.argsort</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dfarr</span> <span class="o">=</span> <span class="n">arr_handler</span><span class="p">(</span><span class="n">dfarr</span><span class="p">)</span>
+        <span class="n">sortmask</span> <span class="o">=</span> <span class="n">ak</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">dfarr</span><span class="p">,</span> 
+                   <span class="n">axis</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;axis&#39;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> 
+                   <span class="n">ascending</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ascending&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                   <span class="n">highlevel</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;highlevel&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+                   <span class="p">)</span>
+        <span class="k">return</span> <span class="n">sortmask</span></div>
+
+    
+<div class="viewcode-block" id="Object.fourvector">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.fourvector">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">fourvector</span><span class="p">(</span><span class="n">events</span><span class="p">:</span> <span class="s1">&#39;ak.Array&#39;</span><span class="p">,</span> <span class="n">objname</span><span class="p">:</span> <span class="s1">&#39;str&#39;</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sortname</span><span class="o">=</span><span class="s1">&#39;pt&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">vec</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a fourvector from the events.</span>
+<span class="sd">    </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        - `events`: the events to extract the fourvector from. </span>
+<span class="sd">        - `objname`: the name of the field in the events that contains the fourvector information.</span>
+<span class="sd">        - `sort`: whether to sort the fourvector</span>
+<span class="sd">        - `sortname`: the name of the field to sort the fourvector by.</span>
+<span class="sd">        - `ascending`: whether to sort the fourvector in ascending order.</span>
+
+<span class="sd">        Return</span>
+<span class="sd">        - a fourvector object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">to_be_zipped</span> <span class="o">=</span> <span class="n">Object</span><span class="o">.</span><span class="n">get_namemap</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">objname</span><span class="p">)</span>
+        <span class="n">object_ak</span> <span class="o">=</span> <span class="n">ak</span><span class="o">.</span><span class="n">zip</span><span class="p">(</span><span class="n">to_be_zipped</span><span class="p">)</span> <span class="k">if</span> <span class="n">mask</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ak</span><span class="o">.</span><span class="n">zip</span><span class="p">(</span><span class="n">to_be_zipped</span><span class="p">)[</span><span class="n">mask</span><span class="p">]</span> 
+        <span class="k">if</span> <span class="n">sort</span><span class="p">:</span>
+            <span class="n">object_ak</span> <span class="o">=</span> <span class="n">object_ak</span><span class="p">[</span><span class="n">ak</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">object_ak</span><span class="p">[</span><span class="n">sortname</span><span class="p">],</span> <span class="n">ascending</span><span class="o">=</span><span class="n">ascending</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">)]</span>
+        <span class="n">object_LV</span> <span class="o">=</span> <span class="n">vec</span><span class="o">.</span><span class="n">Array</span><span class="p">(</span><span class="n">object_ak</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">object_LV</span></div>
+
+
+<div class="viewcode-block" id="Object.set_zipped">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.set_zipped">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">set_zipped</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">objname</span><span class="p">,</span> <span class="n">namemap</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Given events, read only object-related observables and zip them into ak. </span>
+<span class="sd">        Then zip the dict into an object.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        - `events`: events to extract the object from</span>
+<span class="sd">        - `namemap`: mapping configuration for the object</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">zipped_dict</span> <span class="o">=</span> <span class="n">Object</span><span class="o">.</span><span class="n">get_namemap</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">objname</span><span class="p">,</span> <span class="n">namemap</span><span class="p">)</span>
+        <span class="n">zipped_object</span> <span class="o">=</span> <span class="n">dak</span><span class="o">.</span><span class="n">zip</span><span class="p">(</span><span class="n">zipped_dict</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">dak</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="k">else</span> <span class="n">ak</span><span class="o">.</span><span class="n">zip</span><span class="p">(</span><span class="n">zipped_dict</span><span class="p">)</span> 
+        <span class="k">return</span> <span class="n">zipped_object</span></div>
+
+
+<div class="viewcode-block" id="Object.object_to_df">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.object_to_df">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">object_to_df</span><span class="p">(</span><span class="n">zipped</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Take a zipped object, compute it if needed, turn it into a dataframe&quot;&quot;&quot;</span>
+        <span class="n">zipped</span> <span class="o">=</span> <span class="n">arr_handler</span><span class="p">(</span><span class="n">zipped</span><span class="p">,</span> <span class="n">allow_delayed</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">objdf</span> <span class="o">=</span> <span class="n">ak</span><span class="o">.</span><span class="n">to_dataframe</span><span class="p">(</span><span class="n">zipped</span><span class="p">)</span><span class="o">.</span><span class="n">add_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">objdf</span></div>
+
+
+<div class="viewcode-block" id="Object.maskredmask">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.maskredmask">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">maskredmask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reduces the mask to event level selections.</span>
+<span class="sd">        Count is the number of objects per event that should return true in the mask. </span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        - `mask`: the mask to be reduced</span>
+<span class="sd">        - `op`: the operator to be used for the reduction</span>
+<span class="sd">        - `count`: the count to be used for the reduction</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="n">ak</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">count</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Object.dRoverlap">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.dRoverlap">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">dRoverlap</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span> <span class="n">veclist</span><span class="p">:</span> <span class="s1">&#39;vec.Array&#39;</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">opr</span><span class="o">.</span><span class="n">ge</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ak</span><span class="o">.</span><span class="n">highlevel</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return deltaR mask. Default comparison threshold is 0.4. Default comparison is &gt;=. </span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        - `vec`: the vector to compare with</span>
+<span class="sd">        - `veclist`: the list of vectors to compare against vec</span>
+<span class="sd">        - `threshold`: the threshold for the comparison</span>
+<span class="sd">        </span>
+<span class="sd">        Return</span>
+<span class="sd">        - a mask of the veclist that satisfies the comparison condition.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">vec</span><span class="o">.</span><span class="n">deltaR</span><span class="p">(</span><span class="n">veclist</span><span class="p">)),</span> <span class="n">threshold</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Object.get_namemap">
+<a class="viewcode-back" href="../../../CoffeaMate.analysis.html#CoffeaMate.analysis.objutil.Object.get_namemap">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_namemap</span><span class="p">(</span><span class="n">events</span><span class="p">:</span> <span class="s1">&#39;ak.Array&#39;</span><span class="p">,</span> <span class="n">col_name</span><span class="p">:</span> <span class="s1">&#39;str&#39;</span><span class="p">,</span> <span class="n">namemap</span><span class="p">:</span> <span class="s1">&#39;dict&#39;</span> <span class="o">=</span> <span class="p">{}):</span>
+        <span class="n">vec_type</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;pt&#39;</span><span class="p">,</span> <span class="s1">&#39;eta&#39;</span><span class="p">,</span> <span class="s1">&#39;phi&#39;</span><span class="p">,</span> <span class="s1">&#39;mass&#39;</span><span class="p">]</span>
+        <span class="n">to_be_zipped</span> <span class="o">=</span> <span class="p">{</span><span class="n">cop</span><span class="p">:</span> <span class="n">events</span><span class="p">[</span><span class="n">col_name</span><span class="o">+</span><span class="s2">&quot;_&quot;</span><span class="o">+</span><span class="n">cop</span><span class="p">]</span> 
+                        <span class="k">for</span> <span class="n">cop</span> <span class="ow">in</span> <span class="n">vec_type</span><span class="p">}</span> <span class="k">if</span> <span class="n">col_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="n">cop</span><span class="p">:</span> <span class="n">events</span><span class="p">[</span><span class="n">cop</span><span class="p">]</span> <span class="k">for</span> <span class="n">cop</span> <span class="ow">in</span> <span class="n">vec_type</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">namemap</span><span class="p">:</span> <span class="n">to_be_zipped</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">name</span><span class="p">:</span> <span class="n">events</span><span class="p">[</span><span class="n">nanoaodname</span><span class="p">]</span> 
+                       <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">nanoaodname</span> <span class="ow">in</span> <span class="n">namemap</span><span class="o">.</span><span class="n">items</span><span class="p">()})</span>
+        <span class="k">return</span> <span class="n">to_be_zipped</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Joy Zhou.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

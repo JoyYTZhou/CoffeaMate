@@ -1,0 +1,321 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CoffeaMate.utils.mathutil &mdash; CoffeaMate 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            CoffeaMate
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.analysis.html">CoffeaMate.analysis package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.learning.html">CoffeaMate.learning package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.plotting.html">CoffeaMate.plotting package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CoffeaMate.utils.html">CoffeaMate.utils package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CoffeaMate</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">CoffeaMate.utils.mathutil</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for CoffeaMate.utils.mathutil</h1><div class="highlight"><pre>
+<span></span><span class="c1"># adapted from https://github.com/bu-cms/projectcoffea/blob/master/projectcoffea/helpers/helpers.py</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">awkward</span> <span class="k">as</span> <span class="nn">ak</span>
+<span class="kn">import</span> <span class="nn">vector</span> <span class="k">as</span> <span class="nn">vec</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="n">pjoin</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span>
+
+<div class="viewcode-block" id="clopper_pearson_error">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.clopper_pearson_error">[docs]</a>
+<span class="k">def</span> <span class="nf">clopper_pearson_error</span><span class="p">(</span><span class="n">passed</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mf">0.6827</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    matching TEfficiency::ClopperPearson(),</span>
+<span class="sd">    &gt;&gt;&gt; ROOT.TEfficiency.ClopperPearson(total, passed, level, is_upper)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">scipy.stats</span>
+
+    <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">level</span><span class="p">)</span>
+    <span class="n">low</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">beta</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">passed</span><span class="p">,</span> <span class="n">total</span> <span class="o">-</span> <span class="n">passed</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">high</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">beta</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">passed</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">total</span> <span class="o">-</span> <span class="n">passed</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">low</span><span class="p">,</span> <span class="n">high</span></div>
+
+
+<div class="viewcode-block" id="poisson_errors">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.poisson_errors">[docs]</a>
+<span class="k">def</span> <span class="nf">poisson_errors</span><span class="p">(</span><span class="n">obs</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mi">1</span> <span class="o">-</span> <span class="mf">0.6827</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Taken from https://github.com/aminnj/yahist/blob/master/yahist/utils.py </span>
+<span class="sd">    Return poisson low and high values for a series of data observations</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">gamma</span>
+
+    <span class="n">lows</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">gamma</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">alpha</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">obs</span><span class="p">)))</span>
+    <span class="n">highs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">gamma</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">alpha</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">obs</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">lows</span><span class="p">,</span> <span class="n">highs</span></div>
+
+    
+<div class="viewcode-block" id="simplifyError">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.simplifyError">[docs]</a>
+<span class="k">def</span> <span class="nf">simplifyError</span><span class="p">(</span><span class="n">passed</span><span class="p">,</span><span class="n">total</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="mf">0.6827</span><span class="p">):</span>
+    <span class="n">low</span><span class="p">,</span><span class="n">high</span><span class="o">=</span><span class="n">clopper_pearson_error</span><span class="p">(</span><span class="n">passed</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+    <span class="n">err</span><span class="o">=</span><span class="n">high</span><span class="o">-</span><span class="n">passed</span>
+    <span class="k">return</span> <span class="n">err</span></div>
+
+
+<div class="viewcode-block" id="dphi">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.dphi">[docs]</a>
+<span class="k">def</span> <span class="nf">dphi</span><span class="p">(</span><span class="n">phi1</span><span class="p">,</span> <span class="n">phi2</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculates delta phi between objects&quot;&quot;&quot;</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">phi1</span> <span class="o">-</span> <span class="n">phi2</span><span class="p">)</span>
+    <span class="n">sign</span> <span class="o">=</span> <span class="n">x</span><span class="o">&lt;=</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+    <span class="n">dphi</span> <span class="o">=</span> <span class="n">sign</span><span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="o">~</span><span class="n">sign</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">-</span> <span class="n">x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dphi</span></div>
+
+
+<div class="viewcode-block" id="min_dphi_jet_met">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.min_dphi_jet_met">[docs]</a>
+<span class="k">def</span> <span class="nf">min_dphi_jet_met</span><span class="p">(</span><span class="n">jets</span><span class="p">,</span> <span class="n">met_phi</span><span class="p">,</span> <span class="n">njet</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">ptmin</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">etamax</span><span class="o">=</span><span class="mf">2.4</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate minimal delta phi between jets and met</span>
+
+<span class="sd">    :param jets: Jet candidates to use, must be sorted by pT</span>
+<span class="sd">    :type jets: JaggedCandidateArray</span>
+<span class="sd">    :param met_phi: MET phi values, one per event</span>
+<span class="sd">    :type met_phi: array</span>
+<span class="sd">    :param njet: Number of leading jets to consider, defaults to 4</span>
+<span class="sd">    :type njet: int, optional</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">assert</span><span class="p">(</span><span class="n">met_phi</span><span class="o">.</span><span class="n">shape</span><span class="o">!=</span><span class="p">())</span>
+    
+
+    <span class="n">jets</span><span class="o">=</span><span class="n">jets</span><span class="p">[(</span><span class="n">jets</span><span class="o">.</span><span class="n">pt</span><span class="o">&gt;</span><span class="n">ptmin</span><span class="p">)</span><span class="o">&amp;</span><span class="p">(</span><span class="n">jets</span><span class="o">.</span><span class="n">abseta</span> <span class="o">&lt;</span> <span class="n">etamax</span><span class="p">)]</span>
+    <span class="n">jets</span> <span class="o">=</span> <span class="n">jets</span><span class="p">[:,:</span><span class="n">njet</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">dphi</span><span class="p">(</span><span class="n">jets</span><span class="o">.</span><span class="n">phi</span><span class="p">,</span> <span class="n">met_phi</span><span class="p">)</span><span class="o">.</span><span class="n">min</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="mt">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.mt">[docs]</a>
+<span class="k">def</span> <span class="nf">mt</span><span class="p">(</span><span class="n">pt1</span><span class="p">,</span> <span class="n">phi1</span><span class="p">,</span> <span class="n">pt2</span><span class="p">,</span> <span class="n">phi2</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculates MT of two objects&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">pt1</span> <span class="o">*</span> <span class="n">pt2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">phi1</span><span class="o">-</span><span class="n">phi2</span><span class="p">)))</span></div>
+
+
+<div class="viewcode-block" id="pt_phi_to_px_py">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.pt_phi_to_px_py">[docs]</a>
+<span class="k">def</span> <span class="nf">pt_phi_to_px_py</span><span class="p">(</span><span class="n">pt</span><span class="p">,</span> <span class="n">phi</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert pt and phi to px and py.&quot;&quot;&quot;</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">pt</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">pt</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span></div>
+
+
+<div class="viewcode-block" id="recoil">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.recoil">[docs]</a>
+<span class="k">def</span> <span class="nf">recoil</span><span class="p">(</span><span class="n">met_pt</span><span class="p">,</span> <span class="n">met_phi</span><span class="p">,</span> <span class="n">eles</span><span class="p">,</span> <span class="n">mus</span><span class="p">,</span> <span class="n">photons</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculates hadronic recoil by removing leptons from MET</span>
+
+<span class="sd">    :param met_pt: MET pt values</span>
+<span class="sd">    :type met_pt: array</span>
+<span class="sd">    :param met_phi: MET phi values</span>
+<span class="sd">    :type met_phi: array</span>
+<span class="sd">    :param eles: Electron candidates</span>
+<span class="sd">    :type eles: JaggedCandidateArray</span>
+<span class="sd">    :param mus: Muon candidates</span>
+<span class="sd">    :type mus: JaggedCandidateArray</span>
+<span class="sd">    :return: Pt and phi of the recoil</span>
+<span class="sd">    :rtype: tuple of arrays (pt, phi)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">met_x</span><span class="p">,</span> <span class="n">met_y</span> <span class="o">=</span> <span class="n">pt_phi_to_px_py</span><span class="p">(</span><span class="n">met_pt</span><span class="p">,</span> <span class="n">met_phi</span><span class="p">)</span>
+    <span class="n">ele_x</span><span class="p">,</span> <span class="n">ele_y</span> <span class="o">=</span> <span class="n">pt_phi_to_px_py</span><span class="p">(</span><span class="n">eles</span><span class="o">.</span><span class="n">pt</span><span class="p">,</span> <span class="n">eles</span><span class="o">.</span><span class="n">phi</span><span class="p">)</span>
+    <span class="n">gam_x</span><span class="p">,</span> <span class="n">gam_y</span> <span class="o">=</span> <span class="n">pt_phi_to_px_py</span><span class="p">(</span><span class="n">photons</span><span class="o">.</span><span class="n">pt</span><span class="p">,</span> <span class="n">photons</span><span class="o">.</span><span class="n">phi</span><span class="p">)</span>
+    <span class="n">mu_x</span><span class="p">,</span> <span class="n">mu_y</span> <span class="o">=</span> <span class="n">pt_phi_to_px_py</span><span class="p">(</span><span class="n">mus</span><span class="o">.</span><span class="n">pt</span><span class="p">,</span> <span class="n">mus</span><span class="o">.</span><span class="n">phi</span><span class="p">)</span>
+
+    <span class="n">recoil_x</span> <span class="o">=</span> <span class="n">met_x</span> <span class="o">+</span> <span class="n">ele_x</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">+</span> <span class="n">mu_x</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">+</span> <span class="n">gam_x</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">recoil_y</span> <span class="o">=</span> <span class="n">met_y</span> <span class="o">+</span> <span class="n">ele_y</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">+</span> <span class="n">mu_y</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">+</span> <span class="n">gam_y</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="n">recoil_pt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hypot</span><span class="p">(</span><span class="n">recoil_x</span><span class="p">,</span> <span class="n">recoil_y</span><span class="p">)</span>
+    <span class="n">recoil_phi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">recoil_y</span><span class="p">,</span> <span class="n">recoil_x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">recoil_pt</span><span class="p">,</span> <span class="n">recoil_phi</span></div>
+
+
+
+<div class="viewcode-block" id="weight_shape">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.weight_shape">[docs]</a>
+<span class="k">def</span> <span class="nf">weight_shape</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">weight</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Broadcasts weight array to right shape for given values&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">values</span><span class="p">)</span> <span class="o">*</span> <span class="n">weight</span><span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="object_overlap">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.object_overlap">[docs]</a>
+<span class="k">def</span> <span class="nf">object_overlap</span><span class="p">(</span><span class="n">toclean</span><span class="p">,</span> <span class="n">cleanagainst</span><span class="p">,</span> <span class="n">dr</span><span class="o">=</span><span class="mf">0.4</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate a mask to use for overlap removal</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    - `toclean`: Candidates that should be cleaned (lower priority candidats)</span>
+<span class="sd">    - `cleanagainst`: Candidate that should be cleaned against (higher priority)</span>
+<span class="sd">    - `dr`: Delta R parameter, defaults to 0.4</span>
+
+<span class="sd">    Return</span>
+<span class="sd">    Mask to select non-overlapping candidates in the collection to be cleaned</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">delta_r</span> <span class="o">=</span> <span class="n">toclean</span><span class="o">.</span><span class="n">deltaR</span><span class="p">(</span><span class="n">cleanagainst</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">delta_r</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">dr</span></div>
+
+
+<div class="viewcode-block" id="sigmoid">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.sigmoid">[docs]</a>
+<span class="k">def</span> <span class="nf">sigmoid</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">,</span><span class="n">c</span><span class="p">,</span><span class="n">d</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sigmoid function for trigger turn-on fits.</span>
+
+<span class="sd">    f(x) = c + (d-c) / (1 + np.exp(-a * (x-b)))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">c</span> <span class="o">+</span> <span class="p">(</span><span class="n">d</span><span class="o">-</span><span class="n">c</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">a</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span><span class="o">-</span><span class="n">b</span><span class="p">)))</span></div>
+
+
+<div class="viewcode-block" id="sigmoid3">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.sigmoid3">[docs]</a>
+<span class="k">def</span> <span class="nf">sigmoid3</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">,</span><span class="n">c</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Sigmoid function with three parameters.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="n">c</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">a</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span><span class="o">-</span><span class="n">b</span><span class="p">)))</span></div>
+
+
+<div class="viewcode-block" id="exponential">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.exponential">[docs]</a>
+<span class="k">def</span> <span class="nf">exponential</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exponential function for scale factor fits.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">a</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">b</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span> <span class="o">+</span> <span class="n">c</span></div>
+
+
+
+<div class="viewcode-block" id="candidates_in_hem">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.candidates_in_hem">[docs]</a>
+<span class="k">def</span> <span class="nf">candidates_in_hem</span><span class="p">(</span><span class="n">candidates</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a mask telling you which candidates are in the HEM region&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="o">-</span><span class="mf">3.0</span> <span class="o">&lt;</span> <span class="n">candidates</span><span class="o">.</span><span class="n">eta</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">candidates</span><span class="o">.</span><span class="n">eta</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mf">1.3</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.8</span> <span class="o">&lt;</span> <span class="n">candidates</span><span class="o">.</span><span class="n">phi</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">candidates</span><span class="o">.</span><span class="n">phi</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mf">0.6</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="electrons_in_hem">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.electrons_in_hem">[docs]</a>
+<span class="k">def</span> <span class="nf">electrons_in_hem</span><span class="p">(</span><span class="n">electrons</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a mask telling you which electrons (different region def compared to jets) are in the HEM region&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="o">-</span><span class="mf">3.0</span> <span class="o">&lt;</span> <span class="n">electrons</span><span class="o">.</span><span class="n">eta</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">electrons</span><span class="o">.</span><span class="n">eta</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mf">1.39</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.6</span> <span class="o">&lt;</span> <span class="n">electrons</span><span class="o">.</span><span class="n">phi</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">electrons</span><span class="o">.</span><span class="n">phi</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mf">0.9</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="calculate_vecB">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.calculate_vecB">[docs]</a>
+<span class="k">def</span> <span class="nf">calculate_vecB</span><span class="p">(</span><span class="n">ak4</span><span class="p">,</span> <span class="n">met_pt</span><span class="p">,</span> <span class="n">met_phi</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;Calculate vecB (balance) quantity, based on jets and MET.&#39;&#39;&#39;</span>
+    <span class="n">mht_p4</span> <span class="o">=</span> <span class="n">ak4</span><span class="p">[</span><span class="n">ak4</span><span class="o">.</span><span class="n">pt</span><span class="o">&gt;</span><span class="mi">30</span><span class="p">]</span><span class="o">.</span><span class="n">p4</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">mht_x</span> <span class="o">=</span> <span class="o">-</span> <span class="n">mht_p4</span><span class="o">.</span><span class="n">pt</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">mht_p4</span><span class="o">.</span><span class="n">phi</span><span class="p">)</span> 
+    <span class="n">mht_y</span> <span class="o">=</span> <span class="o">-</span> <span class="n">mht_p4</span><span class="o">.</span><span class="n">pt</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">mht_p4</span><span class="o">.</span><span class="n">phi</span><span class="p">)</span> 
+
+    <span class="n">met_x</span> <span class="o">=</span> <span class="n">met_pt</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">met_phi</span><span class="p">)</span>
+    <span class="n">met_y</span> <span class="o">=</span> <span class="n">met_pt</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">met_phi</span><span class="p">)</span>
+
+    <span class="n">vec_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hypot</span><span class="p">(</span><span class="n">met_x</span><span class="o">-</span><span class="n">mht_x</span><span class="p">,</span> <span class="n">met_y</span><span class="o">-</span><span class="n">mht_y</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">hypot</span><span class="p">(</span><span class="n">met_x</span><span class="o">+</span><span class="n">mht_x</span><span class="p">,</span> <span class="n">met_y</span><span class="o">+</span><span class="n">mht_y</span><span class="p">)</span> 
+
+    <span class="k">return</span> <span class="n">vec_b</span></div>
+
+
+<div class="viewcode-block" id="calculate_vecDPhi">
+<a class="viewcode-back" href="../../../CoffeaMate.utils.html#CoffeaMate.utils.mathutil.calculate_vecDPhi">[docs]</a>
+<span class="k">def</span> <span class="nf">calculate_vecDPhi</span><span class="p">(</span><span class="n">ak4</span><span class="p">,</span> <span class="n">met_pt</span><span class="p">,</span> <span class="n">met_phi</span><span class="p">,</span> <span class="n">tk_met_phi</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;Calculate vecDPhi quantitity.&#39;&#39;&#39;</span>
+    <span class="n">vec_b</span> <span class="o">=</span> <span class="n">calculate_vecB</span><span class="p">(</span><span class="n">ak4</span><span class="p">,</span> <span class="n">met_pt</span><span class="p">,</span> <span class="n">met_phi</span><span class="p">)</span>
+    <span class="n">dphitkpf</span> <span class="o">=</span> <span class="n">dphi</span><span class="p">(</span><span class="n">met_phi</span><span class="p">,</span> <span class="n">tk_met_phi</span><span class="p">)</span>
+    <span class="n">vec_dphi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hypot</span><span class="p">(</span><span class="mf">3.33</span> <span class="o">*</span> <span class="n">vec_b</span><span class="p">,</span> <span class="n">dphitkpf</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">vec_dphi</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Joy Zhou.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
