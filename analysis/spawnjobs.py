@@ -108,7 +108,8 @@ class JobRunner:
         return futures
 
 class JobLoader():
-    """Load meta job files and prepare for processing by slicing the files into smaller jobs."""
+    """Load meta job files and prepare for processing by slicing the files into smaller jobs. 
+    Job files are created in the jobpath, which can be passed into main.py."""
     def __init__(self, datapath, jobpath, transferPBase, out_endpattern) -> None:
         """Initialize the job loader.
         
@@ -125,12 +126,14 @@ class JobLoader():
         self.out_endpattern = out_endpattern
 
     def writejobs(self, intype='json.gz') -> None:
-        """Write job parameters to json file"""
+        """Write job parameters to json file."""
         datafile = glob.glob(pjoin(self.inpath, f'*{intype}'))
         for file in datafile:
             self.prepjobs_from_dict(file)
     
     def prepjobs_from_dict(self, inputdatap, batch_size=10, **kwargs) -> bool:
+        """Prepare job files from a group dictionary containing datasets and the files. Job files are created in the jobpath,
+        with name format: {groupname}_{shortname}_job_{j}.json"""
         with gzip.open(inputdatap, 'rt') as samplepath:
             grp_name = get_fi_prefix(inputdatap)
             loaded = json.load(samplepath)
