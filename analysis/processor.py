@@ -107,14 +107,18 @@ class Processor:
     
     def writeevts(self, passed, suffix, **kwargs) -> int:
         """Write the events to a file, filename formated as {dataset}_{suffix}*."""
+        output_format = self.rtcfg.get("OUTPUT_FORMAT", None)
+        print(type(passed))
         if isinstance(passed, dak.lib.core.Array):
-            rc = self.writedask(passed, suffix, **kwargs)
-        if isinstance(passed, ak.Array):
+            if_parquet = (output_format == 'parquet')
+            rc = self.writedask(passed, suffix, parquet=if_parquet)
+        elif isinstance(passed, ak.Array):
             rc = self.writeak(passed, suffix)
         elif isinstance(passed, pd.DataFrame):
             rc = self.writedf(passed, suffix)
         else:
             rc = self.writepickle(passed, suffix, **kwargs)
+
         if self.transfer is not None:
             self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True)
         return rc
