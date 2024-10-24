@@ -44,7 +44,7 @@ class Processor:
         """Initialize the output directory and copy directory if necessary.
         If the copy directory is specified, it will be created and checked.
         The output directory will be checked and created if necessary."""
-        self.outdir = pjoin(self.rtcfg.OUTPUTDIR_PATH, self.dataset)
+        self.outdir = pjoin(self.rtcfg.get("OUTPUTDIR_PATH", "outputs"), self.dataset)
         self.filehelper.checkpath(self.outdir)
     
     def loadfile_remote(self, fileargs: dict) -> ak.Array:
