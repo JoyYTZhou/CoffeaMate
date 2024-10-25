@@ -78,6 +78,7 @@ class JobRunner:
             helper = FileSysHelper()
             helper.checkpath(self.transferPBase, createdir=True)
             self.transferPBase = f'{self.transferPBase}/{year}'
+            helper.checkpath(self.transferPBase, createdir=True)
         
     def submitjobs(self, client, **kwargs) -> int:
         """Run jobs based on client settings.
