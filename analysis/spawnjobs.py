@@ -6,8 +6,10 @@ from itertools import islice
 from src.analysis.processor import Processor
 from src.utils.filesysutil import FileSysHelper, pjoin
 
-def get_fi_prefix(filepath):
-    return os.path.basename(filepath).split('.')[0].split('_')[0]
+def read_pattern(filepath):
+    basename = os.path.basename(filepath).split('.')[0]
+    keys = basename.split('_')
+    return keys
 
 def div_dict(original_dict, chunk_size):
     """Divide a dictionary into smaller dictionaries of given size."""
@@ -68,11 +70,14 @@ class JobRunner:
         self.rs = runsetting 
         with open(jobfile, 'r') as job:
             self.loaded = json.load(job)
-            grp_name = get_fi_prefix(jobfile)
-        self.grp_name = grp_name
+            keys = read_pattern(jobfile)
+            self.grp_name = keys[0]
+            year = keys[1]
         self.transferPBase = self.rs.get("TRANSFER_PATH", None)
         if self.transferPBase is not None:
             helper = FileSysHelper()
+            helper.checkpath(self.transferPBase, createdir=True)
+            self.transferPBase = f'{self.transferPBase}/{year}'
             helper.checkpath(self.transferPBase, createdir=True)
         
     def submitjobs(self, client, **kwargs) -> int:
@@ -110,42 +115,45 @@ class JobRunner:
 class JobLoader():
     """Load meta job files and prepare for processing by slicing the files into smaller jobs. 
     Job files are created in the jobpath, which can be passed into main.py."""
-    def __init__(self, datapath, groupname, jobpath, transferPBase, out_endpattern) -> None:
+    def __init__(self, datapath, kwd, jobpath, transferPBase, out_endpattern) -> None:
         """Initialize the job loader.
         
         Parameters
         - `datapath`: directory path from which the json.zp files containing dataset information will be grepped.
-        - `groupname`: keyword contained in the json input files to be processed. Example: "TTbar" will grep any .json.gz files starting with TTbar.
+        - `kwd`: kwd to grep from the job file, should take the form of {groupname}_{year}
         - `jobpath`: Path to one job file in json format
         - `transferPBase`: Path to which root/cutflow output files of the selections will be ultimately transferred."""
-        self.jobpath = jobpath
+        self.inpath = datapath
+        self.kwd = kwd
         self.helper = FileSysHelper()
-        self.helper.checkpath(datapath, createdir=False, raiseError=True)
-        self.helper.checkpath(self.jobpath, createdir=True)
-        self.datafile = glob.glob(pjoin(datapath, f'{groupname}*json.gz'))
-        raise FileNotFoundError(f"No files found in {datapath} with {groupname} keyword!") if not self.datafile else None
+        self.helper.checkpath(self.inpath, createdir=False, raiseError=True)
         self.tsferP = transferPBase
+        self.jobpath = jobpath
+        self.helper.checkpath(self.jobpath, createdir=True)
         self.out_endpattern = out_endpattern
 
-    def __call__(self) -> None:
-        """Dissect the json files and create job files."""
-        for file in self.datafile:
+    def writejobs(self) -> None:
+        """Write job parameters to json file"""
+        datafile = glob.glob(pjoin(self.inpath, f'{self.kwd}*json.gz'))
+        for file in datafile:
             self.prepjobs_from_dict(file)
     
     def prepjobs_from_dict(self, inputdatap, batch_size=10, **kwargs) -> bool:
         """Prepare job files from a group dictionary containing datasets and the files. Job files are created in the jobpath,
-        with name format: {groupname}_{shortname}_job_{j}.json"""
+        with name format: {groupname}_{year}_{shortname}_job_{j}.json"""
         with gzip.open(inputdatap, 'rt') as samplepath:
-            grp_name = get_fi_prefix(inputdatap)
+            keys = read_pattern(inputdatap)
+            grp_name = keys[0]
+            yr = keys[1]
             loaded = json.load(samplepath)
         for ds, dsdata in loaded.items():
             shortname = dsdata['metadata']['shortname']
             print(f"===============Preparing job files for {ds}========================")
-            need_process = filterExisting(shortname, dsdata, tsferP=pjoin(self.tsferP, grp_name), out_endpattern=self.out_endpattern)
+            need_process = filterExisting(shortname, dsdata, tsferP=pjoin(self.tsferP, yr, grp_name), out_endpattern=self.out_endpattern)
             if need_process:
                 for j, sliced in enumerate(div_dict(dsdata['files'], batch_size)):
                     baby_job = {'metadata': dsdata['metadata'], 'files': sliced}
-                    finame = pjoin(self.jobpath, f'{grp_name}_{shortname}_job_{j}.json')
+                    finame = pjoin(self.jobpath, f'{grp_name}_{yr}_{shortname}_job_{j}.json')
                     with open(finame, 'w') as fp:
                         json.dump(baby_job, fp)
                     print("Job file created: ", finame)
