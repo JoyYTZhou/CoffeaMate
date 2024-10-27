@@ -115,22 +115,21 @@ class JobLoader():
         
         Parameters
         - `datapath`: directory path from which the json.zp files containing dataset information will be grepped.
-        - `groupname`: Name of the group of datasets
+        - `groupname`: keyword contained in the json input files to be processed. Example: "TTbar" will grep any .json.gz files starting with TTbar.
         - `jobpath`: Path to one job file in json format
         - `transferPBase`: Path to which root/cutflow output files of the selections will be ultimately transferred."""
-        self.inpath = datapath
-        self.groupname = groupname
-        self.helper = FileSysHelper()
-        self.helper.checkpath(self.inpath, createdir=False, raiseError=True)
-        self.tsferP = transferPBase
         self.jobpath = jobpath
+        self.helper = FileSysHelper()
+        self.helper.checkpath(datapath, createdir=False, raiseError=True)
         self.helper.checkpath(self.jobpath, createdir=True)
+        self.datafile = glob.glob(pjoin(datapath, f'{groupname}*json.gz'))
+        raise FileNotFoundError(f"No files found in {datapath} with {groupname} keyword!") if not self.datafile else None
+        self.tsferP = transferPBase
         self.out_endpattern = out_endpattern
 
-    def writejobs(self) -> None:
-        """Write job parameters to json file"""
-        datafile = glob.glob(pjoin(self.inpath, f'{self.groupname}*json.gz'))
-        for file in datafile:
+    def __call__(self) -> None:
+        """Dissect the json files and create job files."""
+        for file in self.datafile:
             self.prepjobs_from_dict(file)
     
     def prepjobs_from_dict(self, inputdatap, batch_size=10, **kwargs) -> bool:
