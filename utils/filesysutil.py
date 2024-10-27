@@ -45,6 +45,7 @@ class FileSysHelper:
         Parameters
         - `dirname`: directory path (remote/local)
         - `filepattern`: pattern to match the file name. Wildcards allowed
+        - `full_path`: whether to return the full path with xrd prefix or not
         - `kwargs`: additional arguments for filtering files
 
         Return
@@ -56,10 +57,25 @@ class FileSysHelper:
         else:
             if filepattern == '*':
                 files = [str(file.absolute()) for file in Path(dirname).iterdir() if file.is_file()]
-                print(files)
             else:
                 files = glob.glob(pjoin(dirname, filepattern)) 
         return sorted(files)
+    
+    @staticmethod
+    def glob_subdirs(dirname, dirpattern='*', full_path=True, **kwargs) -> list:
+        """Returns a SORTED list of subdirectories matching a pattern in a directory. By default will return all subdirectories.
+        
+        Return 
+        - A SORTED list of subdirectories (str)"""
+        if dirname.startswith('/store/user'):
+            xrdhelper = XRootDHelper(kwargs.get("prefix", PREFIX))
+            subdirs = xrdhelper.glob_files(dirname, dirpattern, full_path)
+        else:
+            if dirpattern == '*':
+                subdirs = [str(file.absolute()) for file in Path(dirname).iterdir() if file.is_dir()]
+            else:
+                subdirs = glob.glob(pjoin(dirname, dirpattern))
+        return sorted(subdirs)
     
     @staticmethod
     def checkpath(pathstr, createdir=True, raiseError=False, prefix=PREFIX) -> bool:
@@ -145,7 +161,7 @@ class XRootDHelper:
         self.prefix = prefix
 
     def glob_files(self, dirname, filepattern="*", full_path=True, **kwargs) -> list:
-        """Returns a list of files matching a pattern in a directory. By default will return all files."""
+        """Returns a list of files matching a pattern in a directory. By default will return all files/subdirectories."""
         exist = self.check_path(dirname, createdir=False, raiseError=False)
         if exist == False:
             return []

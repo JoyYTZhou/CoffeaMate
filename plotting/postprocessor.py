@@ -11,11 +11,12 @@ class PostProcessor():
     
     Attributes
     - `cfg`: the configuration file for post processing of datasets
-    - `inputdir`: the directory where the input files are stored
+    - `inputdir`: the directory where the input files to be post-processed are stored
     - `meta_dict`: the metadata dictionary for all datasets. {Groupname: {Datasetname: {metadata}}}
-    - `groups`: list of group names to process
+    - `groups`: list of group names to process. If not provided, will grep from the input directory.
+    - `years`: list of years to process. If not provided, will grep from the input directory.
     - `lumi`: the luminosity of the dataset, in pb^-1"""
-    def __init__(self, ppcfg, groups=None) -> None:
+    def __init__(self, ppcfg, groups=None, years=None) -> None:
         """Parameters
         - `ppcfg`: the configuration file for post processing of datasets"""
         self.cfg = ppcfg
@@ -24,13 +25,56 @@ class PostProcessor():
         self.tempdir = ppcfg.LOCALOUTPUT
         self.transferP = ppcfg.get("TRANSFERPATH", None)
 
+        if self.transferP is not None: FileSysHelper.checkpath(self.transferP, createdir=True, raiseError=False)
         FileSysHelper.checkpath(self.inputdir, createdir=False, raiseError=True)
         FileSysHelper.checkpath(self.tempdir, createdir=True, raiseError=False)
+    
+        self.meta_dict = {}
+            
+        if years is None:
+            self.years = [pbase(subdir) for subdir in FileSysHelper.glob_subdirs(self.inputdir, full_path=False)]
+        else:
+            self.years = years
+            for year in self.years:
+                FileSysHelper.checkpath(pjoin(self.inputdir, year), createdir=False, raiseError=True)
         
-        with open(ppcfg.METADATA, 'r') as f:
-            self.meta_dict = json.load(f)
+        for year in self.years:
+            with open(pjoin(ppcfg.METADATA, f"{year}.json"), 'r') as f:
+                self.meta_dict[year] = json.load(f)
+            if self.transferP is not None: FileSysHelper.checkpath(pjoin(self.transferP, year), createdir=True, raiseError=False)
 
-        self.groups = groups if not None else self.meta_dict.keys()
+        if groups is None:
+            self.groups = self.__generate_groups
+        else:
+            self.groups = lambda year: groups
+    
+    def __generate_groups(self, year):
+        """Generate the groups to process based on the input directory."""
+        return [pbase(subdir) for subdir in FileSysHelper.glob_subdirs(pjoin(self.inputdir, year), full_path=False)]
+    
+    def __iterate_meta(self, callback) -> dict:
+        """Iterate over datasets in a group over all groups and apply the callback function. Transfer any files in the local output directory to the transfer path (if set). 
+        Collect the returns of the callback function in a dictionary.
+        
+        Parameters
+        - `callback`: the function to apply to each dataset. Expects output in the temp directory. Callback has the signature (dsname, dtdir, outdir)."""
+        results = {}
+        for year in self.years:
+            meta = self.meta_dict[year]
+            for group in self.groups(year):
+                results[group] = {}
+                datasets = meta[group]
+                transferP = f"{self.transferP}/{year}/{group}" if self.transferP is not None else None
+                for _, dsitems in datasets.items():
+                    dsname = dsitems['shortname']
+                    dtdir = pjoin(self.inputdir, year, group)
+                    outdir = pjoin(self.tempdir, year, group)
+                    FileSysHelper.checkpath(outdir, createdir=True)
+                    if not FileSysHelper.checkpath(dtdir, createdir=False): continue
+                    results[year][group][dsname] = callback(dsname, dtdir, outdir)
+                    if transferP is not None:
+                        FileSysHelper.transfer_files(outdir, transferP, remove=True, overwrite=True)
+        return results
 
     def __call__(self, output_type=None, outputdir=None):
         """Hadd the root/csv files of the datasets and save to the output directory."""
@@ -48,53 +92,35 @@ class PostProcessor():
         elif output_type == 'csv': self.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
     
-    def check_roots(self, rq_keys=['Events']):
-        """Check if the root files are corrupted by checking if the required keys are present. Save the corrupted files to a text file."""
+    def check_roots(self, rq_keys=['Events']) -> None:
+        """Check if the root files are corrupted by checking if the required keys are present. Save the corrupted files to a text file.
+        
+        Parameters
+        - `rq_keys`: list of required keys to check for in the root files"""
         helper = FileSysHelper()
-        for group in self.groups:
-            possible_corrupted = []
-            for root_file in helper.glob_files(pjoin(self.inputdir, group), '*.root', full_path=False):
-                try: 
-                    with uproot.open(root_file) as f:
-                        f.keys()
-                        if not all(tree in f for tree in rq_keys):
-                            possible_corrupted.append(root_file)
-                except Exception as e:
-                    print(f"Error reading file {root_file}: {e}")
-                    possible_corrupted.append(root_file)
-            if possible_corrupted:
-                print(f"There are corrupted files for {group}!")
-                with open(f'{group}_corrupted_files.txt', 'w') as f:
-                    f.write('\n'.join(possible_corrupted))
-            else:
-                print(f"No corrupted files for {group} : > : > : > : >")
+        for year in self.years:
+            for group in self.groups:
+                possible_corrupted = []
+                for root_file in helper.glob_files(pjoin(self.inputdir, year, group), '*.root', full_path=False):
+                    try: 
+                        with uproot.open(root_file) as f:
+                            f.keys()
+                            if not all(tree in f for tree in rq_keys):
+                                possible_corrupted.append(root_file)
+                    except Exception as e:
+                        print(f"Error reading file {root_file}: {e}")
+                        possible_corrupted.append(root_file)
+                if possible_corrupted:
+                    print(f"There are corrupted files for {group}!")
+                    with open(f'{group}_corrupted_files.txt', 'w') as f:
+                        f.write('\n'.join(possible_corrupted))
+                else:
+                    print(f"No corrupted files for {group} : > : > : > : >")
     
-    def clean_roots(self):
+    def clean_roots(self) -> None:
         """Delete the corrupted files in the filelist."""
         for group in self.groups:
             self.delete_corrupted(f'{group}_corrupted_files.txt')
-
-    def __iterate_meta(self, callback) -> dict:
-        """Iterate over datasets in a group over all groups and apply the callback function. Transfer any files in the local output directory to the transfer path (if set). 
-        Collect the returns of the callback function in a dictionary.
-        
-        Parameters
-        - `callback`: the function to apply to each dataset. Expects output in the temp directory. Callback has the signature (dsname, dtdir, outdir)."""
-        results = {}
-        for group in self.groups:
-            results[group] = {}
-            datasets = self.meta_dict[group]
-            transferP = f"{self.transferP}/{group}" if self.transferP else None
-            for _, dsitems in datasets.items():
-                dsname = dsitems['shortname']
-                dtdir = pjoin(self.inputdir, group)
-                outdir = pjoin(self.tempdir, group)
-                FileSysHelper.checkpath(outdir, createdir=True)
-                if not FileSysHelper.checkpath(dtdir, createdir=False): continue
-                results[group][dsname] = callback(dsname, dtdir, outdir)
-                if transferP is not None:
-                    FileSysHelper.transfer_files(outdir, transferP, remove=True, overwrite=True)
-        return results
     
     def hadd_roots(self) -> str:
         """Hadd root files of datasets into appropriate size based on settings"""
