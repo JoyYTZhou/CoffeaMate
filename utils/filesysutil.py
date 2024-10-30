@@ -45,7 +45,7 @@ class FileSysHelper:
         Parameters
         - `dirname`: directory path (remote/local)
         - `filepattern`: pattern to match the file name. Wildcards allowed
-        - `full_path`: whether to return the full path with xrd prefix or not
+        - `full_path`: whether to return the full path or with just file name globbed.
         - `kwargs`: additional arguments for filtering files
 
         Return

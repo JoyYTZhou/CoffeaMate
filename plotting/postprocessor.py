@@ -1,4 +1,4 @@
-import uproot, json, random, subprocess, re
+import uproot, json, subprocess, re
 import awkward as ak
 import pandas as pd
 
@@ -24,8 +24,9 @@ class PostProcessor():
         self.inputdir = ppcfg.INPUTDIR
         self.tempdir = ppcfg.LOCALOUTPUT
         self.transferP = ppcfg.get("TRANSFERPATH", None)
+        self.__will_trsf = False if self.transferP is None else True
 
-        if self.transferP is not None: FileSysHelper.checkpath(self.transferP, createdir=True, raiseError=False)
+        if self.__will_trsf: FileSysHelper.checkpath(self.transferP, createdir=True, raiseError=False)
         FileSysHelper.checkpath(self.inputdir, createdir=False, raiseError=True)
         FileSysHelper.checkpath(self.tempdir, createdir=True, raiseError=False)
     
@@ -41,7 +42,7 @@ class PostProcessor():
         for year in self.years:
             with open(pjoin(ppcfg.METADATA, f"{year}.json"), 'r') as f:
                 self.meta_dict[year] = json.load(f)
-            if self.transferP is not None: FileSysHelper.checkpath(pjoin(self.transferP, year), createdir=True, raiseError=False)
+            if self.__will_trsf: FileSysHelper.checkpath(pjoin(self.transferP, year), createdir=True, raiseError=False)
 
         if groups is None:
             self.groups = self.__generate_groups
@@ -51,7 +52,7 @@ class PostProcessor():
     def __generate_groups(self, year):
         """Generate the groups to process based on the input directory."""
         return [pbase(subdir) for subdir in FileSysHelper.glob_subdirs(pjoin(self.inputdir, year), full_path=False)]
-    
+
     def __iterate_meta(self, callback) -> dict:
         """Iterate over datasets in a group over all groups and apply the callback function. Transfer any files in the local output directory to the transfer path (if set). 
         Collect the returns of the callback function in a dictionary.
@@ -60,11 +61,11 @@ class PostProcessor():
         - `callback`: the function to apply to each dataset. Expects output in the temp directory. Callback has the signature (dsname, dtdir, outdir)."""
         results = {}
         for year in self.years:
+            results[year] = {}
             meta = self.meta_dict[year]
             for group in self.groups(year):
-                results[group] = {}
+                results[year][group] = {}
                 datasets = meta[group]
-                transferP = f"{self.transferP}/{year}/{group}" if self.transferP is not None else None
                 for _, dsitems in datasets.items():
                     dsname = dsitems['shortname']
                     dtdir = pjoin(self.inputdir, year, group)
@@ -72,7 +73,8 @@ class PostProcessor():
                     FileSysHelper.checkpath(outdir, createdir=True)
                     if not FileSysHelper.checkpath(dtdir, createdir=False): continue
                     results[year][group][dsname] = callback(dsname, dtdir, outdir)
-                    if transferP is not None:
+                    if self.__will_trsf:
+                        transferP = f"{self.transferP}/{year}/{group}"
                         FileSysHelper.transfer_files(outdir, transferP, remove=True, overwrite=True)
         return results
 
@@ -81,27 +83,34 @@ class PostProcessor():
         if output_type is None:
             output_type = self.cfg.get("OUTTYPE", 'root')
         if outputdir is None:
-            outputdir = self.tempdir if self.transferP is None else self.transferP
+            outputdir = self.tempdir if not self.__will_trsf else self.transferP
         
         FileSysHelper.checkpath(outputdir)
 
         self.hadd_cfs()
         if output_type == 'root': 
             self.hadd_roots()
-            self.meta_dict = PostProcessor.calc_wgt(outputdir, self.meta_dict, self.cfg.NEWMETA, self.groups)
+            self.output_wgt_info(outputdir)
         elif output_type == 'csv': self.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
     
+    def output_wgt_info(self, outputdir) -> None:
+        new_meta_dir = pjoin(pdir(self.cfg.METADATA), 'weightedMC')
+        FileSysHelper.checkpath(new_meta_dir)
+        for year in self.years:
+            self.meta_dict[year] = PostProcessor.calc_wgt(pjoin(outputdir, year), self.meta_dict[year],
+                                pjoin(new_meta_dir, f'{year}.json'), self.groups(year))
+    
     def check_roots(self, rq_keys=['Events']) -> None:
-        """Check if the root files are corrupted by checking if the required keys are present. Save the corrupted files to a text file.
+        """Check if the root files are corrupted by checking if the required keys are present. Save the corrupted files (full path with xrdfs prefix) to a text file.
         
         Parameters
         - `rq_keys`: list of required keys to check for in the root files"""
         helper = FileSysHelper()
         for year in self.years:
-            for group in self.groups:
+            for group in self.groups(year):
                 possible_corrupted = []
-                for root_file in helper.glob_files(pjoin(self.inputdir, year, group), '*.root', full_path=False):
+                for root_file in helper.glob_files(pjoin(self.inputdir, year, group), '*.root', full_path=True):
                     try: 
                         with uproot.open(root_file) as f:
                             f.keys()
@@ -119,8 +128,9 @@ class PostProcessor():
     
     def clean_roots(self) -> None:
         """Delete the corrupted files in the filelist."""
-        for group in self.groups:
-            self.delete_corrupted(f'{group}_corrupted_files.txt')
+        for year in self.years:
+            for group in self.groups(year):
+                self.delete_corrupted(f'{group}_corrupted_files.txt')
     
     def hadd_roots(self) -> str:
         """Hadd root files of datasets into appropriate size based on settings"""
@@ -151,7 +161,7 @@ class PostProcessor():
         self.__iterate_meta(process_csv)
         
     def hadd_cfs(self):
-        """Hadd cutflow table output from processor"""
+        """Hadd cutflow table output from processor. Output a total cutflow for the group with all the sub datasets."""
         def process_cf(dsname, dtdir, outdir):
             print(f"Dealing with {dsname} now ...............................")
             try:
@@ -162,12 +172,13 @@ class PostProcessor():
                 print(f"Error combining cutflow tables for {dsname}: {e}")
         
         group_dfs = self.__iterate_meta(process_cf)
-        for group, nested in group_dfs.items():
-            total_df = pd.concat(nested.values(), axis=1)
-            total_df.to_csv(pjoin(self.tempdir, f"{group}_cf.csv"))
-            transferP = f"{self.transferP}/{group}" if self.transferP else None
-            if transferP is not None:
-                FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
+        for year, grouped in group_dfs.items():
+            for group, nested in grouped.items():
+                total_df = pd.concat(nested.values(), axis=1)
+                total_df.to_csv(pjoin(self.tempdir, f"{group}_{year}_cf.csv"))
+                if self.__will_trsf:
+                    transferP = f"{self.transferP}/{year}/{group}"
+                    FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
 
     # not usable for now
     # @staticmethod
@@ -275,18 +286,19 @@ class PostProcessor():
         Parameters
         - `datasrcpath`: path to the output directory (base level)
         - `meta_dict`: metadata dictionary for all datasets. {group: {dataset: {metadata}}}"""
+        new_meta = {}
         for group in groups:
             print(f"Globbing from {pjoin(datasrcpath, group)}")
             resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0) 
+            new_meta[group] = meta_dict[group]
             for ds, dsitems in meta_dict[group].items():
                 nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
-                meta_dict[group][ds]['nwgt'] = nwgt
-                meta_dict[group][ds]['per_evt_wgt'] = meta_dict[group][ds]['xsection'] / nwgt
+                new_meta[group][ds]['nwgt'] = nwgt
         
         with open(pjoin(dict_outpath), 'w') as f:
-            json.dump(meta_dict, f)
+            json.dump(new_meta, f)
         
-        return meta_dict
+        return new_meta
 
     @staticmethod
     def load_cf(group, meta_dict, datasrcpath) -> tuple[pd.DataFrame]:
