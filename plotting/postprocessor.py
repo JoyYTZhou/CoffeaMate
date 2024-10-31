@@ -87,9 +87,9 @@ class PostProcessor():
         
         FileSysHelper.checkpath(outputdir)
 
-        self.hadd_cfs()
+        # self.hadd_cfs()
         if output_type == 'root': 
-            self.hadd_roots()
+            # self.hadd_roots()
             self.output_wgt_info(outputdir)
         elif output_type == 'csv': self.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
@@ -291,9 +291,10 @@ class PostProcessor():
             print(f"Globbing from {pjoin(datasrcpath, group)}")
             resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0) 
             new_meta[group] = meta_dict[group]
-            for ds, dsitems in meta_dict[group].items():
-                nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
-                new_meta[group][ds]['nwgt'] = nwgt
+            for ds, dsitems in meta_dict[group].items(): 
+                if not resolved_df.filter(like=dsitems['shortname']).empty:
+                    nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
+                    new_meta[group][ds]['nwgt'] = nwgt
         
         with open(pjoin(dict_outpath), 'w') as f:
             json.dump(new_meta, f)
