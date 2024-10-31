@@ -478,10 +478,11 @@ def write_root(evts: 'ak.Array | pd.DataFrame', destination, outputtree="Events"
 
 def call_hadd(output_file, input_files):
     """Merge ROOT files using hadd.
+
     Parameters
     - `output_file`: path to the output file
     - `input_files`: list of paths to the input files"""
-    command = ['hadd', '-f0 -O', output_file] + input_files
+    command = ['hadd', '-f2 -O -k', output_file] + input_files
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode == 0:
         print(f"Merged files into {output_file}")
