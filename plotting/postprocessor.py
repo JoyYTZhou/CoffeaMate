@@ -87,9 +87,9 @@ class PostProcessor():
         
         FileSysHelper.checkpath(outputdir)
 
-        # self.hadd_cfs()
+        self.hadd_cfs()
         if output_type == 'root': 
-            # self.hadd_roots()
+            self.hadd_roots()
             self.output_wgt_info(outputdir)
         elif output_type == 'csv': self.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
@@ -137,16 +137,20 @@ class PostProcessor():
         def process_ds(dsname, dtdir, outdir):
             root_files = FileSysHelper.glob_files(dtdir, f'{dsname}*.root', add_prefix=True)
             batch_size = self.cfg.get("BATCHSIZE", 200)
+            corrupted = set()
             for i in range(0, len(root_files), batch_size):
                 batch_files = root_files[i:i+batch_size]
                 outname = pjoin(outdir, f"{dsname}_{i//batch_size+1}.root") 
                 try:
-                    call_hadd(outname, batch_files)
+                    corrupted |= call_hadd(outname, batch_files)
                 except Exception as e:
                     print(f"Hadding encountered error {e}")
                     print(batch_files)
+            return list(corrupted)
         
-        self.__iterate_meta(process_ds)
+        all_corrupted = self.__iterate_meta(process_ds)
+        with open('all_corrupted.json', 'w') as f:
+            json.dump(all_corrupted, f)
 
     def hadd_csvouts(self) -> None:
         """Hadd csv output files of datasets into one csv file"""
@@ -476,15 +480,21 @@ def write_root(evts: 'ak.Array | pd.DataFrame', destination, outputtree="Events"
         file.mktree(name=outputtree, branch_types=branch_types, title=title)
         file[outputtree].extend({name: evts[name] for name in evts.fields}) 
 
-def call_hadd(output_file, input_files):
+def call_hadd(output_file, input_files) -> set:
     """Merge ROOT files using hadd.
 
     Parameters
     - `output_file`: path to the output file
-    - `input_files`: list of paths to the input files"""
+    - `input_files`: list of paths to the input files
+    
+    Return
+    """
     command = ['hadd', '-f2 -O -k', output_file] + input_files
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode == 0:
         print(f"Merged files into {output_file}")
     else:
         print(f"Error merging files: {result.stderr}")    
+        filenames = re.findall(r"root://[^\s]*\.root", result.stderr)
+        unique_filenames = set(filenames)
+    return unique_filenames

@@ -71,7 +71,7 @@ class Processor:
         Returns
         - number of failed files
         """
-        print(f"Expected to see {len(self.dsdict)} outputs")
+        print(f"Expected to see {len(self.dsdict['files'])} outputs")
         rc = 0
         for filename, fileinfo in self.dsdict["files"].items():
             print(filename)
