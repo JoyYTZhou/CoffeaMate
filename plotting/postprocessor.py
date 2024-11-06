@@ -5,6 +5,7 @@ import pandas as pd
 from src.analysis.objutil import Object
 from src.utils.filesysutil import FileSysHelper, pjoin, pbase, pdir
 from src.utils.cutflowutil import combine_cf, calc_eff, load_csvs
+from src.utils.datautil import extract_leaf_values
 
 class PostProcessor():
     """Class for loading and hadding data from skims/predefined selections produced directly by Processor.
@@ -131,6 +132,7 @@ class PostProcessor():
         for year in self.years:
             for group in self.groups(year):
                 self.delete_corrupted(f'{group}_corrupted_files.txt')
+                self.delete_corrupted('all_corrupted.txt')
     
     def hadd_roots(self) -> str:
         """Hadd root files of datasets into appropriate size based on settings"""
@@ -142,15 +144,18 @@ class PostProcessor():
                 batch_files = root_files[i:i+batch_size]
                 outname = pjoin(outdir, f"{dsname}_{i//batch_size+1}.root") 
                 try:
-                    corrupted |= call_hadd(outname, batch_files)
+                    new_corrupt = call_hadd(outname, batch_files)
+                    if new_corrupt is not None:
+                        print(f"Error merging filename batch {i}")
+                        corrupted |= new_corrupt
                 except Exception as e:
                     print(f"Hadding encountered error {e}")
                     print(batch_files)
             return list(corrupted)
         
         all_corrupted = self.__iterate_meta(process_ds)
-        with open('all_corrupted.json', 'w') as f:
-            json.dump(all_corrupted, f)
+        with open('all_corrupted.txt', 'w') as f:
+            f.write('\n'.join(all_corrupted))
 
     def hadd_csvouts(self) -> None:
         """Hadd csv output files of datasets into one csv file"""
@@ -480,7 +485,7 @@ def write_root(evts: 'ak.Array | pd.DataFrame', destination, outputtree="Events"
         file.mktree(name=outputtree, branch_types=branch_types, title=title)
         file[outputtree].extend({name: evts[name] for name in evts.fields}) 
 
-def call_hadd(output_file, input_files) -> set:
+def call_hadd(output_file, input_files) -> tuple[int, set]:
     """Merge ROOT files using hadd.
 
     Parameters
@@ -491,6 +496,7 @@ def call_hadd(output_file, input_files) -> set:
     """
     command = ['hadd', '-f2 -O -k', output_file] + input_files
     result = subprocess.run(command, capture_output=True, text=True)
+    unique_filenames = None
     if result.returncode == 0:
         print(f"Merged files into {output_file}")
     else:

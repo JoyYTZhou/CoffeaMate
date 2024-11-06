@@ -3,7 +3,6 @@ import awkward as ak
 import uproot, pickle, os
 from functools import wraps
 import dask_awkward as dak
-import json
 from src.utils.filesysutil import pjoin
 
 parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -16,6 +15,17 @@ def iterwgt(func):
             for ds in dsinfo.keys():
                 func(instance, process, ds, *args, **kwargs)
     return wrapper
+
+def extract_leaf_values(d):
+    leaf_values = []
+    
+    for value in d.values():
+        if isinstance(value, dict):
+            leaf_values.extend(extract_leaf_values(value))
+        else:
+            leaf_values.append(value)
+
+    return leaf_values
     
 def get_compression(**kwargs):
     """Returns the compression algorithm to use for writing root files."""
