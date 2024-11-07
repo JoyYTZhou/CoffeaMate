@@ -1,4 +1,4 @@
-import uproot, json, subprocess, re
+import uproot, json, subprocess, re, os
 import awkward as ak
 import pandas as pd
 
@@ -131,8 +131,10 @@ class PostProcessor():
         """Delete the corrupted files in the filelist."""
         for year in self.years:
             for group in self.groups(year):
-                self.delete_corrupted(f'{group}_corrupted_files.txt')
-                self.delete_corrupted('all_corrupted.txt')
+                if os.path.exists(f'{group}_corrupted_files.txt'):
+                    self.delete_corrupted(f'{group}_corrupted_files.txt')
+        if os.path.exists('all_corrupted.txt'):
+            self.delete_corrupted('all_corrupted.txt')
     
     def hadd_roots(self) -> str:
         """Hadd root files of datasets into appropriate size based on settings"""
@@ -153,7 +155,7 @@ class PostProcessor():
                     print(batch_files)
             return list(corrupted)
         
-        all_corrupted = self.__iterate_meta(process_ds)
+        all_corrupted = extract_leaf_values(self.__iterate_meta(process_ds))
         with open('all_corrupted.txt', 'w') as f:
             f.write('\n'.join(all_corrupted))
 
