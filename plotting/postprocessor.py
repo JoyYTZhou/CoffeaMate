@@ -94,8 +94,21 @@ class PostProcessor():
             self.output_wgt_info(outputdir)
         elif output_type == 'csv': self.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
+        
+    def get_yield(self):
+        """Get the yield for the resolved cutflow tables. Save to LOCALOUTPUT."""
+        for year in self.years:
+            with open(pjoin(pdir(self.cfg.METADATA), 'weightedMC', f"{year}.json", 'r')) as f:
+                self.meta_dict[year] = json.load(f)
+
+        regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ'], 'ggF': ['HH']}
+        signals = ['HH', 'ZH', 'ZZ']
+        resolved_dict = self.merge_cf()
+        for year, wgt_resolved in resolved_dict.items():
+            self.present_yield(wgt_resolved, signals, pjoin(self.tempdir, year), regroup_dict)
     
     def output_wgt_info(self, outputdir) -> None:
+        """Output the weight information for each dataset to a json file."""
         new_meta_dir = pjoin(pdir(self.cfg.METADATA), 'weightedMC')
         FileSysHelper.checkpath(new_meta_dir)
         for year in self.years:
@@ -203,37 +216,41 @@ class PostProcessor():
     #         else:
     #             print(f"Discrepancies between cutflow numbers and output number exist for {process}. Please double check selections.")
                 
-    def merge_cf(self, inputdir=None, outputdir=None) -> pd.DataFrame:
+    def merge_cf(self, inputdir=None, outputdir=None) -> dict:
         """Merge all cutflow tables for all processes into one. Save to LOCALOUTPUT.
-        Output formatted cutflow table as well.
-        
-        Parameters
-        - `signals`: list of signal process names
+        Output formatted cutflow table as well. Produces four files: allDatasetCutflow.csv, ResolvedWgtOnly.csv, ResolvedEffOnly.csv.
+        The weighting is done by xsection/nwgt * per event weight.
         
         Return 
-        - dataframe of weighted cutflows for every dataset merged"""
+        - a dictionary of resolved cutflow tables for each year."""
         if inputdir is None: inputdir = self.inputdir
         else: FileSysHelper.checkpath(inputdir, createdir=False, raiseError=True)
         
         if outputdir is None: outputdir = self.tempdir
         else: FileSysHelper.checkpath(outputdir, createdir=True)
 
-        resolved_list = []
-        for group in self.groups:
-            resolved, _ = PostProcessor.load_cf(group, self.meta_dict, inputdir) 
-            resolved_list.append(resolved)
-        resolved_all = pd.concat(resolved_list, axis=1)
-        resolved_all.to_csv(pjoin(outputdir, "allDatasetCutflow.csv"))
-        wgt_resolved = resolved_all.filter(like='wgt', axis=1)
-        wgt_resolved.columns = wgt_resolved.columns.str.replace('_wgt$', '', regex=True)
-        wgt_resolved.to_csv(pjoin(outputdir, "ResolvedWgtOnly.csv"))
-        wgtpEff = calc_eff(wgt_resolved, None, 'incremental', True)
-        wgtpEff.filter(like='eff', axis=1).to_csv(pjoin(outputdir, "ResolvedEffOnly.csv"))
+        resolved_wgted = {}
 
-        return wgt_resolved
-    
-    def get_yield(self):
-        pass
+        lumi = self.lumi/len(self.years)
+
+        for year in self.years:
+            resolved_list = []
+            FileSysHelper.checkpath(pjoin(outputdir, year), createdir=True)
+            for group in self.groups(year):
+                resolved, _ = PostProcessor.load_cf(group, self.meta_dict[year], inputdir, lumi) 
+                resolved_list.append(resolved)
+            resolved_all = pd.concat(resolved_list, axis=1)
+            resolved_all.to_csv(pjoin(outputdir, year, f"allDatasetCutflow.csv"))
+            wgt_resolved = resolved_all.filter(like='wgt', axis=1)
+            wgt_resolved.columns = wgt_resolved.columns.str.replace('_wgt$', '', regex=True)
+            wgt_resolved.to_csv(pjoin(outputdir, year, "ResolvedWgtOnly.csv"))
+            wgtpEff = calc_eff(wgt_resolved, None, 'incremental', True)
+            wgtpEff.filter(like='eff', axis=1).to_csv(pjoin(outputdir, year, "ResolvedEffOnly.csv"))
+            
+            resolved_wgted[year] = wgt_resolved
+        
+        return resolved_wgted
+
     
     @staticmethod
     def present_yield(wgt_resolved, signals, outputdir, regroup_dict=None) -> pd.DataFrame:
@@ -313,8 +330,8 @@ class PostProcessor():
         return new_meta
 
     @staticmethod
-    def load_cf(group, meta_dict, datasrcpath) -> tuple[pd.DataFrame]:
-        """Load cutflow tables for one group containing datasets to be grouped tgt and scale it by xsection 
+    def load_cf(group, meta_dict, datasrcpath, luminosity) -> tuple[pd.DataFrame]:
+        """Load cutflow tables for one group containing datasets to be grouped tgt and scale it by xsection * luminosity
 
         Parameters
         -`group`: the name of the cutflow that will be grepped from datasrcpath
@@ -325,7 +342,7 @@ class PostProcessor():
         resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0)
         for _, dsitems in meta_dict[group].items():
             dsname = dsitems['shortname']
-            per_evt_wgt = dsitems['per_evt_wgt']
+            per_evt_wgt = 1/dsitems['nwgt'] * dsitems['xsection'] * luminosity
             sel_cols = resolved_df.filter(like=dsname).filter(like='wgt')
             resolved_df[sel_cols.columns] = sel_cols * per_evt_wgt
             combined_cf = PostProcessor.sum_kwd(resolved_df, 'wgt', f"{group}_wgt")
