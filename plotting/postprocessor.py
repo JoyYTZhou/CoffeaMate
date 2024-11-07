@@ -1,4 +1,4 @@
-import uproot, json, subprocess, re, os
+import uproot, json, subprocess, re, os, shutil
 import awkward as ak
 import pandas as pd
 
@@ -50,6 +50,9 @@ class PostProcessor():
         else:
             self.groups = lambda year: groups
     
+    def __del__(self):
+        FileSysHelper.remove_emptydir(self.tempdir)
+    
     def __generate_groups(self, year):
         """Generate the groups to process based on the input directory."""
         return [pbase(subdir) for subdir in FileSysHelper.glob_subdirs(pjoin(self.inputdir, year), full_path=False)]
@@ -97,13 +100,15 @@ class PostProcessor():
         
     def get_yield(self):
         """Get the yield for the resolved cutflow tables. Save to LOCALOUTPUT."""
+        self.output_wgt_info(self.transferP)
+
         for year in self.years:
-            with open(pjoin(pdir(self.cfg.METADATA), 'weightedMC', f"{year}.json", 'r')) as f:
+            with open(pjoin(pdir(self.cfg.METADATA), 'weightedMC', f"{year}.json"), 'r') as f:
                 self.meta_dict[year] = json.load(f)
 
         regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ'], 'ggF': ['HH']}
         signals = ['HH', 'ZH', 'ZZ']
-        resolved_dict = self.merge_cf()
+        resolved_dict = self.merge_cf(inputdir=self.transferP, outputdir=self.tempdir)
         for year, wgt_resolved in resolved_dict.items():
             self.present_yield(wgt_resolved, signals, pjoin(self.tempdir, year), regroup_dict)
     
@@ -216,19 +221,13 @@ class PostProcessor():
     #         else:
     #             print(f"Discrepancies between cutflow numbers and output number exist for {process}. Please double check selections.")
                 
-    def merge_cf(self, inputdir=None, outputdir=None) -> dict:
+    def merge_cf(self, inputdir, outputdir) -> dict:
         """Merge all cutflow tables for all processes into one. Save to LOCALOUTPUT.
         Output formatted cutflow table as well. Produces four files: allDatasetCutflow.csv, ResolvedWgtOnly.csv, ResolvedEffOnly.csv.
         The weighting is done by xsection/nwgt * per event weight.
         
         Return 
         - a dictionary of resolved cutflow tables for each year."""
-        if inputdir is None: inputdir = self.inputdir
-        else: FileSysHelper.checkpath(inputdir, createdir=False, raiseError=True)
-        
-        if outputdir is None: outputdir = self.tempdir
-        else: FileSysHelper.checkpath(outputdir, createdir=True)
-
         resolved_wgted = {}
 
         lumi = self.lumi/len(self.years)
@@ -237,7 +236,7 @@ class PostProcessor():
             resolved_list = []
             FileSysHelper.checkpath(pjoin(outputdir, year), createdir=True)
             for group in self.groups(year):
-                resolved, _ = PostProcessor.load_cf(group, self.meta_dict[year], inputdir, lumi) 
+                resolved, _ = PostProcessor.load_cf(group, self.meta_dict[year], pjoin(inputdir, year), lumi) 
                 resolved_list.append(resolved)
             resolved_all = pd.concat(resolved_list, axis=1)
             resolved_all.to_csv(pjoin(outputdir, year, f"allDatasetCutflow.csv"))
@@ -250,7 +249,6 @@ class PostProcessor():
             resolved_wgted[year] = wgt_resolved
         
         return resolved_wgted
-
     
     @staticmethod
     def present_yield(wgt_resolved, signals, outputdir, regroup_dict=None) -> pd.DataFrame:
@@ -318,11 +316,13 @@ class PostProcessor():
         for group in groups:
             print(f"Globbing from {pjoin(datasrcpath, group)}")
             resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0) 
-            new_meta[group] = meta_dict[group]
+            new_meta[group] = meta_dict[group].copy()
             for ds, dsitems in meta_dict[group].items(): 
                 if not resolved_df.filter(like=dsitems['shortname']).empty:
                     nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
                     new_meta[group][ds]['nwgt'] = nwgt
+                else:
+                    del new_meta[group][ds]
         
         with open(pjoin(dict_outpath), 'w') as f:
             json.dump(new_meta, f)
@@ -331,7 +331,7 @@ class PostProcessor():
 
     @staticmethod
     def load_cf(group, meta_dict, datasrcpath, luminosity) -> tuple[pd.DataFrame]:
-        """Load cutflow tables for one group containing datasets to be grouped tgt and scale it by xsection * luminosity
+        """Load cutflow tables for one group of datasets and scale it by xsection * luminosity
 
         Parameters
         -`group`: the name of the cutflow that will be grepped from datasrcpath

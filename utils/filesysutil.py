@@ -22,6 +22,12 @@ class FileSysHelper:
         pass
 
     @staticmethod
+    def remove_emptydir(root_dir):
+        for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
+            if not dirnames and not filenames:
+                os.rmdir(dirpath)
+
+    @staticmethod
     def cross_check(filepattern, existentfiles) -> bool:
         """Check if a file pattern exists in a list of files.
         
