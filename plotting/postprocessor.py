@@ -225,10 +225,16 @@ class PostProcessor():
         """Merge all cutflow tables for all processes into one. Save to LOCALOUTPUT.
         Output formatted cutflow table as well. Produces four files: allDatasetCutflow.csv, ResolvedWgtOnly.csv, ResolvedEffOnly.csv.
         The weighting is done by xsection/nwgt * per event weight.
+
+        allDatasetCutflow.csv: contains all the datasets raw and weighted events
+        ResolvedWgtOnly.csv: contains all the datasets weighted events. 
+        ResolvedEffOnly.csv: contains all the datasets efficiency.
+
         
         Return 
         - a dictionary of resolved cutflow tables for each year."""
         resolved_wgted = {}
+        combined_wgted = {}
 
         lumi = self.lumi/len(self.years)
 
@@ -236,19 +242,20 @@ class PostProcessor():
             resolved_list = []
             FileSysHelper.checkpath(pjoin(outputdir, year), createdir=True)
             for group in self.groups(year):
-                resolved, _ = PostProcessor.load_cf(group, self.meta_dict[year], pjoin(inputdir, year), lumi) 
+                resolved, combined = PostProcessor.load_cf(group, self.meta_dict[year], pjoin(inputdir, year), lumi) 
                 resolved_list.append(resolved)
             resolved_all = pd.concat(resolved_list, axis=1)
             resolved_all.to_csv(pjoin(outputdir, year, f"allDatasetCutflow.csv"))
             wgt_resolved = resolved_all.filter(like='wgt', axis=1)
             wgt_resolved.columns = wgt_resolved.columns.str.replace('_wgt$', '', regex=True)
             wgt_resolved.to_csv(pjoin(outputdir, year, "ResolvedWgtOnly.csv"))
-            wgtpEff = calc_eff(wgt_resolved, None, 'incremental', True)
+            wgtpEff = calc_eff(wgt_resolved, None, 'incremental', False)
             wgtpEff.filter(like='eff', axis=1).to_csv(pjoin(outputdir, year, "ResolvedEffOnly.csv"))
             
             resolved_wgted[year] = wgt_resolved
+            combined_wgted[year] = combined
         
-        return resolved_wgted
+        return resolved_wgted, combined_wgted
     
     @staticmethod
     def present_yield(wgt_resolved, signals, outputdir, regroup_dict=None) -> pd.DataFrame:
