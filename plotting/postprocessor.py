@@ -94,25 +94,23 @@ class PostProcessor():
         self.hadd_cfs()
         if output_type == 'root': 
             self.hadd_roots()
-            self.output_wgt_info(outputdir)
+            self.update_wgt_info(outputdir)
         elif output_type == 'csv': self.hadd_csvouts()
         else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
         
     def get_yield(self):
         """Get the yield for the resolved cutflow tables. Save to LOCALOUTPUT."""
-        self.output_wgt_info(self.transferP)
-
         for year in self.years:
             with open(pjoin(pdir(self.cfg.METADATA), 'weightedMC', f"{year}.json"), 'r') as f:
                 self.meta_dict[year] = json.load(f)
 
-        regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ'], 'ggF': ['HH']}
+        regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ'], 'HH': ['ggF']}
         signals = ['HH', 'ZH', 'ZZ']
-        resolved_dict = self.merge_cf(inputdir=self.transferP, outputdir=self.tempdir)
-        for year, wgt_resolved in resolved_dict.items():
-            self.present_yield(wgt_resolved, signals, pjoin(self.tempdir, year), regroup_dict)
+        _, combined_dict = self.merge_cf(inputdir=self.transferP, outputdir=self.tempdir)
+        for year, combined in combined_dict.items():
+            self.present_yield(combined, signals, pjoin(self.tempdir, year), regroup_dict)
     
-    def output_wgt_info(self, outputdir) -> None:
+    def update_wgt_info(self, outputdir) -> None:
         """Output the weight information for each dataset to a json file."""
         new_meta_dir = pjoin(pdir(self.cfg.METADATA), 'weightedMC')
         FileSysHelper.checkpath(new_meta_dir)
@@ -174,8 +172,9 @@ class PostProcessor():
             return list(corrupted)
         
         all_corrupted = extract_leaf_values(self.__iterate_meta(process_ds))
-        with open('all_corrupted.txt', 'w') as f:
-            f.write('\n'.join(all_corrupted))
+        if all_corrupted:
+            with open('all_corrupted.txt', 'w') as f:
+                f.write('\n'.join(all_corrupted))
 
     def hadd_csvouts(self) -> None:
         """Hadd csv output files of datasets into one csv file"""
@@ -195,7 +194,7 @@ class PostProcessor():
             print(f"Dealing with {dsname} now ...............................")
             try:
                 df = combine_cf(inputdir=dtdir, dsname=dsname, output=False)
-                df.to_csv(pjoin(outdir, f"{dsname}_cf.csv"))
+                df.to_csv(pjoin(outdir, f"{dsname}_cutflow.csv"))
                 return df
             except Exception as e:
                 print(f"Error combining cutflow tables for {dsname}: {e}")
@@ -240,20 +239,27 @@ class PostProcessor():
 
         for year in self.years:
             resolved_list = []
+            combined_list = []
             FileSysHelper.checkpath(pjoin(outputdir, year), createdir=True)
+
             for group in self.groups(year):
                 resolved, combined = PostProcessor.load_cf(group, self.meta_dict[year], pjoin(inputdir, year), lumi) 
                 resolved_list.append(resolved)
+                combined_list.append(combined)
+
             resolved_all = pd.concat(resolved_list, axis=1)
             resolved_all.to_csv(pjoin(outputdir, year, f"allDatasetCutflow.csv"))
             wgt_resolved = resolved_all.filter(like='wgt', axis=1)
             wgt_resolved.columns = wgt_resolved.columns.str.replace('_wgt$', '', regex=True)
             wgt_resolved.to_csv(pjoin(outputdir, year, "ResolvedWgtOnly.csv"))
-            wgtpEff = calc_eff(wgt_resolved, None, 'incremental', False)
-            wgtpEff.filter(like='eff', axis=1).to_csv(pjoin(outputdir, year, "ResolvedEffOnly.csv"))
-            
             resolved_wgted[year] = wgt_resolved
-            combined_wgted[year] = combined
+
+            wgtEff = calc_eff(wgt_resolved, None, 'incremental')
+            wgtEff.filter(like='eff', axis=1).to_csv(pjoin(outputdir, year, "ResolvedEffOnly.csv"))
+
+            combined_df = pd.concat(combined_list, axis=1)
+            
+            combined_wgted[year] = combined_df
         
         return resolved_wgted, combined_wgted
     
@@ -320,10 +326,15 @@ class PostProcessor():
         - `datasrcpath`: path to the output directory (base level)
         - `meta_dict`: metadata dictionary for all datasets. {group: {dataset: {metadata}}}"""
         new_meta = {}
+        if os.path.exists(dict_outpath):
+            with open(dict_outpath, 'r') as f:
+                new_meta = json.load(f)
+
         for group in groups:
             print(f"Globbing from {pjoin(datasrcpath, group)}")
             resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0) 
-            new_meta[group] = meta_dict[group].copy()
+            if not(group in new_meta):
+                new_meta[group] = meta_dict[group].copy()
             for ds, dsitems in meta_dict[group].items(): 
                 if not resolved_df.filter(like=dsitems['shortname']).empty:
                     nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
@@ -353,6 +364,7 @@ class PostProcessor():
             sel_cols = resolved_df.filter(like=dsname).filter(like='wgt')
             resolved_df[sel_cols.columns] = sel_cols * per_evt_wgt
             combined_cf = PostProcessor.sum_kwd(resolved_df, 'wgt', f"{group}_wgt")
+            combined_cf.name = group
         return resolved_df, combined_cf
 
     @staticmethod
@@ -368,8 +380,6 @@ class PostProcessor():
         - Series of the summed column"""
         same_cols = cfdf.filter(like=keyword)
         sumcol = same_cols.sum(axis=1)
-        cfdf = cfdf.drop(columns=same_cols)
-        cfdf[name] = sumcol
         return sumcol
 
     @staticmethod
