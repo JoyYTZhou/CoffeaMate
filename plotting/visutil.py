@@ -43,6 +43,7 @@ class CSVPlotter():
         cutflow[f'{ds}_wgt'] = df[wgtname].sum()
     
     def __get_rwgt_fac(self, group, ds, signals, factor):
+        """Get the reweighting factor for the dataset."""
         if group in signals: 
             multiply = factor
         else:
@@ -64,6 +65,7 @@ class CSVPlotter():
         new_outdir = f'{datasource}_extrasel'
         FileSysHelper.checkpath(new_outdir)
         self.__set_meta(metadata_path)
+
         def add_wgt(dfs, rwfac, ds, group):
             df = dfs[0]
             if df.empty: return None
@@ -72,10 +74,12 @@ class CSVPlotter():
             df['group'] = group 
             if extraprocess: return extraprocess(df)
             else: return df
+
         for group in self.labels:
             load_dir = pjoin(datasource, group) 
+            if not FileSysHelper.checkpath(load_dir): continue
             cf_dict = {}
-            cf_df = load_csvs(load_dir, f'{group}*cf*')[0]
+            cf_df = load_csvs(load_dir, f'{group}*cf.csv')[0]
             for ds in self.meta_dict[group].keys():
                 rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor)
                 dsname = self.meta_dict[group][ds]['shortname']
@@ -89,6 +93,7 @@ class CSVPlotter():
                     cf_dict[f'{dsname}_wgt'] = 0
             cf_df = pd.concat([cf_df, pd.DataFrame(cf_dict, index=[selname])])
             cf_df.to_csv(pjoin(new_outdir, group, f'{group}_{selname.replace(" ", "")}_cf.csv'))
+
         grouped = pd.concat(list_of_df, axis=0).reset_index().drop('index', axis=1)
         return grouped
 
