@@ -172,7 +172,8 @@ class PostProcessor():
             return list(corrupted)
         
         all_corrupted = extract_leaf_values(self.__iterate_meta(process_ds))
-        if all_corrupted:
+        all_corrupted_list = [fn for sub in all_corrupted for fn in sub]
+        if all_corrupted_list:
             with open('all_corrupted.txt', 'w') as f:
                 f.write('\n'.join(all_corrupted))
 
