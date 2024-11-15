@@ -127,3 +127,15 @@ class BaseEventSelections:
     
     def getObj(self, name, events, **kwargs) -> Object:
         return Object(events, name, self.objselcfg[name], self.mapcfg[name], **kwargs)
+
+class TriggerEventSelections(BaseEventSelections):
+    """A class to skim the events based on the trigger selections."""
+    def __init__(self, trigcfg, objselcfg, mapcfg, sequential=True):
+        super().__init__(trigcfg, objselcfg, mapcfg, sequential)
+    
+    def triggersel(self, events):
+        for trigname, value in self.trigcfg.items():
+            if value:
+                self.objsel.add(trigname, events[trigname])
+            else:
+                self.objsel.add(trigname, events[~trigname])

@@ -14,6 +14,7 @@ from hep_ml.metrics_utils import ks_2samp_weighted
 from xgboost import XGBClassifier
 
 def drop_likes(df: 'pd.DataFrame', drop_kwd: 'list[str]' = []):
+    """Drop columns containing the keywords in `drop_kwd`."""
     for kwd in drop_kwd:
         df = df.drop(columns=df.filter(like=kwd).columns, inplace=False)
     return df
@@ -33,27 +34,30 @@ class Reweighter():
         self.reweighter = None
         self.visualizer = CSVPlotter(results_dir)
     
-    def preprocess_data(self, drop_kwd: 'list[str]' = []):
+    def preprocess_data(self, drop_kwd: 'list[str]' = [], drop_neg_wgts=True):
         """Preprocess the data by dropping columns containing the keywords in `drop_kwd`."""
+        if drop_neg_wgts:
+            self.ori_data = self.ori_data[self.ori_data[self.weight_column] > 0]
+            self.tar_data = self.tar_data[self.tar_data[self.weight_column] > 0]
+
+        self.ori_weight = self.ori_data[self.weight_column]
+        self.tar_weight = self.tar_data[self.weight_column]
+
         self.ori_data = drop_likes(self.ori_data, drop_kwd)
         self.tar_data = drop_likes(self.tar_data, drop_kwd)
             
-        self.ori_weight = self.ori_data[self.weight_column]
-        self.tar_weight = self.tar_data[self.weight_column]
-        
         self.ori_data.drop(columns=[self.weight_column], inplace=True)
         self.tar_data.drop(columns=[self.weight_column], inplace=True)
     
     def gridSearch(self, param_grid, scoring='roc_auc', cv=5, n_jobs=-1):
         estimator = reweight.GBReweighter()
         grid_search = GridSearchCV(estimator, param_grid, scoring=scoring, cv=cv, n_jobs=n_jobs)
-        
     
     def fit_rwgt(self, **kwargs) -> 'reweight.GBReweighter':
         """Fit the reweighter on the original and target data."""
         self.reweighter = reweight.GBReweighter(**kwargs)
-        ori_train, ori_test, wo_train, wo_test = train_test_split(self.ori_data, self.ori_weight, test_size=0.3, random_state=42)
-        tar_train, tar_test, wt_train, wt_test = train_test_split(self.tar_data, self.tar_weight, test_size=0.3, random_state=42)
+        ori_train, ori_test, wo_train, wo_test = train_test_split(self.ori_data, self.ori_weight)
+        tar_train, tar_test, wt_train, wt_test = train_test_split(self.tar_data, self.tar_weight)
 
         self.reweighter.fit(ori_train, tar_train, wo_train, wt_train)
 
@@ -76,6 +80,7 @@ class Reweighter():
         self.wt_test = pd.concat([self.wt_test, tar_wgt], ignore_index=True)
 
     def get_new_weights_train(self):
+        """Get the new weights for the original training data."""
         return self.reweighter.predict_weights(self.o_train, self.wo_train)
     
     def get_new_weights_test(self):
@@ -100,8 +105,9 @@ class Reweighter():
         for id, column in enumerate(columns, 1):
             xlim = np.percentile(np.hstack([target[column]]), [0.01, 99.99])
             plt.subplot(2, 3, id)
-            plt.hist(original[column], weights=o_wgt, range=xlim, **hist_settings)
-            plt.hist(target[column], weights=t_wgt, range=xlim, **hist_settings)
+            plt.hist(original[column], weights=o_wgt, range=xlim, label='Original', **hist_settings)
+            plt.hist(target[column], weights=t_wgt, range=xlim, label='Target', **hist_settings)
+            plt.legend(loc='best')
             plt.title(column)
             print('KS over ', column, ' = ', ks_2samp_weighted(original[column], target[column], 
                                             weights1=o_wgt, weights2=t_wgt))

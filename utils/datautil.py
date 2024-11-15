@@ -16,7 +16,12 @@ def iterwgt(func):
                 func(instance, process, ds, *args, **kwargs)
     return wrapper
 
-def extract_leaf_values(d):
+def extract_leaf_values(d) -> list:
+    """Extract leaf values from a dictionary.
+    
+    Return
+    - list of leaf values
+    """
     leaf_values = []
     
     for value in d.values():

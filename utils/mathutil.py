@@ -1,23 +1,50 @@
 # adapted from https://github.com/bu-cms/projectcoffea/blob/master/projectcoffea/helpers/helpers.py
 import numpy as np
 import os
-import awkward as ak
-import vector as vec
-import pandas as pd
+from src.analysis.objutil import Object
 
 pjoin = os.path.join
 
-def clopper_pearson_error(passed, total, level=0.6827):
-    """
-    matching TEfficiency::ClopperPearson(),
-    >>> ROOT.TEfficiency.ClopperPearson(total, passed, level, is_upper)
-    """
-    import scipy.stats
+class MathUtil:
+    @staticmethod
+    def clopper_pearson_error(passed, total, level=0.6827):
+        """
+        matching TEfficiency::ClopperPearson(),
+        >>> ROOT.TEfficiency.ClopperPearson(total, passed, level, is_upper)
+        """
+        import scipy.stats
 
-    alpha = 0.5 * (1.0 - level)
-    low = scipy.stats.beta.ppf(alpha, passed, total - passed + 1)
-    high = scipy.stats.beta.ppf(1 - alpha, passed + 1, total - passed)
-    return low, high
+        alpha = 0.5 * (1.0 - level)
+        low = scipy.stats.beta.ppf(alpha, passed, total - passed + 1)
+        high = scipy.stats.beta.ppf(1 - alpha, passed + 1, total - passed)
+        return low, high
+    
+    def add_inv_M(df, objx:'str', objy:'str', inv_m_name:'str') -> None:
+        """Add invariant mass column to the dataframe.
+        
+        Parameters
+        - df: DataFrame
+        - objx: Object 1 name
+        - objy: Object 2 name
+        - inv_m_name: Name of the invariant mass column
+        """
+        fvx = Object.fourvector(df, objx, sort=False)
+        fvy = Object.fourvector(df, objy, sort=False)
+        df[inv_m_name] = (fvx+fvy).mass
+    
+    def add_dR(df, objx:'str', objy:'str', dR_name:'str') -> None:
+        """Add delta R column to the dataframe.
+        
+        Parameters
+        - df: DataFrame
+        - objx: Object 1 name
+        - objy: Object 2 name
+        - dR_name: Name of the delta R column
+        """
+        fvx = Object.fourvector(df, objx, sort=False)
+        fvy = Object.fourvector(df, objy, sort=False)
+        df[dR_name] = fvx.deltaR(fvy)
+
 
 def poisson_errors(obs, alpha=1 - 0.6827) -> tuple[np.ndarray, np.ndarray]:
     """

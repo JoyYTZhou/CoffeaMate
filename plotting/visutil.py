@@ -8,7 +8,7 @@ from matplotlib.ticker import ScalarFormatter
 
 from src.utils.datautil import arr_handler, iterwgt
 from src.analysis.objutil import Object
-from src.utils.filesysutil import FileSysHelper, pjoin
+from src.utils.filesysutil import FileSysHelper, pjoin, pdir, pbase
 from src.utils.cutflowutil import load_csvs
 
 colors = list(mpl.colormaps['Set2'].colors)
@@ -42,28 +42,36 @@ class CSVPlotter():
         cutflow[f'{ds}_raw'] = len(df)
         cutflow[f'{ds}_wgt'] = df[wgtname].sum()
     
-    def __get_rwgt_fac(self, group, ds, signals, factor):
+    def __get_rwgt_fac(self, group, ds, signals, factor, luminosity) -> float:
+        """Get the reweighting factor for the dataset.
+        
+        - `group`: the group of the dataset
+        - `ds`: the dataset name
+        - `signals`: the signal groups
+        - `factor`: the factor to multiply to the flat weights
+        - `scaled`: the scaling factor (luminosity * cross section)"""
         if group in signals: 
             multiply = factor
         else:
             multiply = 1
-        flat_wgt = self.meta_dict[group][ds]['per_evt_wgt'] * multiply
+        flat_wgt = 1/self.meta_dict[group][ds]['nwgt'] * multiply * self.meta_dict[group][ds]['xsection'] * luminosity
         return flat_wgt
     
-    def postprocess_csv(self, datasource, metadata_path, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100) -> pd.DataFrame:
+    def postprocess_csv(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=220) -> pd.DataFrame:
         """Post-process the datasets and save the processed dataframes to csv files.
         
         Parameters
         - `datasource`: the directory of the group subdirectories containing different csv output files.
+        - `postp_output`: the directory to save the cutflows for post-processing
         - `per_evt_wgt`: the weight to be multiplied to the flat weights
         - `extraprocess`: additional processing to be done on the dataframe
         
         Return 
         - `grouped`: the concatenated dataframe"""
         list_of_df = []
-        new_outdir = f'{datasource}_extrasel'
-        FileSysHelper.checkpath(new_outdir)
+        FileSysHelper.checkpath(postp_output)
         self.__set_meta(metadata_path)
+
         def add_wgt(dfs, rwfac, ds, group):
             df = dfs[0]
             if df.empty: return None
@@ -72,15 +80,17 @@ class CSVPlotter():
             df['group'] = group 
             if extraprocess: return extraprocess(df)
             else: return df
+
         for group in self.labels:
             load_dir = pjoin(datasource, group) 
+            if not FileSysHelper.checkpath(load_dir, createdir=False): continue
             cf_dict = {}
-            cf_df = load_csvs(load_dir, f'{group}*cf*')[0]
+            cf_df = load_csvs(load_dir, f'{group}*cf.csv')[0]
             for ds in self.meta_dict[group].keys():
-                rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor)
+                rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor, luminosity)
                 dsname = self.meta_dict[group][ds]['shortname']
                 df = load_csvs(load_dir, f'{dsname}*out*', func=add_wgt, rwfac=rwfac, ds=dsname, group=group)
-                FileSysHelper.checkpath(f'{new_outdir}/{group}')
+                FileSysHelper.checkpath(f'{postp_output}/{group}')
                 if df is not None: 
                     list_of_df.append(df)
                     self.__addextcf(cf_dict, df, dsname, per_evt_wgt)
@@ -88,7 +98,8 @@ class CSVPlotter():
                     cf_dict[f'{dsname}_raw'] = 0
                     cf_dict[f'{dsname}_wgt'] = 0
             cf_df = pd.concat([cf_df, pd.DataFrame(cf_dict, index=[selname])])
-            cf_df.to_csv(pjoin(new_outdir, group, f'{group}_{selname.replace(" ", "")}_cf.csv'))
+            cf_df.to_csv(pjoin(postp_output, group, f'{group}_{selname.replace(" ", "")}_cf.csv'))
+
         grouped = pd.concat(list_of_df, axis=0).reset_index().drop('index', axis=1)
         return grouped
 
