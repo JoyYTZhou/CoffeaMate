@@ -5,6 +5,8 @@ import os
 import xgboost as xgb
 from matplotlib import pyplot as plt
 import numpy as np
+from torch import nn, optim
+import torch
 
 from src.plotting.visutil import CSVPlotter
 pjoin = os.path.join
@@ -29,7 +31,7 @@ class Reweighter():
         self.results_dir = results_dir
     
     @staticmethod
-    def clean_data(self, ori, tar, drop_kwd, drop_neg_wgts=True):
+    def clean_data(ori, tar, drop_kwd, wgt_col, drop_neg_wgts=True):
         """Clean the data by dropping columns containing the keywords in `drop_kwd`.
         
         Return
@@ -41,12 +43,12 @@ class Reweighter():
         data = pd.concat([ori, tar], ignore_index=True, axis=0)
         precleaned_len = len(data)
         if drop_neg_wgts:
-            data = data[data[self.weight_column] > 0]
+            data = data[data[wgt_col] > 0]
             print('Dropped ', precleaned_len - len(data), ' events with negative weights out of ', precleaned_len, ' events.')
-        drop_kwd.append(self.weight_column)
+        drop_kwd.append(wgt_col)
         X = drop_likes(data, drop_kwd)
         y = data['label']
-        weights = data[self.weight_column]
+        weights = data[wgt_col]
         
         return X, y, weights
     
@@ -67,7 +69,7 @@ class Reweighter():
 class SingleXGBReweighter(Reweighter):
     def prep_data(self, drop_kwd, drop_neg_wgts=True):
         """Preprocess the data by dropping columns containing the keywords in `drop_kwd`."""
-        X, y, weights = self.clean_data(self.ori_data, self.tar_data, drop_kwd, drop_neg_wgts)
+        X, y, weights = self.clean_data(self.ori_data, self.tar_data, drop_kwd, self.weight_column, drop_neg_wgts)
 
         X_train, X_test, self.y_train, self.y_test, self.w_train, self.w_test = train_test_split(X, y, weights, test_size=0.3, random_state=42)
         self.dtrain = xgb.DMatrix(X_train, label=self.y_train, weight=self.w_train)
@@ -97,12 +99,16 @@ class SingleXGBReweighter(Reweighter):
         
         self.__cv_results = cv_results
         self.__best_round = best_round
+        self.__max_depth = max_depth
     
-    def train(self, max_depth, num_round, save=False):
-        """Train the XGBoost model"""
+    def train(self, save=False):
+        """Train the XGBoost model. 
+        
+        Parameters:
+        - `save`: Boolean indicating whether to save the model."""
         watchlist = [(self.dtrain, 'train'), (self.dtest, 'test')]
-        model = xgb.train({"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.2, "eval_metric": 'logloss', "nthread": 4, "seed": 42}, 
-                          self.dtrain, num_round, watchlist, early_stopping_rounds=10, verbose_eval=40)
+        model = xgb.train({"objective": "binary:logistic", "max_depth": self.__max_depth, "eta": 0.2, "eval_metric": 'logloss', "nthread": 4, "seed": 42}, 
+                          self.dtrain, self.__best_round, watchlist, early_stopping_rounds=10, verbose_eval=40)
         if save:
             model.save_model(pjoin(self.results_dir, 'SingleXGBmodel.xgb'))
         
@@ -110,20 +116,20 @@ class SingleXGBReweighter(Reweighter):
     
     def evaluate(self):
         """Evaluate the model on the test data."""
-        y_pred = self.__model.predict(self.dtest)
+        y_pred = self._model.predict(self.dtest)
         y_pred_binary = (y_pred > 0.5).astype(int)
         print('Accuracy: ', accuracy_score(self.y_test, y_pred_binary))
 
         roc_auc = roc_auc_score(self.y_test, y_pred)
         print('ROC AUC Score: ', roc_auc)
     
-    def reweight(self, original, target, drop_kwd, original_name, target_name, kin_var, save_path=False):
+    def reweight(self, original, target, drop_kwd, original_name, target_name, kin_var, range):
         """Reweight the original data.
         
         Parameters
         - `original`: pandas DataFrame containing the original data to be reweighted
         - `target`: pandas DataFrame containing the target data."""
-        X, y, weights = self.clean_data(original, target, drop_kwd, drop_neg_wgts=True)
+        X, y, weights = self.clean_data(original, target, drop_kwd, self.weight_column, drop_neg_wgts=True)
         mask = (y == 0)
         X_filtered = X[mask]
         weights_filtered = weights[mask]
@@ -132,15 +138,14 @@ class SingleXGBReweighter(Reweighter):
         data = xgb.DMatrix(X_filtered, label=y_filtered, weight=weights_filtered)
         y_pred = self._model.predict(data)
         
-        data['weight'] = weights_filtered
-        data['new_weight'] = weights_filtered * y_pred / (1 - y_pred)
+        new_weights = weights_filtered * y_pred / (1 - y_pred)
 
-        self.draw_distributions(data, target, data['weight'], target['weight'], 
+        self.draw_distributions(X_filtered, target, weights_filtered, target['weight'], 
                                 f'{original_name} (Before Rwgt)', target_name, 
-                                kin_var, bins=10, range=[0, 200], save_path=pjoin(self.results_dir, 'mass_dist.png'))
-        self.draw_distributions(data, target, data['new_weight'], target['weight'], 
+                                kin_var, bins=10, range=range, save_path=pjoin(self.results_dir, f'{kin_var}.png'))
+        self.draw_distributions(X_filtered, target, new_weights, target['weight'], 
                                 f'{original_name} (After Rwgt)', target_name,
-                                kin_var, bins=10, range=[0, 200], save_path=pjoin(self.results_dir, 'mass_dist_rwgt.png'))
+                                kin_var, bins=10, range=range, save_path=pjoin(self.results_dir, f'{kin_var}.png'))
     
 class MultipleXGBReweighter(Reweighter):
     def preprocess_data(self, drop_kwd: 'list[str]' = [], drop_neg_wgts=True):
