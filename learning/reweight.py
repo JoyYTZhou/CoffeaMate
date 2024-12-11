@@ -1,24 +1,19 @@
 from sklearn.model_selection import train_test_split, GridSearchCV
-from src.plotting.visutil import CSVPlotter
-
+from sklearn.metrics import accuracy_score, roc_auc_score 
 import pandas as pd
-import numpy as np
-from hep_ml import reweight 
-from sklearn.preprocessing import StandardScaler
+import os
+import xgboost as xgb
 from matplotlib import pyplot as plt
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-from hep_ml.metrics_utils import ks_2samp_weighted
-from xgboost import XGBClassifier
+import numpy as np
+
+from src.plotting.visutil import CSVPlotter
+pjoin = os.path.join
 
 def drop_likes(df: 'pd.DataFrame', drop_kwd: 'list[str]' = []):
     """Drop columns containing the keywords in `drop_kwd`."""
     for kwd in drop_kwd:
         df = df.drop(columns=df.filter(like=kwd).columns, inplace=False)
     return df
-
 
 class Reweighter():
     def __init__(self, ori_data:'pd.DataFrame', tar_data:'pd.DataFrame', weight_column, results_dir):
@@ -31,9 +26,123 @@ class Reweighter():
         self.weight_column = weight_column
         self.ori_weight = None
         self.tar_weight = None
-        self.reweighter = None
-        self.visualizer = CSVPlotter(results_dir)
+        self.results_dir = results_dir
     
+    @staticmethod
+    def clean_data(self, ori, tar, drop_kwd, drop_neg_wgts=True):
+        """Clean the data by dropping columns containing the keywords in `drop_kwd`.
+        
+        Return
+        - `X`: Features
+        - `y`: Labels
+        - `weights`: Weights"""
+        ori['label'] = 0
+        tar['label'] = 1
+        data = pd.concat([ori, tar], ignore_index=True, axis=0)
+        precleaned_len = len(data)
+        if drop_neg_wgts:
+            data = data[data[self.weight_column] > 0]
+            print('Dropped ', precleaned_len - len(data), ' events with negative weights out of ', precleaned_len, ' events.')
+        drop_kwd.append(self.weight_column)
+        X = drop_likes(data, drop_kwd)
+        y = data['label']
+        weights = data[self.weight_column]
+        
+        return X, y, weights
+    
+    @staticmethod
+    def draw_distributions(original, target, o_wgt, t_wgt, original_label, target_label, column, bins=10, range=None, save_path=False):
+        """Draw the distributions of the original and target data. Normalized."""
+        hist_settings = {'bins': bins, 'density': True, 'alpha': 0.5}
+        plt.figure(figsize=[12, 7])
+        xlim = np.percentile(np.hstack([target[column]]), [0.01, 99.99])
+        range = xlim if range is None else range
+        plt.hist(original[column], weights=o_wgt, range=range, label=original_label, **hist_settings)
+        plt.hist(target[column], weights=t_wgt, range=range, label=target_label, **hist_settings)
+        plt.legend(loc='best')
+        plt.title(column)
+        if save_path:
+            plt.savefig(save_path)
+
+class SingleXGBReweighter(Reweighter):
+    def prep_data(self, drop_kwd, drop_neg_wgts=True):
+        """Preprocess the data by dropping columns containing the keywords in `drop_kwd`."""
+        X, y, weights = self.clean_data(self.ori_data, self.tar_data, drop_kwd, drop_neg_wgts)
+
+        X_train, X_test, self.y_train, self.y_test, self.w_train, self.w_test = train_test_split(X, y, weights, test_size=0.3, random_state=42)
+        self.dtrain = xgb.DMatrix(X_train, label=self.y_train, weight=self.w_train)
+        self.dtest = xgb.DMatrix(X_test, label=self.y_test, weight=self.w_test)
+
+    def boostingSearch(self, max_depth, num_round) -> None:
+        """Perform grid search to find the best hyperparameters for the XGBoost model.
+        
+        Parameters:
+        `max_depth`: List of integers containing the maximum depth of the trees.
+        `num_round`: List of integers containing the number of boosting rounds."""
+        
+        params = {"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.2, "eval_metric": 'logloss', "nthread": 4, "seed": 42}
+        cv_results = xgb.cv(
+            params=params,
+            dtrain=self.dtrain,
+            num_boost_round=num_round,
+            nfold=5,  # Number of CV folds
+            early_stopping_rounds=10,  # Stop if no improvement after 10 rounds
+            as_pandas=True,  # Return results as a pandas DataFrame
+            seed=42,  # Random seed for reproducibility
+            verbose_eval=20  # Print results every 20 rounds
+        )
+        print(cv_results)
+        best_round = cv_results['test-logloss-mean'].idxmin()
+        print(f"Optimal number of boosting rounds: {best_round}")
+        
+        self.__cv_results = cv_results
+        self.__best_round = best_round
+    
+    def train(self, max_depth, num_round, save=False):
+        """Train the XGBoost model"""
+        watchlist = [(self.dtrain, 'train'), (self.dtest, 'test')]
+        model = xgb.train({"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.2, "eval_metric": 'logloss', "nthread": 4, "seed": 42}, 
+                          self.dtrain, num_round, watchlist, early_stopping_rounds=10, verbose_eval=40)
+        if save:
+            model.save_model(pjoin(self.results_dir, 'SingleXGBmodel.xgb'))
+        
+        self._model = model
+    
+    def evaluate(self):
+        """Evaluate the model on the test data."""
+        y_pred = self.__model.predict(self.dtest)
+        y_pred_binary = (y_pred > 0.5).astype(int)
+        print('Accuracy: ', accuracy_score(self.y_test, y_pred_binary))
+
+        roc_auc = roc_auc_score(self.y_test, y_pred)
+        print('ROC AUC Score: ', roc_auc)
+    
+    def reweight(self, original, target, drop_kwd, original_name, target_name, kin_var, save_path=False):
+        """Reweight the original data.
+        
+        Parameters
+        - `original`: pandas DataFrame containing the original data to be reweighted
+        - `target`: pandas DataFrame containing the target data."""
+        X, y, weights = self.clean_data(original, target, drop_kwd, drop_neg_wgts=True)
+        mask = (y == 0)
+        X_filtered = X[mask]
+        weights_filtered = weights[mask]
+        y_filtered = y[mask] 
+
+        data = xgb.DMatrix(X_filtered, label=y_filtered, weight=weights_filtered)
+        y_pred = self._model.predict(data)
+        
+        data['weight'] = weights_filtered
+        data['new_weight'] = weights_filtered * y_pred / (1 - y_pred)
+
+        self.draw_distributions(data, target, data['weight'], target['weight'], 
+                                f'{original_name} (Before Rwgt)', target_name, 
+                                kin_var, bins=10, range=[0, 200], save_path=pjoin(self.results_dir, 'mass_dist.png'))
+        self.draw_distributions(data, target, data['new_weight'], target['weight'], 
+                                f'{original_name} (After Rwgt)', target_name,
+                                kin_var, bins=10, range=[0, 200], save_path=pjoin(self.results_dir, 'mass_dist_rwgt.png'))
+    
+class MultipleXGBReweighter(Reweighter):
     def preprocess_data(self, drop_kwd: 'list[str]' = [], drop_neg_wgts=True):
         """Preprocess the data by dropping columns containing the keywords in `drop_kwd`."""
         if drop_neg_wgts:
@@ -97,20 +206,7 @@ class Reweighter():
         ori['weight'] = self.wo_test
         self.visualizer.plot_shape([ori, self.t_test], ['Original', 'Target'], attridict, ratio_ylabel=ratio_ylabel, save_name=f'{save_name}_ori', title=title)
     
-    @staticmethod
-    def draw_distributions(original, target, o_wgt, t_wgt, columns):
-        """Draw the distributions of the original and target data. Normalized."""
-        hist_settings = {'bins': 100, 'density': True, 'alpha': 0.7}
-        plt.figure(figsize=[15, 7])
-        for id, column in enumerate(columns, 1):
-            xlim = np.percentile(np.hstack([target[column]]), [0.01, 99.99])
-            plt.subplot(2, 3, id)
-            plt.hist(original[column], weights=o_wgt, range=xlim, label='Original', **hist_settings)
-            plt.hist(target[column], weights=t_wgt, range=xlim, label='Target', **hist_settings)
-            plt.legend(loc='best')
-            plt.title(column)
-            print('KS over ', column, ' = ', ks_2samp_weighted(original[column], target[column], 
-                                            weights1=o_wgt, weights2=t_wgt))
+    
 
 class DataLoader():
     def __init__(self, data:'pd.DataFrame', target_column):
