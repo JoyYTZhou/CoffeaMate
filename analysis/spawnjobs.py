@@ -138,7 +138,7 @@ class JobLoader():
         for file in datafile:
             self.prepjobs_from_dict(file)
     
-    def prepjobs_from_dict(self, inputdatap, batch_size=10, **kwargs) -> bool:
+    def prepjobs_from_dict(self, inputdatap, batch_size=5, **kwargs) -> bool:
         """Prepare job files from a group dictionary containing datasets and the files. Job files are created in the jobpath,
         with name format: {groupname}_{year}_{shortname}_job_{j}.json"""
         with gzip.open(inputdatap, 'rt') as samplepath:
