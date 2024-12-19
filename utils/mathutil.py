@@ -19,6 +19,7 @@ class MathUtil:
         high = scipy.stats.beta.ppf(1 - alpha, passed + 1, total - passed)
         return low, high
     
+    @staticmethod
     def add_inv_M(df, objx:'str', objy:'str', inv_m_name:'str') -> None:
         """Add invariant mass column to the dataframe.
         
@@ -32,6 +33,7 @@ class MathUtil:
         fvy = Object.fourvector(df, objy, sort=False)
         df[inv_m_name] = (fvx+fvy).mass
     
+    @staticmethod
     def add_dR(df, objx:'str', objy:'str', dR_name:'str') -> None:
         """Add delta R column to the dataframe.
         
@@ -44,7 +46,18 @@ class MathUtil:
         fvx = Object.fourvector(df, objx, sort=False)
         fvy = Object.fourvector(df, objy, sort=False)
         df[dR_name] = fvx.deltaR(fvy)
-
+    
+    @staticmethod
+    def add_system_4vec(df, objx:'str', objy:'str', sys_name:'str') -> None:
+        """Add system fourvector column to the dataframe.
+        """
+        fvx = Object.fourvector(df, objx, sort=False)
+        fvy = Object.fourvector(df, objy, sort=False)
+        inv_sys = fvx + fvy
+        df[f'{sys_name}_pt'] = inv_sys.pt
+        df[f'{sys_name}_eta'] = inv_sys.eta
+        df[f'{sys_name}_phi'] = inv_sys.phi
+        df[f'{sys_name}_mass'] = inv_sys.mass
 
 def poisson_errors(obs, alpha=1 - 0.6827) -> tuple[np.ndarray, np.ndarray]:
     """

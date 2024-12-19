@@ -38,8 +38,12 @@ class Reweighter():
         - `X`: Features
         - `y`: Labels
         - `weights`: Weights"""
-        ori['label'] = 0
-        tar['label'] = 1
+        ori = ori.copy()
+        tar = tar.copy()
+
+        ori.loc[:, 'label'] = 0
+        tar.loc[:, 'label'] = 1
+
         data = pd.concat([ori, tar], ignore_index=True, axis=0)
         precleaned_len = len(data)
         if drop_neg_wgts:
@@ -67,6 +71,9 @@ class Reweighter():
             plt.savefig(save_path)
 
 class SingleXGBReweighter(Reweighter):
+    def __init__(self, ori_data, tar_data, weight_column, results_dir):
+        super().__init__(ori_data, tar_data, weight_column, results_dir)
+
     def prep_data(self, drop_kwd, drop_neg_wgts=True):
         """Preprocess the data by dropping columns containing the keywords in `drop_kwd`."""
         X, y, weights = self.clean_data(self.ori_data, self.tar_data, drop_kwd, self.weight_column, drop_neg_wgts)
@@ -75,22 +82,21 @@ class SingleXGBReweighter(Reweighter):
         self.dtrain = xgb.DMatrix(X_train, label=self.y_train, weight=self.w_train)
         self.dtest = xgb.DMatrix(X_test, label=self.y_test, weight=self.w_test)
 
-    def boostingSearch(self, max_depth, num_round) -> None:
+    def boostingSearch(self, max_depth, num_round, seed=42) -> None:
         """Perform grid search to find the best hyperparameters for the XGBoost model.
         
         Parameters:
         `max_depth`: List of integers containing the maximum depth of the trees.
         `num_round`: List of integers containing the number of boosting rounds."""
         
-        params = {"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.2, "eval_metric": 'logloss', "nthread": 4, "seed": 42}
+        params = {"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.4, "eval_metric": 'logloss', "nthread": 4, "seed": seed}
         cv_results = xgb.cv(
             params=params,
             dtrain=self.dtrain,
             num_boost_round=num_round,
-            nfold=5,  # Number of CV folds
-            early_stopping_rounds=10,  # Stop if no improvement after 10 rounds
+            nfold=6,  # Number of CV folds
+            early_stopping_rounds=20,  # Stop if no improvement after 10 rounds
             as_pandas=True,  # Return results as a pandas DataFrame
-            seed=42,  # Random seed for reproducibility
             verbose_eval=20  # Print results every 20 rounds
         )
         print(cv_results)
@@ -98,8 +104,8 @@ class SingleXGBReweighter(Reweighter):
         print(f"Optimal number of boosting rounds: {best_round}")
         
         self.__cv_results = cv_results
-        self.__best_round = best_round
-        self.__max_depth = max_depth
+        self.__boost_round = best_round
+        self.__params = params
     
     def train(self, save=False):
         """Train the XGBoost model. 
@@ -107,8 +113,7 @@ class SingleXGBReweighter(Reweighter):
         Parameters:
         - `save`: Boolean indicating whether to save the model."""
         watchlist = [(self.dtrain, 'train'), (self.dtest, 'test')]
-        model = xgb.train({"objective": "binary:logistic", "max_depth": self.__max_depth, "eta": 0.2, "eval_metric": 'logloss', "nthread": 4, "seed": 42}, 
-                          self.dtrain, self.__best_round, watchlist, early_stopping_rounds=10, verbose_eval=40)
+        model = xgb.train(params=self.__params, dtrain=self.dtrain, num_boost_round=self.__boost_round, evals=watchlist, verbose_eval=40)
         if save:
             model.save_model(pjoin(self.results_dir, 'SingleXGBmodel.xgb'))
         
