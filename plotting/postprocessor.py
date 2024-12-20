@@ -111,7 +111,7 @@ class PostProcessor():
             self.present_yield(combined, signals, pjoin(self.tempdir, year), regroup_dict)
     
     def update_wgt_info(self, outputdir) -> None:
-        """Output the weight information for each dataset to a json file."""
+        """Output the weight information based on per-year per-dataset xsec to a json file."""
         new_meta_dir = pjoin(pdir(self.cfg.METADATA), 'weightedMC')
         FileSysHelper.checkpath(new_meta_dir)
         for year in self.years:
@@ -321,7 +321,7 @@ class PostProcessor():
     
     @staticmethod
     def calc_wgt(datasrcpath, meta_dict, dict_outpath, groups) -> dict:
-        """Calculate the weight per event for each dataset and save to a json file with provided metadata.
+        """Calculate the sum of `Generator_weight` per each dataset and save to a json file with provided metadata.
         
         Parameters
         - `datasrcpath`: path to the output directory (base level)

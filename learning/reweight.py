@@ -31,30 +31,40 @@ class Reweighter():
         self.results_dir = results_dir
     
     @staticmethod
-    def clean_data(ori, tar, drop_kwd, wgt_col, drop_neg_wgts=True):
+    def clean_data(df_original, label, drop_kwd, wgt_col, drop_neg_wgts=True) -> tuple['pd.DataFrame', 'pd.Series', 'pd.Series', 'pd.DataFrame']:
         """Clean the data by dropping columns containing the keywords in `drop_kwd`.
+
+        Parameters:
+        - `label`: Label column
         
         Return
-        - `X`: Features
-        - `y`: Labels
-        - `weights`: Weights"""
-        ori = ori.copy()
-        tar = tar.copy()
+        - `X`: Features, pandas DataFrame
+        - `y`: Labels, pandas Series
+        - `weights`: Weights, pandas Series
+        - `neg_df`: DataFrame containing the events with negative weights."""
+        df = df_original.copy()
+        neg_df = df[df[wgt_col] < 0]
+        df = df[df[wgt_col] > 0] if drop_neg_wgts else df
 
-        ori.loc[:, 'label'] = 0
-        tar.loc[:, 'label'] = 1
+        print("Dropped ", len(df_original) - len(df), " events with negative weights out of ", len(df_original), " events.")
 
-        data = pd.concat([ori, tar], ignore_index=True, axis=0)
-        precleaned_len = len(data)
-        if drop_neg_wgts:
-            data = data[data[wgt_col] > 0]
-            print('Dropped ', precleaned_len - len(data), ' events with negative weights out of ', precleaned_len, ' events.')
         drop_kwd.append(wgt_col)
-        X = drop_likes(data, drop_kwd)
-        y = data['label']
-        weights = data[wgt_col]
+        X = drop_likes(df, drop_kwd)
+
+        y = pd.Series([label] * len(df))
+
+        weights = df[wgt_col]
         
-        return X, y, weights
+        return X, y, weights, neg_df
+    
+    @staticmethod
+    def prep_ori_tar(ori, tar, drop_kwd, wgt_col, drop_neg_wgts=True):
+        """Preprocess the original and target data by dropping columns containing the keywords in `drop_kwd`."""
+        
+        X_ori, y_ori, w_ori, _ = Reweighter.clean_data(ori, 0, drop_kwd, wgt_col, drop_neg_wgts)
+        X_tar, y_tar, w_tar, _ = Reweighter.clean_data(tar, 1, drop_kwd, wgt_col, drop_neg_wgts)
+        
+        return pd.concat([X_ori, X_tar], ignore_index=True, axis=0), pd.concat([y_ori, y_tar], ignore_index=True, axis=0), pd.concat([w_ori, w_tar], ignore_index=True, axis=0)
     
     @staticmethod
     def draw_distributions(original, target, o_wgt, t_wgt, original_label, target_label, column, bins=10, range=None, save_path=False):
@@ -76,7 +86,7 @@ class SingleXGBReweighter(Reweighter):
 
     def prep_data(self, drop_kwd, drop_neg_wgts=True):
         """Preprocess the data by dropping columns containing the keywords in `drop_kwd`."""
-        X, y, weights = self.clean_data(self.ori_data, self.tar_data, drop_kwd, self.weight_column, drop_neg_wgts)
+        X, y, weights = self.prep_ori_tar(self.ori_data, self.tar_data, drop_kwd, self.weight_column, drop_neg_wgts)
 
         X_train, X_test, self.y_train, self.y_test, self.w_train, self.w_test = train_test_split(X, y, weights, test_size=0.3, random_state=42)
         self.dtrain = xgb.DMatrix(X_train, label=self.y_train, weight=self.w_train)
@@ -128,29 +138,35 @@ class SingleXGBReweighter(Reweighter):
         roc_auc = roc_auc_score(self.y_test, y_pred)
         print('ROC AUC Score: ', roc_auc)
     
-    def reweight(self, original, target, drop_kwd, original_name, target_name, kin_var, range):
+    def reweight(self, original, normalize, drop_kwd, save_results=False, save_name=''):
         """Reweight the original data.
         
         Parameters
         - `original`: pandas DataFrame containing the original data to be reweighted
-        - `target`: pandas DataFrame containing the target data."""
-        X, y, weights = self.clean_data(original, target, drop_kwd, self.weight_column, drop_neg_wgts=True)
-        mask = (y == 0)
-        X_filtered = X[mask]
-        weights_filtered = weights[mask]
-        y_filtered = y[mask] 
+        - `normalize`: constant to which the weights are normalized"""
+        X, y, weights, neg_df = self.clean_data(original, 0, drop_kwd, self.weight_column, drop_neg_wgts=True)
 
-        data = xgb.DMatrix(X_filtered, label=y_filtered, weight=weights_filtered)
+        data = xgb.DMatrix(X, label=y, weight=weights)
         y_pred = self._model.predict(data)
         
-        new_weights = weights_filtered * y_pred / (1 - y_pred)
+        new_weights = weights * y_pred / (1 - y_pred)
+        normalize -= neg_df[self.weight_column].sum()
+        new_weights = new_weights * normalize / new_weights.sum()
+        
+        if save_results:
+            X[self.weight_column] = new_weights
+            reweighted = pd.concat([X, neg_df], ignore_index=True)
+            reweighted.to_csv(pjoin(self.results_dir, save_name))
+    
+    def plot_rwgt(self, original, target, drop_kwd, original_name, target_name, kin_var, range):
+        pass
 
-        self.draw_distributions(X_filtered, target, weights_filtered, target['weight'], 
-                                f'{original_name} (Before Rwgt)', target_name, 
-                                kin_var, bins=10, range=range, save_path=pjoin(self.results_dir, f'{kin_var}.png'))
-        self.draw_distributions(X_filtered, target, new_weights, target['weight'], 
-                                f'{original_name} (After Rwgt)', target_name,
-                                kin_var, bins=10, range=range, save_path=pjoin(self.results_dir, f'{kin_var}.png'))
+        # self.draw_distributions(X_filtered, target, weights_filtered, target['weight'], 
+        #                         f'{original_name} (Before Rwgt)', target_name, 
+        #                         kin_var, bins=10, range=range, save_path=pjoin(self.results_dir, f'{kin_var}.png'))
+        # self.draw_distributions(X_filtered, target, new_weights, target['weight'], 
+        #                         f'{original_name} (After Rwgt)', target_name,
+        #                         kin_var, bins=10, range=range, save_path=pjoin(self.results_dir, f'{kin_var}.png'))
     
 class MultipleXGBReweighter(Reweighter):
     def preprocess_data(self, drop_kwd: 'list[str]' = [], drop_neg_wgts=True):

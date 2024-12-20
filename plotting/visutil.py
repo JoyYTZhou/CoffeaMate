@@ -157,8 +157,9 @@ class CSVPlotter():
     def order_list(list_of_obj, order) -> list:
         """Order the list of lists based on the order."""
         return [list_of_obj[i] for i in order]
-
-    def plot_shape(self, list_of_evts: list[pd.DataFrame], labels, attridict: dict, ratio_ylabel, hist_ylabel='Normalized', title='', save_name='') -> None:
+    
+    @staticmethod
+    def plot_shape(list_of_evts: list[pd.DataFrame], labels, attridict: dict, ratio_ylabel, outdir, hist_ylabel='Normalized', title='', save_name='') -> None:
         """Compare the (normalized) shape of the object attribute for two different dataframes, with ratio panel attached.
         
         Parameters
@@ -180,7 +181,7 @@ class CSVPlotter():
                 wgt_list.append(evts['weight'])
             ObjectPlotter.plot_var_with_err(ax, ax2, hist_list, wgt_list, bins, labels, bin_range, **pltopts)
 
-            fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'), dpi=400, bbox_inches='tight')
+            fig.savefig(pjoin(outdir, f'{att}{save_name}.png'), dpi=400, bbox_inches='tight')
     
     def plot_SvBHist(self, ax, evts, att, attoptions, title, **kwargs) -> list:
         """Plot the signal and background histograms.
