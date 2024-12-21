@@ -43,22 +43,22 @@ class CSVPlotter():
         cutflow[f'{ds}_wgt'] = df[wgtname].sum()
     
     def __get_rwgt_fac(self, group, ds, signals, factor, luminosity) -> float:
-        """Get the reweighting factor for the dataset.
+        """Get the reweighting factor for the dataset (xsection * lumi)
         
         - `group`: the group of the dataset
         - `ds`: the dataset name
         - `signals`: the signal groups
         - `factor`: the factor to multiply to the flat weights
-        - `scaled`: the scaling factor (luminosity * cross section)"""
+        - `luminosity`: the luminosity (in fb^-1)"""
         if group in signals: 
             multiply = factor
         else:
             multiply = 1
-        flat_wgt = 1/self.meta_dict[group][ds]['nwgt'] * multiply * self.meta_dict[group][ds]['xsection'] * luminosity
+        flat_wgt = 1/self.meta_dict[group][ds]['nwgt'] * multiply * self.meta_dict[group][ds]['xsection'] * luminosity * 1000
         return flat_wgt
     
     def postprocess_csv(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=220) -> pd.DataFrame:
-        """Post-process the datasets and save the processed dataframes to csv files.
+        """Reweight the datasets to the desired xsection * luminosity and save the processed dataframes to csv files. 
         
         Parameters
         - `datasource`: the directory of the group subdirectories containing different csv output files.
