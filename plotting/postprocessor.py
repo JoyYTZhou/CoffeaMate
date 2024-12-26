@@ -16,7 +16,7 @@ class PostProcessor():
     - `meta_dict`: the metadata dictionary for all datasets. {Groupname: {Datasetname: {metadata}}}
     - `groups`: list of group names to process. If not provided, will grep from the input directory.
     - `years`: list of years to process. If not provided, will grep from the input directory.
-    - `lumi`: the luminosity of the dataset, in pb^-1"""
+    - `lumi`: the luminosity of the dataset, in fb^-1"""
     def __init__(self, ppcfg, groups=None, years=None) -> None:
         """Parameters
         - `ppcfg`: the configuration file for post processing of datasets"""
@@ -355,6 +355,7 @@ class PostProcessor():
         Parameters
         -`group`: the name of the cutflow that will be grepped from datasrcpath
         -`datasrcpath`: path to the output directory (base level)
+        -`luminosity`: the luminosity of the dataset, in pb^-1
         
         Returns
         - tuple of resolved (per channel) cutflow dataframe and combined cutflow (per group) dataframe"""

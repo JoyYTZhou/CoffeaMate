@@ -52,13 +52,15 @@ class CSVPlotter():
         - `luminosity`: the luminosity (in fb^-1)"""
         if group in signals: 
             multiply = factor
+            print("Dataset is a signal.")
+            print(f"Multiplying by {factor}")
         else:
             multiply = 1
-        flat_wgt = 1/self.meta_dict[group][ds]['nwgt'] * multiply * self.meta_dict[group][ds]['xsection'] * luminosity * 1000
+        flat_wgt = 1/self.meta_dict[group][ds]['nwgt'] * multiply * self.meta_dict[group][ds]['xsection'] * luminosity
         return flat_wgt
     
-    def postprocess_csv(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=220) -> pd.DataFrame:
-        """Reweight the datasets to the desired xsection * luminosity and save the processed dataframes to csv files. 
+    def postprocess_csv(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
+        """Reweight the datasets to the desired xsection * luminosity by adding a column `weight` and save the processed dataframes to csv files. 
         
         Parameters
         - `datasource`: the directory of the group subdirectories containing different csv output files.
@@ -159,7 +161,7 @@ class CSVPlotter():
         return [list_of_obj[i] for i in order]
     
     @staticmethod
-    def plot_shape(list_of_evts: list[pd.DataFrame], labels, attridict: dict, ratio_ylabel, outdir, hist_ylabel='Normalized', title='', save_name='') -> None:
+    def plot_shape(list_of_evts: list[pd.DataFrame], labels, attridict: dict, ratio_ylabel, outdir, hist_ylabel='Normalized', title='', save_suffix='') -> None:
         """Compare the (normalized) shape of the object attribute for two different dataframes, with ratio panel attached.
         
         Parameters
@@ -181,7 +183,7 @@ class CSVPlotter():
                 wgt_list.append(evts['weight'])
             ObjectPlotter.plot_var_with_err(ax, ax2, hist_list, wgt_list, bins, labels, bin_range, **pltopts)
 
-            fig.savefig(pjoin(outdir, f'{att}{save_name}.png'), dpi=400, bbox_inches='tight')
+            fig.savefig(pjoin(outdir, f'{att}{save_suffix}.png'), dpi=400, bbox_inches='tight')
     
     def plot_SvBHist(self, ax, evts, att, attoptions, title, **kwargs) -> list:
         """Plot the signal and background histograms.
@@ -306,7 +308,10 @@ class ObjectPlotter():
         ObjectPlotter.plot_var(ax, norm_hist_list, bins, label, xrange, histtype='step', alpha=1.0, **kwargs) 
 
         np.seterr(divide='ignore', invalid='ignore')
-        ax2.errorbar((bins[:-1] + bins[1:])/2, ratio, yerr=ratio_err, markersize=4, fmt='o', color='black')
+        ax2.errorbar((bins[:-1] + bins[1:])/2, ratio, yerr=ratio_err, markersize=3, fmt='o', color='black')
+
+        ax2.axhline(1, color='gray', linestyle='--', linewidth=1)
+        ax2.set_ylim(0.5, 1.5)
     
     @staticmethod
     def plotSigVBkg(ax, sig_hists, bkg_hists, bin_edges, sig_label, bkg_label, xrange, title, **kwargs):

@@ -99,7 +99,7 @@ class SingleXGBReweighter(Reweighter):
         `max_depth`: List of integers containing the maximum depth of the trees.
         `num_round`: List of integers containing the number of boosting rounds."""
         
-        params = {"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.4, "eval_metric": 'logloss', "nthread": 4, "seed": seed}
+        params = {"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.1, "eval_metric": 'logloss', "nthread": 4, "seed": seed}
         cv_results = xgb.cv(
             params=params,
             dtrain=self.dtrain,
@@ -144,6 +144,8 @@ class SingleXGBReweighter(Reweighter):
         Parameters
         - `original`: pandas DataFrame containing the original data to be reweighted
         - `normalize`: constant to which the weights are normalized"""
+
+        #! note a potential bug: X does not contain the dropped columns but neg_df does
         X, y, weights, neg_df = self.clean_data(original, 0, drop_kwd, self.weight_column, drop_neg_wgts=True)
 
         data = xgb.DMatrix(X, label=y, weight=weights)
@@ -157,6 +159,8 @@ class SingleXGBReweighter(Reweighter):
             X[self.weight_column] = new_weights
             reweighted = pd.concat([X, neg_df], ignore_index=True)
             reweighted.to_csv(pjoin(self.results_dir, save_name))
+        
+        return reweighted
     
     def plot_rwgt(self, original, target, drop_kwd, original_name, target_name, kin_var, range):
         pass
