@@ -1,4 +1,4 @@
-import uproot, json, subprocess, re, os, shutil
+import uproot, json, subprocess, re, os
 import awkward as ak
 import pandas as pd
 
@@ -16,12 +16,12 @@ class PostProcessor():
     - `meta_dict`: the metadata dictionary for all datasets. {Groupname: {Datasetname: {metadata}}}
     - `groups`: list of group names to process. If not provided, will grep from the input directory.
     - `years`: list of years to process. If not provided, will grep from the input directory.
-    - `lumi`: the luminosity of the dataset, in fb^-1"""
-    def __init__(self, ppcfg, groups=None, years=None) -> None:
+    - `luminosity`: per-year luminosity info in dictionary, in pb^-1"""
+    def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
         """Parameters
         - `ppcfg`: the configuration file for post processing of datasets"""
         self.cfg = ppcfg
-        self.lumi = ppcfg.LUMI * 1000
+        self.lumi = luminosity
         self.inputdir = ppcfg.INPUTDIR
         self.tempdir = ppcfg.LOCALOUTPUT
         self.transferP = ppcfg.get("TRANSFERPATH", None)
@@ -192,7 +192,7 @@ class PostProcessor():
     def hadd_cfs(self):
         """Hadd cutflow table output from processor. Output a total cutflow for the group with all the sub datasets."""
         def process_cf(dsname, dtdir, outdir):
-            print(f"Dealing with {dsname} now ...............................")
+            print(f"Dealing with {dsname} cutflow hadding now ...............................")
             try:
                 df = combine_cf(inputdir=dtdir, dsname=dsname, output=False)
                 df.to_csv(pjoin(outdir, f"{dsname}_cutflow.csv"))
@@ -215,7 +215,7 @@ class PostProcessor():
     #     """Check the cutflow numbers against the number of events in the root files."""
     #     for group in groupnames:
     #         query_dir = pjoin(base_dir, group)
-    #         cf = PostProcessor.load_cf(group, base_dir)[0]
+    #         cf = PostProcessor.scale_cf(group, base_dir)[0]
     #         if check_last_no(cf, f"{process}_raw", glob_files(condorpath, f'{process}*.root')):
     #             print(f"Cutflow check for {process} passed!")
     #         else:
@@ -236,17 +236,17 @@ class PostProcessor():
         resolved_wgted = {}
         combined_wgted = {}
 
-        lumi = self.lumi/len(self.years)
-
         for year in self.years:
+            lumi = self.lumi[year]
             resolved_list = []
             combined_list = []
             FileSysHelper.checkpath(pjoin(outputdir, year), createdir=True)
 
             for group in self.groups(year):
-                resolved, combined = PostProcessor.load_cf(group, self.meta_dict[year], pjoin(inputdir, year), lumi) 
-                resolved_list.append(resolved)
-                combined_list.append(combined)
+                if FileSysHelper.checkpath(pjoin(inputdir, year, group), createdir=False):
+                    resolved, combined = PostProcessor.scale_cf(group, self.meta_dict[year], pjoin(inputdir, year), lumi)
+                    resolved_list.append(resolved)
+                    combined_list.append(combined)
 
             resolved_all = pd.concat(resolved_list, axis=1)
             resolved_all.to_csv(pjoin(outputdir, year, f"allDatasetCutflow.csv"))
@@ -349,8 +349,8 @@ class PostProcessor():
         return new_meta
 
     @staticmethod
-    def load_cf(group, meta_dict, datasrcpath, luminosity) -> tuple[pd.DataFrame]:
-        """Load cutflow tables for one group of datasets and scale it by xsection * luminosity
+    def scale_cf(group, meta_dict, datasrcpath, luminosity) -> tuple[pd.DataFrame]:
+        """Scale cutflow tables for one group of datasets by xsection * luminosity
 
         Parameters
         -`group`: the name of the cutflow that will be grepped from datasrcpath
