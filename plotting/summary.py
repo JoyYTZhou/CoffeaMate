@@ -1,4 +1,4 @@
-import uproot, json, subprocess, re, os, shutil
+import uproot, json, subprocess, re, os
 import awkward as ak
 import pandas as pd
 
@@ -16,7 +16,7 @@ class PostProcessor():
     - `meta_dict`: the metadata dictionary for all datasets. {Groupname: {Datasetname: {metadata}}}
     - `groups`: list of group names to process. If not provided, will grep from the input directory.
     - `years`: list of years to process. If not provided, will grep from the input directory.
-    - `luminosity`: per-year luminosity info in dictionary"""
+    - `luminosity`: per-year luminosity info in dictionary, in pb^-1"""
     def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
         """Parameters
         - `ppcfg`: the configuration file for post processing of datasets"""
