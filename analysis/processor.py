@@ -9,7 +9,7 @@ import dask
 import awkward as ak
 import gc
 
-from src.utils.filesysutil import FileSysHelper, pjoin, checkx509
+from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper
 from src.analysis.evtselutil import BaseEventSelections
 
 class Processor:
@@ -45,7 +45,9 @@ class Processor:
         If the copy directory is specified, it will be created and checked.
         The output directory will be checked and created if necessary."""
         self.outdir = pjoin(self.rtcfg.get("OUTPUTDIR_PATH", "outputs"), self.dataset)
+        self.copydir = self.rtcfg.get("COPYDIR_PATH", "copydir")
         self.filehelper.checkpath(self.outdir)
+        self.filehelper.checkpath(self.copydir)
     
     def loadfile_remote(self, fileargs: dict) -> ak.Array:
         """This is a wrapper function around uproot._dask.
@@ -60,6 +62,20 @@ class Processor:
             if not filename.endswith(":Events"):
                 filename += ":Events"
             events = uproot.open(filename).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
+        return events
+    
+    def loadfile_local(self, fileargs: dict) -> ak.Array:
+        """Copy the file to the copy directory and load it."""
+        if not filename.endswith(":Events"): filename = list(fileargs['files'].keys())[0]
+        else: filename = list(fileargs['files'].keys())[0].split(":Events")[0]
+        XRootDHelper.call_xrdcp(filename, pjoin(self.copydir, "copy.root"))
+        new_filename = pjoin(self.copydir, "copy.root")
+        new_filename.append(":Events")
+        new_fileargs = {"files": {new_filename: fileargs['files'][filename]}}
+        if self.rtcfg.get("DELAYED_OPEN", True):
+            events = uproot.dask(**new_fileargs)
+        else:
+            events = uproot.open(new_filename).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
         return events
 
     def runfiles(self, write_npz=False, **kwargs):
@@ -78,7 +94,8 @@ class Processor:
             try:
                 suffix = fileinfo['uuid']
                 self.evtsel = self.evtselclass(**self.evtsel_kwargs)
-                events = self.loadfile_remote(fileargs={"files": {filename: fileinfo}})
+                remote_load = self.rtcfg.get("REMOTELOAD", True)
+                events = self.loadfile_remote(fileargs={"files": {filename: fileinfo}}) if remote_load else self.loadfile_local(fileargs={"files": {filename: fileinfo}})
                 if events is not None: 
                     events = self.evtsel(events)
                     self.writeCF(suffix, write_npz=write_npz)
@@ -90,6 +107,7 @@ class Processor:
                 print(f"Error encountered for file index {suffix} in {self.dataset}: {e}")
                 rc += 1
                 gc.collect()
+            if not remote_load: self.filehelper.remove_files(self.copydir)
         return rc
     
     def writeCF(self, suffix, **kwargs) -> int:
