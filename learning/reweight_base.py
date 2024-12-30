@@ -1,7 +1,15 @@
 from matplotlib import pyplot as plt
 import pandas as pd
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset
 
-
+def add_hidden_layer(layers, hidden_dims, activation):
+    """Add hidden layers to the model."""
+    for h_dim in hidden_dims:
+        layers.append(nn.Linear(in_dim, h_dim))
+        layers.append(activation)
+        in_dim = h_dim
 
 class ReweighterBase():
     def __init__(self, ori_data:'pd.DataFrame', tar_data:'pd.DataFrame', weight_column, results_dir):
@@ -72,3 +80,46 @@ class ReweighterBase():
         plt.title(column)
         if save_path:
             plt.savefig(save_path)
+
+class WeightedDataset(Dataset):
+    """Dataset class for weighted data."""
+    def __init__(self, dataframe, feature_columns, weight_column):
+        self.data = torch.tensor(dataframe[feature_columns].values, dtype=torch.float32)
+        self.weights = torch.tensor(dataframe[weight_column].values, dtype=torch.float32)
+    
+    def __len__(self):
+        return len(self.data)
+        
+    def __getitem__(self, idx):
+        data = self.data[idx]
+        weight = self.weights[idx]
+        return torch.tensor(data, dtype=torch.float), torch.tensor(weight, dtype=torch.float)
+
+class Generator(nn.Module):
+    """Generator class for the reweighting model."""
+    def __init__(self, input_dim, output_dim, hidden_dims):
+        super(Generator, self).__init__()
+
+        layers = []
+        add_hidden_layer(layers, hidden_dims, nn.ReLU())
+        layers.append(nn.Linear(hidden_dims[-1], output_dim))
+        layers.append(nn.Tanh())
+
+        self.main = nn.Sequential(*layers)
+    
+    def forward(self, z):
+        return self.main(z)
+
+class Discriminator(nn.Module):
+    def __init__(self, input_dim, hidden_dims):
+        super(Discriminator, self).__init__()
+
+        layers = []
+        add_hidden_layer(layers, hidden_dims, nn.ReLU())
+        layers.append(nn.Linear(hidden_dims[-1], 1))
+        layers.append(nn.Sigmoid())
+
+        self.main = nn.Sequential(*layers)
+    
+    def forward(self, x):
+        return self.main(x)
