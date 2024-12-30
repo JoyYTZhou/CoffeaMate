@@ -1,4 +1,5 @@
 from matplotlib import pyplot as plt
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -12,6 +13,15 @@ def add_hidden_layer(layers, hidden_dims, activation):
         in_dim = h_dim
 
 class ReweighterBase():
+    """Base class for reweighting.
+
+    Attributes:
+    - `ori_data`: pandas DataFrame containing the original data.
+    - `tar_data`: pandas DataFrame containing the target data.
+    - `weight_column`: Column name for the weights.
+    - `ori_weight`: Weights for the original data.
+    - `tar_weight`: Weights for the target data.
+    - `results_dir`: Directory to save the results."""
     def __init__(self, ori_data:'pd.DataFrame', tar_data:'pd.DataFrame', weight_column, results_dir):
         """
         Parameters:
@@ -32,7 +42,7 @@ class ReweighterBase():
         return df
     
     @staticmethod
-    def clean_data(df_original, label, drop_kwd, wgt_col, drop_neg_wgts=True) -> tuple['pd.DataFrame', 'pd.Series', 'pd.Series', 'pd.DataFrame']:
+    def clean_data(df_original, drop_kwd, wgt_col, label=None, drop_wgts=True, drop_neg_wgts=True) -> tuple['pd.DataFrame', 'pd.Series', 'pd.Series', 'pd.DataFrame']:
         """Clean the data by dropping columns containing the keywords in `drop_kwd`.
 
         Parameters:
@@ -40,7 +50,7 @@ class ReweighterBase():
         
         Return
         - `X`: Features, pandas DataFrame
-        - `y`: Labels, pandas Series
+        - `y`: Labels, pandas Series. If `label` is None, return None.
         - `weights`: Weights, pandas Series
         - `neg_df`: DataFrame containing the events with negative weights."""
         df = df_original.copy()
@@ -49,10 +59,11 @@ class ReweighterBase():
 
         print("Dropped ", len(df_original) - len(df), " events with negative weights out of ", len(df_original), " events.")
 
-        drop_kwd.append(wgt_col)
-        X = Reweighter.drop_likes(df, drop_kwd)
+        if drop_wgts: drop_kwd.append(wgt_col)
+        X = ReweighterBase.drop_likes(df, drop_kwd)
 
-        y = pd.Series([label] * len(df))
+        if label is not None: y = pd.Series([label] * len(df))
+        else: y = None
 
         weights = df[wgt_col]
         
@@ -62,8 +73,8 @@ class ReweighterBase():
     def prep_ori_tar(ori, tar, drop_kwd, wgt_col, drop_neg_wgts=True):
         """Preprocess the original and target data by dropping columns containing the keywords in `drop_kwd`."""
         
-        X_ori, y_ori, w_ori, _ = Reweighter.clean_data(ori, 0, drop_kwd, wgt_col, drop_neg_wgts)
-        X_tar, y_tar, w_tar, _ = Reweighter.clean_data(tar, 1, drop_kwd, wgt_col, drop_neg_wgts)
+        X_ori, y_ori, w_ori, _ = ReweighterBase.clean_data(ori, drop_kwd, wgt_col, label=0, drop_neg_wgts=drop_neg_wgts)
+        X_tar, y_tar, w_tar, _ = ReweighterBase.clean_data(tar, drop_kwd, wgt_col, label=1, drop_neg_wgts=drop_neg_wgts)
         
         return pd.concat([X_ori, X_tar], ignore_index=True, axis=0), pd.concat([y_ori, y_tar], ignore_index=True, axis=0), pd.concat([w_ori, w_tar], ignore_index=True, axis=0)
     

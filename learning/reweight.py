@@ -1,13 +1,19 @@
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import accuracy_score, roc_auc_score 
 import pandas as pd
+import numpy as np
 import os
 import xgboost as xgb
 
-from torch import nn, optim
-import torch
+from sklearn.preprocessing import MinMaxScaler
 
-from src.learning.reweight_base import ReweighterBase
+import torch
+from torch import nn
+from torch.utils.data import DataLoader
+import torch.optim as optim
+
+
+from src.learning.reweight_base import ReweighterBase, WeightedDataset, Generator, Discriminator
 pjoin = os.path.join
 
 def weighted_bce_loss(predictions, targets, weights):
@@ -99,10 +105,68 @@ class SingleXGBReweighter(ReweighterBase):
 class GANReweighter(ReweighterBase):
     def __init__(self, ori_data, tar_data, weight_column, results_dir):
         super().__init__(ori_data, tar_data, weight_column, results_dir)
+        self.scaler = MinMaxScaler()
     
-    def prep_data(self, drop_kwd, drop_neg_wgts=True):
+    def prep_data(self, drop_kwd, drop_neg_wgts=True) -> tuple[WeightedDataset, pd.DataFrame]:
+        """Preprocess the data into WeightedDataset objects.
+        Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
+        target_df, _,  _, _ = self.clean_data(self.tar_data, drop_kwd, self.weight_column, None, False, drop_neg_wgts)
+        features = list(target_df.columns)
+        features.remove(self.weight_column)
+        target_df[features] = self.scaler.fit_transform(target_df[features])
+        target_df["weight"] /= target_df["weight"].sum()
+        target_dataset = WeightedDataset(target_df, features, self.weight_column)
+
+        noise_df, _, _, _ = self.clean_data(self.ori_data, drop_kwd, self.weight_column, None, False, drop_neg_wgts)
+        noise_df[features] = self.scaler.transform(noise_df[features])
+        noise_df["weight"] /= noise_df["weight"].sum()
+        
+        self.target_dataset = target_dataset
+        self.noise_df = noise_df
+        self.feature_cols = features
+
+        return self.target_dataset, self.noise_df
+    
+    def train(self, num_epochs, hidden_dims, batch_size):
+        mps_device = torch.device('mps')
+
+        target_loader = DataLoader(self.tar_data, batch_size, shuffle=True)
+        noise_data = self.noise_df[self.feature_cols].values()
+        noise_weights = self.noise_df[self.weight_column].values()
+        
+        input_dim = len(self.feature_cols)
+        # generator = Generator(input_dim, input_dim, hidden_dims).to(mps_device)
+        discriminator = Discriminator(input_dim, hidden_dims).to(mps_device)
+        generator = Discriminator(input_dim, hidden_dims).to(mps_device)
+
+        optimizer_D = optim.Adam(discriminator.parameters(), lr=0.0002)
+        optimizer_G = optim.Adam(generator.parameters(), lr=0.0002)
+
+        G_losses = []
+        D_losses = []
+
+        for epoch in range(num_epochs):
+            for real_samples, real_weights in target_loader:
+                real_samples, real_weights = real_samples.to(mps_device), real_weights.to(mps_device)
+                batch_size = real_samples.shape[0]
+
+                optimizer_D.zero_grad()
+                
+                real_labels = torch.ones(batch_size, 1).to(mps_device)
+                real_predictions = discriminator(real_samples)
+                real_loss = weighted_bce_loss(real_predictions, real_labels, real_weights)
+
+                noise_indices = np.random.choice(len(noise_data), size=batch_size, p=noise_weights)
+                noise = torch.tensor(noise_data[noise_indices], dtype=torch.float32).to(mps_device)
+                fake_weights = generator(noise)
+                fake_labels = torch.zeros(batch_size, 1).to(mps_device)
+                fake_predictions = discriminator(noise)
+                fake_loss = weighted_bce_loss(fake_predictions, fake_labels, fake_weights)
+                
+
         pass
-    
+
+
 
 # class MultipleXGBReweighter(Reweighter):
 #     def preprocess_data(self, drop_kwd: 'list[str]' = [], drop_neg_wgts=True):
