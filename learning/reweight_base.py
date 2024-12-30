@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
-def add_hidden_layer(layers, hidden_dims, activation):
+def add_hidden_layer(layers, in_dim, hidden_dims, activation):
     """Add hidden layers to the model."""
     for h_dim in hidden_dims:
         layers.append(nn.Linear(in_dim, h_dim))
@@ -70,11 +70,11 @@ class ReweighterBase():
         return X, y, weights, neg_df
     
     @staticmethod
-    def prep_ori_tar(ori, tar, drop_kwd, wgt_col, drop_neg_wgts=True):
+    def prep_ori_tar(ori, tar, drop_kwd, wgt_col, drop_neg_wgts=True, drop_wgts=True):
         """Preprocess the original and target data by dropping columns containing the keywords in `drop_kwd`."""
         
-        X_ori, y_ori, w_ori, _ = ReweighterBase.clean_data(ori, drop_kwd, wgt_col, label=0, drop_neg_wgts=drop_neg_wgts)
-        X_tar, y_tar, w_tar, _ = ReweighterBase.clean_data(tar, drop_kwd, wgt_col, label=1, drop_neg_wgts=drop_neg_wgts)
+        X_ori, y_ori, w_ori, _ = ReweighterBase.clean_data(ori, drop_kwd, wgt_col, label=0, drop_neg_wgts=drop_neg_wgts, drop_wgts=drop_wgts)
+        X_tar, y_tar, w_tar, _ = ReweighterBase.clean_data(tar, drop_kwd, wgt_col, label=1, drop_neg_wgts=drop_neg_wgts, drop_wgts=drop_wgts)
         
         return pd.concat([X_ori, X_tar], ignore_index=True, axis=0), pd.concat([y_ori, y_tar], ignore_index=True, axis=0), pd.concat([w_ori, w_tar], ignore_index=True, axis=0)
     
@@ -109,10 +109,10 @@ class WeightedDataset(Dataset):
 class Generator(nn.Module):
     """Generator class for the reweighting model."""
     def __init__(self, input_dim, output_dim, hidden_dims):
-        super(Generator, self).__init__()
+        super().__init__()
 
         layers = []
-        add_hidden_layer(layers, hidden_dims, nn.ReLU())
+        add_hidden_layer(layers, input_dim, hidden_dims, nn.ReLU())
         layers.append(nn.Linear(hidden_dims[-1], output_dim))
         layers.append(nn.Tanh())
 
@@ -123,10 +123,10 @@ class Generator(nn.Module):
 
 class Discriminator(nn.Module):
     def __init__(self, input_dim, hidden_dims):
-        super(Discriminator, self).__init__()
+        super().__init__()
 
         layers = []
-        add_hidden_layer(layers, hidden_dims, nn.ReLU())
+        add_hidden_layer(layers, input_dim, hidden_dims, nn.ReLU())
         layers.append(nn.Linear(hidden_dims[-1], 1))
         layers.append(nn.Sigmoid())
 

@@ -1,20 +1,28 @@
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, roc_auc_score 
 import pandas as pd
 import numpy as np
 import os
 import xgboost as xgb
-
 from sklearn.preprocessing import MinMaxScaler
-
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 import torch.optim as optim
-
+import matplotlib.pyplot as plt
 
 from src.learning.reweight_base import ReweighterBase, WeightedDataset, Generator, Discriminator
 pjoin = os.path.join
+
+def check_device():
+    if torch.cuda.is_available():
+        device = torch.device('cuda')  # NVIDIA GPU
+    elif torch.backends.mps.is_available():
+        device = torch.device('mps')   # Apple Silicon GPU
+    else:
+        device = torch.device('cpu')   # Fallback to CPU
+    print(f"Using device: {device}")
+    return device
 
 def weighted_bce_loss(predictions, targets, weights):
     """Compute the weighted binary cross-entropy loss."""
@@ -102,10 +110,140 @@ class SingleXGBReweighter(ReweighterBase):
         
         return reweighted
     
-class GANReweighter(ReweighterBase):
+class SingleNNReweighter(ReweighterBase):
     def __init__(self, ori_data, tar_data, weight_column, results_dir):
         super().__init__(ori_data, tar_data, weight_column, results_dir)
         self.scaler = MinMaxScaler()
+    
+    def prep_data(self, drop_kwd, drop_neg_wgts=True):
+        """Preprocess the data into WeightedDataset objects.
+        Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
+        X, y, weights = self.prep_ori_tar(self.ori_data, self.tar_data, drop_kwd, self.weight_column, drop_wgts=True, drop_neg_wgts=drop_neg_wgts)
+        features = list(X.columns)
+
+        X[features] = self.scaler.fit_transform(X[features])
+
+        X_train, X_val, y_train, y_val, w_train, w_val = train_test_split(X.values, y.values, weights.values, test_size=0.3, random_state=42)
+
+        self.dataset = TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32).view(-1, 1), torch.tensor(w_train, dtype=torch.float32))
+        self.val_dataset = TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32).view(-1, 1), torch.tensor(w_val, dtype=torch.float32))
+        self.features = features
+    
+    def train(self, num_epochs, hidden_dims, batch_size, eval=True):
+        """Train the discriminator model.
+        
+        Parameters:
+        - `num_epochs`: Number of epochs
+        - `hidden_dims`: List of integers containing the number of hidden units in each layer.
+        - `batch_size`: Batch size
+        - `eval`: Boolean indicating whether to evaluate the model on the validation data."""
+        device = check_device()
+        input_dim = len(self.features)
+
+        model = Discriminator(input_dim, hidden_dims).to(device)
+
+        criterion = nn.BCELoss(reduction='none')
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+        train_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(self.val_dataset, batch_size=batch_size, shuffle=False)
+
+        train_losses = []
+        val_losses = []
+
+        for epoch in range(num_epochs):
+            model.train()
+            running_loss = 0.0
+            val_running_loss = 0.0
+
+            for batch_data, batch_labels, batch_weights in train_loader:
+                batch_data, batch_labels, batch_weights = batch_data.to(device), batch_labels.to(device), batch_weights.to(device)
+                optimizer.zero_grad()
+                outputs = model(batch_data)
+                loss = criterion(outputs, batch_labels)
+                weighted_loss = (loss * batch_weights).mean()
+                weighted_loss.backward()
+                optimizer.step()
+                running_loss += weighted_loss.item()
+            
+            epoch_loss = running_loss / len(train_loader)
+            train_losses.append(epoch_loss)
+
+            model.eval()
+
+            with torch.no_grad():
+                for val_data, val_labels, val_weights in val_loader:
+                    val_data, val_labels, val_weights = val_data.to(device), val_labels.to(device), val_weights.to(device)
+                    val_outputs = model(val_data)
+                    val_loss = criterion(val_outputs, val_labels)
+                    weighted_val_loss = (val_loss * val_weights).mean()
+                    val_running_loss += weighted_val_loss.item()
+
+            val_loss = val_running_loss / len(val_loader)
+            val_losses.append(weighted_val_loss.item())
+            
+            if epoch % 10 == 0:
+                print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {epoch_loss}, Val Loss: {val_loss}")
+        
+        self.history = {'train': train_losses, 'val': val_losses}
+        self.model = model
+
+        model.eval()
+        with torch.no_grad():
+            val_preds = model(val_data).numpy()
+            auc = roc_auc_score(y_val, val_preds)
+            print(f"Validation AUC: {auc}")
+    
+    def visualize(self, save=False):
+        """Visualize the training and validation losses."""
+        plt.figure(figsize=[12, 7])
+        plt.plot(self.history['train'], label='Train')
+        plt.plot(self.history['val'], label='Validation')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid()
+        if save:
+            plt.savefig(pjoin(self.results_dir, 'train_val_losses.png'))
+        else:
+            plt.show()
+
+    def reweight(self, original, normalize, drop_kwd, save_results=False, save_name='') -> 'pd.DataFrame':
+        """Reweight the original data.
+        
+        Parameters
+        - `original`: pandas DataFrame containing the original data to be reweighted
+        - `normalize`: constant to which the weights are normalized"""
+
+        X, _, weights, neg_df = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
+        X = self.scaler.transform(X)
+        data = torch.tensor(X, dtype=torch.float32)
+        data = DataLoader(data, batch_size=64, shuffle=False)
+
+        device = check_device()
+        model = self.model.to(device)
+        model.eval()
+        new_weights = []
+        for batch in data:
+            with torch.no_grad():
+                outputs = model(batch[0].to(device))
+                new_weights.append(outputs.numpy())
+        
+        new_weights = np.concatenate(new_weights)
+        new_weights = weights * new_weights / (1 - new_weights)
+        normalize -= neg_df[self.weight_column].sum()
+        new_weights = new_weights * normalize / new_weights.sum()
+        
+        if save_results:
+            X[self.weight_column] = new_weights
+            reweighted = pd.concat([X, neg_df], ignore_index=True)
+            reweighted.to_csv(pjoin(self.results_dir, save_name))
+        
+        return reweighted
+
+class GANReweighter(SingleNNReweighter):
+    def __init__(self, ori_data, tar_data, weight_column, results_dir):
+        super().__init__(ori_data, tar_data, weight_column, results_dir)
     
     def prep_data(self, drop_kwd, drop_neg_wgts=True) -> tuple[WeightedDataset, pd.DataFrame]:
         """Preprocess the data into WeightedDataset objects.
