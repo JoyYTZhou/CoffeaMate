@@ -116,7 +116,7 @@ class SingleNNReweighter(ReweighterBase):
         self.scaler = MinMaxScaler()
     
     def prep_data(self, drop_kwd, drop_neg_wgts=True):
-        """Preprocess the data into WeightedDataset objects.
+        """Preprocess the data into TensorDataset objects.
         Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
         X, y, weights = self.prep_ori_tar(self.ori_data, self.tar_data, drop_kwd, self.weight_column, drop_wgts=True, drop_neg_wgts=drop_neg_wgts)
         features = list(X.columns)
@@ -187,12 +187,13 @@ class SingleNNReweighter(ReweighterBase):
         
         self.history = {'train': train_losses, 'val': val_losses}
         self.model = model
+    
+    def auc_score(self):
+        """Compute the AUC score for the model."""
+        train_auc = self.compute_nn_auc(self.model, DataLoader(self.dataset, batch_size=64, shuffle=False), check_device())
+        val_auc = self.compute_nn_auc(self.model, DataLoader(self.val_dataset, batch_size=64, shuffle=False), check_device())
 
-        model.eval()
-        with torch.no_grad():
-            val_preds = model(val_data).numpy()
-            auc = roc_auc_score(y_val, val_preds)
-            print(f"Validation AUC: {auc}")
+        print(f"Train AUC: {train_auc}, Val AUC: {val_auc}")
     
     def visualize(self, save=False):
         """Visualize the training and validation losses."""

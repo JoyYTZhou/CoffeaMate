@@ -4,6 +4,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
+from sklearn.metrics import accuracy_score, roc_auc_score 
 
 def add_hidden_layer(layers, in_dim, hidden_dims, activation):
     """Add hidden layers to the model."""
@@ -91,6 +92,22 @@ class ReweighterBase():
         plt.title(column)
         if save_path:
             plt.savefig(save_path)
+    
+    @staticmethod
+    def compute_nn_auc(model, data_loader, device):
+        """Compute the AUC score for a nn model."""
+        all_labels = []
+        all_preds = []
+        
+        model.eval()
+        with torch.no_grad():
+            for data, label, weight in data_loader:
+                data, label, weight = data.to(device), label.to(device), weight.to(device)
+                pred = model(data).squeeze()
+                all_labels.extend(label.cpu().numpy())
+                all_preds.extend(pred.cpu().numpy())
+        
+        return roc_auc_score(all_labels, all_preds)
 
 class WeightedDataset(Dataset):
     """Dataset class for weighted data."""
