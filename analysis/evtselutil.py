@@ -3,7 +3,7 @@ import dask
 import pandas as pd
 import awkward as ak
 
-from src.utils.cutflowutil import weightedSelection
+from src.utils.coffeautil import weightedSelection
 from src.analysis.objutil import Object
 
 class BaseEventSelections:
