@@ -7,7 +7,6 @@ from src.utils.filesysutil import FileSysHelper
 pjoin = os.path.join
 runcom = subprocess.run
 
-
 def load_csvs(dirname, filepattern, func=None, *args, **kwargs) -> pd.DataFrame:
     """Load csv files matching a pattern into a list of DataFrames. Post process if func is provided.
     
