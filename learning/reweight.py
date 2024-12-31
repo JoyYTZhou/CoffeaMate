@@ -129,7 +129,7 @@ class SingleNNReweighter(ReweighterBase):
         self.val_dataset = TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32).view(-1, 1), torch.tensor(w_val, dtype=torch.float32))
         self.features = features
     
-    def train(self, num_epochs, hidden_dims, batch_size, eval=True):
+    def train(self, num_epochs, hidden_dims, batch_size, lr, save=True, eval=True, savename='SingleNNmodel.pth'):
         """Train the discriminator model.
         
         Parameters:
@@ -143,7 +143,7 @@ class SingleNNReweighter(ReweighterBase):
         model = Discriminator(input_dim, hidden_dims).to(device)
 
         criterion = nn.BCELoss(reduction='none')
-        optimizer = optim.Adam(model.parameters(), lr=0.001)
+        optimizer = optim.Adam(model.parameters(), lr=lr)
 
         train_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(self.val_dataset, batch_size=batch_size, shuffle=False)
@@ -187,6 +187,14 @@ class SingleNNReweighter(ReweighterBase):
         
         self.history = {'train': train_losses, 'val': val_losses}
         self.model = model
+        if save:
+            torch.save(model.state_dict(), pjoin(self.results_dir, savename))
+    
+    def load_model(self, model_path, hidden_dim):
+        """Load the model from a saved file."""
+        model = Discriminator(len(self.features), hidden_dim)
+        model.load_state_dict(torch.load(model_path))
+        self.model = model
     
     def auc_score(self):
         """Compute the AUC score for the model."""
@@ -216,28 +224,38 @@ class SingleNNReweighter(ReweighterBase):
         - `original`: pandas DataFrame containing the original data to be reweighted
         - `normalize`: constant to which the weights are normalized"""
 
-        X, _, weights, neg_df = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
-        X = self.scaler.transform(X)
+        X_df, _, weights, neg_df = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
+        X = self.scaler.transform(X_df)
         data = torch.tensor(X, dtype=torch.float32)
-        data = DataLoader(data, batch_size=64, shuffle=False)
+        data = DataLoader(data, batch_size=512, shuffle=False)
 
         device = check_device()
         model = self.model.to(device)
         model.eval()
-        new_weights = []
-        for batch in data:
-            with torch.no_grad():
-                outputs = model(batch[0].to(device))
-                new_weights.append(outputs.numpy())
         
-        new_weights = np.concatenate(new_weights)
+        new_weights = torch.zeros(len(weights), dtype=torch.float32)
+        start_idx = 0
+
+        for batch in data:
+            batch_size = batch.size(0)
+            with torch.no_grad():
+                outputs = model(batch.to(device)).cpu()
+                new_weights[start_idx:start_idx+batch_size] = outputs.squeeze()
+            start_idx += batch_size
+        
+        new_weights = new_weights.numpy()
+        
+        epsilon = 1e-6  # Small value to prevent division by zero
+        new_weights = np.clip(new_weights, epsilon, 1 - epsilon)
+
         new_weights = weights * new_weights / (1 - new_weights)
         normalize -= neg_df[self.weight_column].sum()
         new_weights = new_weights * normalize / new_weights.sum()
         
+        X_df[self.weight_column] = new_weights
+        reweighted = pd.concat([X_df, neg_df], ignore_index=True)
+
         if save_results:
-            X[self.weight_column] = new_weights
-            reweighted = pd.concat([X, neg_df], ignore_index=True)
             reweighted.to_csv(pjoin(self.results_dir, save_name))
         
         return reweighted
