@@ -218,6 +218,12 @@ class XRootDHelper:
         if status.returncode != 0:
             raise Exception(f"Failed to copy {src_file} to {dest_file}: {status.stderr}")
     
+    @staticmethod
+    def copy_local(src_file, dest_file):
+        status = runcom(f'xrdcp {src_file} {dest_file}', shell=True, capture_output=True)
+        if status.returncode != 0:
+            raise Exception(f"Failed to copy {src_file} to {dest_file}: {status.stderr}")
+    
     def transfer_files(self, srcpath, destpath, filepattern='*', remove=False, overwrite=True) -> None:
         """Transfer all files matching filepattern from srcpath to destpath. Will create the destpath if it doesn't exist.
         This is only meant for transferring files from local to xrdfs.
