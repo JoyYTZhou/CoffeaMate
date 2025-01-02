@@ -167,7 +167,7 @@ class CSVPlotter():
         Parameters
         - `list_of_evts`: the list of dataframes to be histogrammed and compared"""
 
-        assert len(list_of_evts) == 2, "The number of dataframes must be 2."
+        assert len(list_of_evts) >= 2, "The number of dataframes must be at least 2."
         assert 'weight' in list_of_evts[0].columns, "The weight column must be present in the dataframe."
 
         for att, options in attridict.items():
@@ -296,20 +296,29 @@ class ObjectPlotter():
         - `wgt_list`: the list of weights array"""
         bin_width = bins[1] - bins[0]
 
+        color = colors[0:len(hist_list)]
+
         norm_hist_list = []
         norm_err_list = []
         for hist, wgt in zip(hist_list, wgt_list):
             norm_hist_list.append(hist / (np.sum(wgt) * bin_width))
             norm_err_list.append(np.sqrt(hist) / (np.sum(wgt) * bin_width))
     
-        ratio = np.nan_to_num(hist_list[0] / hist_list[1], nan=0., posinf=0.)
-        ratio_err = np.nan_to_num(ratio * np.sqrt((norm_err_list[0]/norm_hist_list[0])**2 + (norm_err_list[1]/norm_hist_list[1])**2), nan=0., posinf=0.)
-
-        ObjectPlotter.plot_var(ax, norm_hist_list, bins, label, xrange, histtype='step', alpha=1.0, **kwargs) 
+        ObjectPlotter.plot_var(ax, norm_hist_list, bins, label, xrange, histtype='step', alpha=1.0, color=color, **kwargs) 
 
         np.seterr(divide='ignore', invalid='ignore')
-        ax2.errorbar((bins[:-1] + bins[1:])/2, ratio, yerr=ratio_err, markersize=3, fmt='o', color='black')
 
+        error_x = (bins[:-1] + bins[1:])/2
+
+        if len(hist_list) == 2:
+            ratio = np.nan_to_num(hist_list[1] / hist_list[0], nan=0., posinf=0.)
+            ratio_err = np.nan_to_num(ratio * np.sqrt((norm_err_list[0]/norm_hist_list[0])**2 + (norm_err_list[1]/norm_hist_list[1])**2), nan=0., posinf=0.)
+            ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color='black')
+        else:
+            for i in range(1, len(hist_list)):
+                ratio = np.nan_to_num(hist_list[i] / hist_list[0], nan=0., posinf=0.)
+                ratio_err = np.nan_to_num(ratio * np.sqrt((norm_err_list[i]/norm_hist_list[i])**2 + (norm_err_list[0]/norm_hist_list[0])**2), nan=0., posinf=0.)
+                ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color=color[i])
         ax2.axhline(1, color='gray', linestyle='--', linewidth=1)
         ax2.set_ylim(0.5, 1.5)
     
