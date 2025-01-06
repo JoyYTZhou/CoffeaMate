@@ -49,7 +49,7 @@ class CSVPlotter():
         - `ds`: the dataset name
         - `signals`: the signal groups
         - `factor`: the factor to multiply to the flat weights
-        - `luminosity`: the luminosity (in fb^-1)"""
+        - `luminosity`: the luminosity (in pb^-1)"""
         if group in signals: 
             multiply = factor
             print("Dataset is a signal.")
@@ -67,6 +67,7 @@ class CSVPlotter():
         - `postp_output`: the directory to save the cutflows for post-processing
         - `per_evt_wgt`: the weight to be multiplied to the flat weights
         - `extraprocess`: additional processing to be done on the dataframe
+        - `luminosity`: the luminosity in pb^-1
         
         Return 
         - `grouped`: the concatenated dataframe"""
@@ -172,7 +173,9 @@ class CSVPlotter():
 
         for att, options in attridict.items():
             pltopts = options['plot'].copy()
-            fig, ax, ax2 = ObjectPlotter.set_style_with_ratio(title, pltopts.pop('xlabel', ''), hist_ylabel, ratio_ylabel)
+            fig, axs, ax2s = ObjectPlotter.set_style_with_ratio(title, pltopts.pop('xlabel', ''), hist_ylabel, ratio_ylabel)
+            ax = axs[0]
+            ax2 = ax2s[0]
             hist_list = []
             bins = options['hist']['bins']
             bin_range = options['hist']['range']
@@ -224,31 +227,38 @@ class ObjectPlotter():
         pass
     
     @staticmethod
-    def set_style_with_ratio(title, x_label, top_ylabel, bottom_ylabel, set_log=False, lumi=220):
+    def set_style_with_ratio(title, x_label, top_ylabel, bottom_ylabel, num_figure=1, set_log=False, lumi=None):
         """Set the style of the plot to CMS HEP with ratio plot as bottom panel.
         
         Parameters
-        - `top_ylabel`: the ylabel of the top panel"""
-        fig = plt.figure(figsize=(8, 6))
-        fig.suptitle(title, fontsize=14, y=0.92)
+        - `top_ylabel`: the ylabel of the top panel
+        - `bottom_ylabel`: the ylabel of the bottom panel
+        - `num_figure`: the number of figures (each with two panels top-down) to be plotted"""
+        fig = plt.figure(figsize=(8*num_figure, 6))
+        fig.suptitle(title, fontsize=14)
         hep.style.use("CMS")
-        gs = fig.add_gridspec(2, 1, height_ratios=(4, 1))
-        ax2 = fig.add_subplot(gs[1,0])
-        ax = fig.add_subplot(gs[0,0], sharex=ax2)
-        fig.subplots_adjust(hspace=0.1)
+        gs = fig.add_gridspec(2, 1*num_figure, height_ratios=(4, 1))
+        ax2s = [None] * num_figure
+        axs = [None] * num_figure
+        x_label = [x_label] if not isinstance(x_label, list) else x_label
+        top_ylabel = [top_ylabel] if not isinstance(top_ylabel, list) else top_ylabel
+        bottom_ylabel = [bottom_ylabel] if not isinstance(bottom_ylabel, list) else bottom_ylabel
+        for i in range(num_figure):
+            ax2s[i] = fig.add_subplot(gs[1,i])
+            axs[i] = fig.add_subplot(gs[0,i], sharex=ax2s[i])
+            hep.cms.label(ax=axs[i], loc=2, label='Work in Progress', fontsize=11, com=13.6, lumi=lumi)
+            axs[i].set_ylabel(top_ylabel[i], fontsize=12)
+            axs[i].tick_params(axis='both', which='major', labelsize=10, length=0, labelbottom=False)
+            ax2s[i].yaxis.get_offset_text().set_fontsize(11)  # Adjust the font size as needed
+            ax2s[i].set_ylabel(bottom_ylabel[i], fontsize=11)
+            ax2s[i].set_xlabel(x_label[i], fontsize=12)
+            ax2s[i].tick_params(axis='both', which='major', labelsize=10, length=0)
+            if set_log: ax2s[i].set_yscale('log')
 
-        hep.cms.label(ax=ax, loc=2, label='Work in Progress', fontsize=11, com=13.6, lumi=lumi)
+        fig.subplots_adjust(hspace=0.15)
+        
+        return fig, axs, ax2s
 
-        ax.set_ylabel(top_ylabel, fontsize=12)
-        ax.tick_params(axis='both', which='major', labelsize=10, length=0, labelbottom=False)
-
-        ax2.yaxis.get_offset_text().set_fontsize(11)  # Adjust the font size as needed
-        ax2.set_ylabel(bottom_ylabel, fontsize=11)
-        ax2.set_xlabel(x_label, fontsize=12)
-        ax2.tick_params(axis='both', which='major', labelsize=10, length=0)
-        if set_log: ax2.set_yscale('log')
-
-        return fig, ax, ax2
 
     @staticmethod
     def set_style(title, xlabel='', n_row=1, n_col=1, year=None, lumi=220) -> tuple:

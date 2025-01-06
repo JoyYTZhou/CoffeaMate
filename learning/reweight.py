@@ -1,5 +1,5 @@
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, roc_auc_score 
+from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve, auc
 import pandas as pd
 import numpy as np
 import os
@@ -65,7 +65,7 @@ class SingleXGBReweighter(ReweighterBase):
         self.__boost_round = best_round
         self.__params = params
     
-    def train(self, save=False):
+    def train(self, save=False, savename='SingleXGBmodel.json'):
         """Train the XGBoost model. 
         
         Parameters:
@@ -73,18 +73,28 @@ class SingleXGBReweighter(ReweighterBase):
         watchlist = [(self.dtrain, 'train'), (self.dtest, 'test')]
         model = xgb.train(params=self.__params, dtrain=self.dtrain, num_boost_round=self.__boost_round, evals=watchlist, verbose_eval=40)
         if save:
-            model.save_model(pjoin(self.results_dir, 'SingleXGBmodel.xgb'))
-        
+            model.save_model(pjoin(self.results_dir, savename))
         self._model = model
+        self._modelname = savename.split('.')[0]
     
-    def evaluate(self):
+    def evaluate(self, save=True):
         """Evaluate the model on the test data."""
         y_pred = self._model.predict(self.dtest)
+        self.plot_roc(y_pred, self.y_test, self.w_test, save, save_path=pjoin(self.results_dir, f'{self._modelname}_roc.png'))
+        
+        ax = xgb.plot_importance(self._model, max_num_features=10)
+        ax.figure.tight_layout()
+        if save:
+            ax.figure.savefig(pjoin(self.results_dir, f'{self._modelname}_feature_importance.png'))
+
         y_pred_binary = (y_pred > 0.5).astype(int)
         print('Accuracy: ', accuracy_score(self.y_test, y_pred_binary))
-
-        roc_auc = roc_auc_score(self.y_test, y_pred)
-        print('ROC AUC Score: ', roc_auc)
+    
+    def load_model(self, model_path):
+        """Load the model from a saved file."""
+        self._model = xgb.Booster()
+        self._model.load_model(model_path)
+        self._modelname = model_path.split('.')[0]
     
     def reweight(self, original, normalize, drop_kwd, save_results=False, save_name='') -> 'pd.DataFrame':
         """Reweight the original data.
@@ -94,7 +104,7 @@ class SingleXGBReweighter(ReweighterBase):
         - `normalize`: constant to which the weights are normalized"""
 
         #! note a potential bug: X does not contain the dropped columns but neg_df does
-        X, y, weights, neg_df = self.clean_data(original, 0, drop_kwd, self.weight_column, drop_neg_wgts=True)
+        X, y, weights, neg_df = self.clean_data(original, drop_kwd, self.weight_column, label=0, drop_neg_wgts=True)
 
         data = xgb.DMatrix(X, label=y, weight=weights)
         y_pred = self._model.predict(data)
@@ -189,19 +199,21 @@ class SingleNNReweighter(ReweighterBase):
         self.model = model
         if save:
             torch.save(model.state_dict(), pjoin(self.results_dir, savename))
+        
+        self._name = savename.split('.')[0]
     
-    def load_model(self, model_path, hidden_dim):
+    def load_model(self, model_name, hidden_dim):
         """Load the model from a saved file."""
         model = Discriminator(len(self.features), hidden_dim)
-        model.load_state_dict(torch.load(model_path))
+        model.load_state_dict(torch.load(pjoin(self.results_dir, model_name)))
         self.model = model
+        self._name = model_name.split('.')[0]
     
-    def auc_score(self):
+    def evaluate(self):
         """Compute the AUC score for the model."""
-        train_auc = self.compute_nn_auc(self.model, DataLoader(self.dataset, batch_size=64, shuffle=False), check_device())
-        val_auc = self.compute_nn_auc(self.model, DataLoader(self.val_dataset, batch_size=64, shuffle=False), check_device())
-
-        print(f"Train AUC: {train_auc}, Val AUC: {val_auc}")
+        device = check_device()
+        self.compute_nn_auc(self.model, DataLoader(self.val_dataset, batch_size=64, shuffle=False), device, True, pjoin(self.results_dir, f'{self._name}_val_roc.png'), 'Validation ROC Curve')
+        self.compute_nn_auc(self.model, DataLoader(self.dataset, batch_size=64, shuffle=False), device, True, pjoin(self.results_dir, f'{self._name}_train_roc.png'), 'Training ROC Curve')
     
     def visualize(self, save=False):
         """Visualize the training and validation losses."""

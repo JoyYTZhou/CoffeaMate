@@ -4,7 +4,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from sklearn.metrics import accuracy_score, roc_auc_score 
+from sklearn.metrics import roc_curve, auc
 
 def add_hidden_layer(layers, in_dim, hidden_dims, activation):
     """Add hidden layers to the model."""
@@ -94,20 +94,39 @@ class ReweighterBase():
             plt.savefig(save_path)
     
     @staticmethod
-    def compute_nn_auc(model, data_loader, device):
+    def compute_nn_auc(model, data_loader, device, save, save_path, title='ROC Curve'):
         """Compute the AUC score for a nn model."""
         all_labels = []
         all_preds = []
+        all_weights = []
         
         model.eval()
+        print("Using device: ", device)
         with torch.no_grad():
             for data, label, weight in data_loader:
                 data, label, weight = data.to(device), label.to(device), weight.to(device)
+                #! Bug here
                 pred = model(data).squeeze()
                 all_labels.extend(label.cpu().numpy())
                 all_preds.extend(pred.cpu().numpy())
+                all_weights.extend(weight.cpu().numpy())
         
-        return roc_auc_score(all_labels, all_preds)
+        ReweighterBase.plot_roc(all_preds, all_labels, all_weights, save, save_path, title)
+        
+    @staticmethod
+    def plot_roc(pred, label, weight, save, save_path, title='ROC Curve'):
+        """Plot the ROC curve."""
+        fpr, tpr, _ = roc_curve(label, pred, sample_weight=weight)
+        auc_score = auc(fpr, tpr)
+
+        plt.plot(fpr, tpr, label=f'AUC = {auc_score:.2f}')
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title(title)
+        plt.legend()
+        if save: plt.savefig(save_path)
+        print('ROC AUC Score: ', auc_score)
 
 class WeightedDataset(Dataset):
     """Dataset class for weighted data."""
