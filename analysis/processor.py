@@ -66,11 +66,11 @@ class Processor:
     
     def loadfile_local(self, fileargs: dict) -> ak.Array:
         """Copy the file to the copy directory and load it."""
-        if not filename.endswith(":Events"): filename = list(fileargs['files'].keys())[0]
-        else: filename = list(fileargs['files'].keys())[0].split(":Events")[0]
-        XRootDHelper.call_xrdcp(filename, pjoin(self.copydir, "copy.root"))
+        filename = list(fileargs['files'].keys())[0]
+        if filename.endswith(":Events"): filename = list(fileargs['files'].keys())[0].split(":Events")[0]
+        XRootDHelper.copy_local(filename, pjoin(self.copydir, "copy.root"))
         new_filename = pjoin(self.copydir, "copy.root")
-        new_filename.append(":Events")
+        new_filename += ":Events"
         new_fileargs = {"files": {new_filename: fileargs['files'][filename]}}
         if self.rtcfg.get("DELAYED_OPEN", True):
             events = uproot.dask(**new_fileargs)
@@ -94,7 +94,7 @@ class Processor:
             try:
                 suffix = fileinfo['uuid']
                 self.evtsel = self.evtselclass(**self.evtsel_kwargs)
-                remote_load = self.rtcfg.get("REMOTELOAD", True)
+                remote_load = self.rtcfg.get("REMOTE_LOAD", True)
                 events = self.loadfile_remote(fileargs={"files": {filename: fileinfo}}) if remote_load else self.loadfile_local(fileargs={"files": {filename: fileinfo}})
                 if events is not None: 
                     events = self.evtsel(events)
