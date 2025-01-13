@@ -10,6 +10,8 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 import torch.optim as optim
 import matplotlib.pyplot as plt
+from hep_ml.reweight import GBReweighter
+import pickle
 
 from src.learning.reweight_base import ReweighterBase, WeightedDataset, Generator, Discriminator
 pjoin = os.path.join
@@ -139,7 +141,7 @@ class SingleNNReweighter(ReweighterBase):
         self.val_dataset = TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32).view(-1, 1), torch.tensor(w_val, dtype=torch.float32))
         self.features = features
     
-    def train(self, num_epochs, hidden_dims, batch_size, lr, save=True, eval=True, savename='SingleNNmodel.pth'):
+    def train(self, num_epochs, hidden_dims, batch_size, lr, save=True, savename='SingleNNmodel.pth', save_interval=30):
         """Train the discriminator model.
         
         Parameters:
@@ -194,11 +196,18 @@ class SingleNNReweighter(ReweighterBase):
             
             if epoch % 10 == 0:
                 print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {epoch_loss}, Val Loss: {val_loss}")
+            
+            if (epoch + 1) % save_interval == 0 and save:
+                save_path = f"{savename.split('.')[0]}_{epoch+1}.pth"
+                torch.save(model.state_dict(), pjoin(self.results_dir, save_path))
+                print(f"Model saved at {save_path}")
         
         self.history = {'train': train_losses, 'val': val_losses}
         self.model = model
+
         if save:
             torch.save(model.state_dict(), pjoin(self.results_dir, savename))
+            print(f"Final Model saved to {savename}")
         
         self._name = savename.split('.')[0]
     
@@ -337,7 +346,20 @@ class GANReweighter(SingleNNReweighter):
 
 
 
-# class MultipleXGBReweighter(Reweighter):
+class MultipleXGBReweighter(SingleXGBReweighter):
+    def prep_data(self, drop_kwd, drop_neg_wgts=True):
+        """Preprocess the data into xgboost matrices.
+        Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
+        X_target, _, wgt_tar, neg_tar = self.clean_data(self.tar_data, drop_kwd, self.weight_column, label=1, drop_neg_wgts=drop_neg_wgts)
+        X_original, _, wgt_ori, neg_ori = self.clean_data(self.ori_data, drop_kwd, self.weight_column, label=0, drop_neg_wgts=drop_neg_wgts)
+
+        self.X_tar_train, self.X_tar_test, self.wgt_tar_train, self.wgt_tar_test = train_test_split(X_target, wgt_tar, test_size=0.3, random_state=42)
+        self.X_ori_train, self.X_ori_test, self.wgt_ori_train, self.wgt_ori_test = train_test_split(X_original, wgt_ori, test_size=0.3, random_state=42)
+    
+    def train(self, n_estimator, lr, max_depth, min_samples_leaf, gb_args={'subsample': 0.4}):
+        model = GBReweighter(n_estimators=n_estimator, learning_rate=lr, max_depth=max_depth, min_samples_leaf=min_samples_leaf, gb_args=gb_args)
+        model.fit(self.X_ori_train, self.X_tar_train, self.wgt_ori_train, self.wgt_tar_train)
+        self._model = model
 #     def preprocess_data(self, drop_kwd: 'list[str]' = [], drop_neg_wgts=True):
 #         """Preprocess the data by dropping columns containing the keywords in `drop_kwd`."""
 #         if drop_neg_wgts:

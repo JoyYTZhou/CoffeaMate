@@ -102,6 +102,7 @@ class ReweighterBase():
         
         model.eval()
         print("Using device: ", device)
+        model.to(device)
         with torch.no_grad():
             for data, label, weight in data_loader:
                 data, label, weight = data.to(device), label.to(device), weight.to(device)
