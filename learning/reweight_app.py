@@ -38,6 +38,8 @@ class SingleXGBReweighter(ReweighterBase):
         """Preprocess the data into xgboost matrices.
         Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
         X, y, weights = self.prep_ori_tar(self.ori_data, self.tar_data, drop_kwd, self.weight_column, drop_neg_wgts)
+        print("X columns: ")
+        print(X.columns)
 
         X_train, X_test, self.y_train, self.y_test, self.w_train, self.w_test = train_test_split(X, y, weights, test_size=0.3, random_state=42)
         self.dtrain = xgb.DMatrix(X_train, label=self.y_train, weight=self.w_train)
@@ -105,8 +107,7 @@ class SingleXGBReweighter(ReweighterBase):
         - `original`: pandas DataFrame containing the original data to be reweighted
         - `normalize`: constant to which the weights are normalized"""
 
-        #! note a potential bug: X does not contain the dropped columns but neg_df does
-        X, y, weights, neg_df = self.clean_data(original, drop_kwd, self.weight_column, label=0, drop_neg_wgts=True)
+        X, y, weights, neg_df, dropped_X = self.clean_data(original, drop_kwd, self.weight_column, label=0, drop_neg_wgts=True)
 
         data = xgb.DMatrix(X, label=y, weight=weights)
         y_pred = self._model.predict(data)
@@ -116,8 +117,9 @@ class SingleXGBReweighter(ReweighterBase):
         new_weights = new_weights * normalize / new_weights.sum()
         
         if save_results:
+            X = pd.concat([X, dropped_X], axis=1)
             X[self.weight_column] = new_weights
-            reweighted = pd.concat([X, neg_df], ignore_index=True)
+            reweighted = pd.concat([X, neg_df], axis=0)
             reweighted.to_csv(pjoin(self.results_dir, save_name))
         
         return reweighted
@@ -245,7 +247,7 @@ class SingleNNReweighter(ReweighterBase):
         - `original`: pandas DataFrame containing the original data to be reweighted
         - `normalize`: constant to which the weights are normalized"""
 
-        X_df, _, weights, neg_df = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
+        X_df, _, weights, neg_df, dropped_X = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
         X = self.scaler.transform(X_df)
         data = torch.tensor(X, dtype=torch.float32)
         data = DataLoader(data, batch_size=512, shuffle=False)
@@ -288,14 +290,14 @@ class GANReweighter(SingleNNReweighter):
     def prep_data(self, drop_kwd, drop_neg_wgts=True) -> tuple[WeightedDataset, pd.DataFrame]:
         """Preprocess the data into WeightedDataset objects.
         Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
-        target_df, _,  _, _ = self.clean_data(self.tar_data, drop_kwd, self.weight_column, None, False, drop_neg_wgts)
+        target_df, _,  _, _, _ = self.clean_data(self.tar_data, drop_kwd, self.weight_column, None, False, drop_neg_wgts)
         features = list(target_df.columns)
         features.remove(self.weight_column)
         target_df[features] = self.scaler.fit_transform(target_df[features])
         target_df["weight"] /= target_df["weight"].sum()
         target_dataset = WeightedDataset(target_df, features, self.weight_column)
 
-        noise_df, _, _, _ = self.clean_data(self.ori_data, drop_kwd, self.weight_column, None, False, drop_neg_wgts)
+        noise_df, _, _, _, _ = self.clean_data(self.ori_data, drop_kwd, self.weight_column, None, False, drop_neg_wgts)
         noise_df[features] = self.scaler.transform(noise_df[features])
         noise_df["weight"] /= noise_df["weight"].sum()
         

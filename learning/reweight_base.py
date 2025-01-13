@@ -38,9 +38,12 @@ class ReweighterBase():
     @staticmethod
     def drop_likes(df: 'pd.DataFrame', drop_kwd: 'list[str]' = []):
         """Drop columns containing the keywords in `drop_kwd`."""
+        dropped = pd.DataFrame()
         for kwd in drop_kwd:
+            cols_to_drop = df.filter(like=kwd).columns
+            dropped = pd.concat([dropped, df[cols_to_drop]], axis=1)
             df = df.drop(columns=df.filter(like=kwd).columns, inplace=False)
-        return df
+        return df, dropped
     
     @staticmethod
     def clean_data(df_original, drop_kwd, wgt_col, label=None, drop_wgts=True, drop_neg_wgts=True) -> tuple['pd.DataFrame', 'pd.Series', 'pd.Series', 'pd.DataFrame']:
@@ -61,21 +64,21 @@ class ReweighterBase():
         print("Dropped ", len(df_original) - len(df), " events with negative weights out of ", len(df_original), " events.")
 
         if drop_wgts: drop_kwd.append(wgt_col)
-        X = ReweighterBase.drop_likes(df, drop_kwd)
+        X, dropped_X = ReweighterBase.drop_likes(df, drop_kwd)
 
         if label is not None: y = pd.Series([label] * len(df))
         else: y = None
 
         weights = df[wgt_col]
         
-        return X, y, weights, neg_df
+        return X, y, weights, neg_df, dropped_X
     
     @staticmethod
     def prep_ori_tar(ori, tar, drop_kwd, wgt_col, drop_neg_wgts=True, drop_wgts=True):
         """Preprocess the original and target data by dropping columns containing the keywords in `drop_kwd`."""
         
-        X_ori, y_ori, w_ori, _ = ReweighterBase.clean_data(ori, drop_kwd, wgt_col, label=0, drop_neg_wgts=drop_neg_wgts, drop_wgts=drop_wgts)
-        X_tar, y_tar, w_tar, _ = ReweighterBase.clean_data(tar, drop_kwd, wgt_col, label=1, drop_neg_wgts=drop_neg_wgts, drop_wgts=drop_wgts)
+        X_ori, y_ori, w_ori, _, _= ReweighterBase.clean_data(ori, drop_kwd, wgt_col, label=0, drop_neg_wgts=drop_neg_wgts, drop_wgts=drop_wgts)
+        X_tar, y_tar, w_tar, _, _ = ReweighterBase.clean_data(tar, drop_kwd, wgt_col, label=1, drop_neg_wgts=drop_neg_wgts, drop_wgts=drop_wgts)
         
         return pd.concat([X_ori, X_tar], ignore_index=True, axis=0), pd.concat([y_ori, y_tar], ignore_index=True, axis=0), pd.concat([w_ori, w_tar], ignore_index=True, axis=0)
     
