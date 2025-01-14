@@ -51,7 +51,7 @@ class BaseEventSelections:
         """
         pass
 
-    def setevtsel(self, events):
+    def setevtsel(self, events, **kwargs):
         """Custom function to set the object selections based on config.
         Mask should be N*bool 1-D array.
 
