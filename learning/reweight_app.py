@@ -45,17 +45,21 @@ class SingleXGBReweighter(ReweighterBase):
         self.dtrain = xgb.DMatrix(X_train, label=self.y_train, weight=self.w_train)
         self.dtest = xgb.DMatrix(X_test, label=self.y_test, weight=self.w_test)
 
-    def boostingSearch(self, max_depth, num_round, seed=42) -> None:
+    def boostingSearch(self, max_depth, num_round, seed=42, booster='gbtree') -> None:
         """Perform grid search to find the best hyperparameters for the XGBoost model.
         
         Parameters:
         `max_depth`: List of integers containing the maximum depth of the trees.
-        `num_round`: List of integers containing the number of boosting rounds."""
+        `num_round`: List of integers containing the number of boosting rounds.
+        `booster`: String indicating the type of booster. 'gbtree' for tree-based models, 'dart' for dart models."""
         
-        params = {"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.1, "eval_metric": 'logloss', "nthread": 4, "seed": seed}
+        params = {"objective": "binary:logistic", "eta": 0.05, "eval_metric": 'logloss', "nthread": 4, 
+                  "subsample": 0.7, "colsample_bytree": 0.8,
+                  "seed": seed, "booster": booster, "max_depth": max_depth}
         cv_results = xgb.cv(
             params=params,
             dtrain=self.dtrain,
+            metrics=['logloss', 'auc', 'rmse'],
             num_boost_round=num_round,
             nfold=6,  # Number of CV folds
             early_stopping_rounds=20,  # Stop if no improvement after 10 rounds

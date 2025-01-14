@@ -188,7 +188,7 @@ class CSVPlotter():
 
             fig.savefig(pjoin(outdir, f'{att}{save_suffix}.png'), dpi=400, bbox_inches='tight')
     
-    def plot_SvBHist(self, ax, evts, att, attoptions, title, **kwargs) -> list:
+    def plot_SvBHist(self, ax, evts, att, attoptions, **kwargs) -> list:
         """Plot the signal and background histograms.
         
         Parameters
@@ -198,27 +198,31 @@ class CSVPlotter():
         
         Return
         - `order`: the order of the histograms"""
-        xlabel = attoptions['plot'].get('xlabel', '')
-        b_hists, bins, range, blabels, _ = self.get_hist(evts, att, attoptions, self.bkg_group)
+        b_hists, bins, x_range, blabels, _ = self.get_hist(evts, att, attoptions, self.bkg_group)
         order = kwargs.pop('order', CSVPlotter.get_order(b_hists))
         b_hists, blabels = CSVPlotter.order_list(b_hists, order), CSVPlotter.order_list(blabels, order)
-
-        s_hists, bins, range, slabels, _ = self.get_hist(evts, att, attoptions, self.sig_group, **kwargs)
-        ObjectPlotter.plotSigVBkg(ax, s_hists, b_hists, bins, slabels, blabels, range, title, xlabel=xlabel, **kwargs)  
+        
+        if self.sig_group is not None:
+            s_hists, bins, x_range, slabels, _ = self.get_hist(evts, att, attoptions, self.sig_group, **kwargs)
+            ObjectPlotter.plotSigVBkg(ax, s_hists, b_hists, bins, slabels, blabels, x_range, **kwargs)  
+        else:
+            ObjectPlotter.plot_var(ax, b_hists, bins, blabels, x_range, **kwargs)
 
         return order
 
-    def plot_fourRegions(self, regionA, regionB, regionC, regionD, attridict, bgroup, sgroup, title='', save_name='', **kwargs):
+    def plot_fourRegions(self, regionA, regionB, regionC, regionD, attridict, bgroup, sgroup, title='', save_name='', lumi=220, **kwargs):
         """Plot the signal and background histograms for the four regions."""
         self.__set_group(sgroup, bgroup)
         for att, options in attridict.items():
-            fig, axes = ObjectPlotter.set_style(title, '', n_row=2, n_col=2)
+            xlabel = options['plot'].get('xlabel', '')
+            subtitles = ['Region A (OS, 2b)', 'Region B (OS, 1b)', 'Region C (SS, 2b)', 'Region D (SS, 1b)']
+            fig, axes = ObjectPlotter.set_style(title, [xlabel] * 4, subtitles, n_row=2, n_col=2, lumi=lumi)
 
-            order = self.plot_SvBHist(ax=axes[0,0], evts=regionA, att=att, attoptions=options, title='Region A (OS, 2 b-tagged)', **kwargs)
-
-            self.plot_SvBHist(ax=axes[0,1], evts=regionB, att=att, attoptions=options, title='Region B (OS, 1 b-tagged)', order=order, **kwargs)
-            self.plot_SvBHist(ax=axes[1,0], evts=regionC, att=att, attoptions=options, title='Region C (SS, 2 b-tagged)', order=order, **kwargs)
-            self.plot_SvBHist(ax=axes[1,1], evts=regionD, att=att, attoptions=options, title='Region D (SS, 1 b-tagged)', order=order, **kwargs)
+            order = self.plot_SvBHist(ax=axes[0,0], evts=regionA, att=att, attoptions=options,  **kwargs)
+            self.plot_SvBHist(ax=axes[0,1], evts=regionB, att=att, attoptions=options, order=order, **kwargs)
+            self.plot_SvBHist(ax=axes[1,0], evts=regionC, att=att, attoptions=options, order=order, **kwargs)
+            self.plot_SvBHist(ax=axes[1,1], evts=regionD, att=att, attoptions=options, order=order, **kwargs)
+                
 
             fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'), dpi=300, bbox_inches='tight', pad_inches=0.1)
         
@@ -227,10 +231,12 @@ class ObjectPlotter():
         pass
     
     @staticmethod
-    def set_style_with_ratio(title, x_label, top_ylabel, bottom_ylabel, num_figure=1, set_log=False, lumi=None):
+    def set_style_with_ratio(title: 'str', x_label, top_ylabel, bottom_ylabel, num_figure=1, set_log=False, lumi=None):
         """Set the style of the plot to CMS HEP with ratio plot as bottom panel.
         
         Parameters
+        - `title`: the title of the plot
+        - `x_label`: (str or list of str) the xlabel of the plot
         - `top_ylabel`: the ylabel of the top panel
         - `bottom_ylabel`: the ylabel of the bottom panel
         - `num_figure`: the number of figures (each with two panels top-down) to be plotted"""
@@ -261,7 +267,7 @@ class ObjectPlotter():
 
 
     @staticmethod
-    def set_style(title, xlabel='', n_row=1, n_col=1, year=None, lumi=220) -> tuple:
+    def set_style(title, xlabel='', subtitles='', n_row=1, n_col=1, year=None, lumi=220) -> tuple:
         """Set the style of the plot to CMS HEP.
         
         Return 
@@ -274,13 +280,16 @@ class ObjectPlotter():
 
         if not isinstance(axes, np.ndarray):
             axes = np.array([axes])
+            xlabel = [xlabel] if isinstance(xlabel, str) else xlabel
+            subtitles = [subtitles] if isinstance(subtitles, str) else subtitles
 
-        for ax in axes.flat:
+        for i, ax in enumerate(axes.flat):
             hep.cms.label(ax=ax, loc=2, label='Work in Progress', fontsize=11, com=13.6, lumi=lumi, year=year)
-            ax.set_xlabel(xlabel, fontsize=12)
+            ax.set_xlabel(xlabel[i], fontsize=12)
             ax.set_ylabel("Events", fontsize=12)
             ax.set_prop_cycle('color', colors)
             ax.tick_params(axis='both', which='major', labelsize=10, length=0)
+            ax.set_title(subtitles[i], fontsize=12)
             for spine in ax.spines.values():
                 spine.set_linewidth(0.5)
         return fig, axes
@@ -296,6 +305,7 @@ class ObjectPlotter():
         hep.histplot(hist, bins=bin_edges, label=label, ax=ax, linewidth=1.5, **kwargs)
         ax.legend(fontsize=12, loc='upper right')
         ax.set_xlim(*xrange)
+        ax.legend(fontsize=12, loc='upper right')
     
     @staticmethod
     def plot_var_with_err(ax, ax2, hist_list, wgt_list, bins, label, xrange, **kwargs):
@@ -333,7 +343,7 @@ class ObjectPlotter():
         ax2.set_ylim(0.5, 1.5)
     
     @staticmethod
-    def plotSigVBkg(ax, sig_hists, bkg_hists, bin_edges, sig_label, bkg_label, xrange, title, **kwargs):
+    def plotSigVBkg(ax, sig_hists, bkg_hists, bin_edges, sig_label, bkg_label, xrange, **kwargs):
         """Plot the signal and background histograms.
         
         Parameters
@@ -347,8 +357,6 @@ class ObjectPlotter():
         hep.histplot(sig_hists, bins=bin_edges, ax=ax, color=s_colors, label=sig_label, stack=False, histtype='step', alpha=1.0, linewidth=1.5)
         ax.set_xlim(*xrange)
         ax.set_ylim(bottom=0)
-        ax.set_xlabel(kwargs.get('xlabel', ''))
-        ax.set_title(title, fontsize=12)
         ax.legend(fontsize=12, loc='upper right')
         
     @staticmethod
