@@ -120,10 +120,11 @@ class SingleXGBReweighter(ReweighterBase):
         normalize -= neg_df[self.weight_column].sum()
         new_weights = new_weights * normalize / new_weights.sum()
         
+        X = pd.concat([X, dropped_X], axis=1)
+        X[self.weight_column] = new_weights
+        reweighted = pd.concat([X, neg_df], axis=0)
+
         if save_results:
-            X = pd.concat([X, dropped_X], axis=1)
-            X[self.weight_column] = new_weights
-            reweighted = pd.concat([X, neg_df], axis=0)
             reweighted.to_csv(pjoin(self.results_dir, save_name))
         
         return reweighted
@@ -251,7 +252,7 @@ class SingleNNReweighter(ReweighterBase):
         - `original`: pandas DataFrame containing the original data to be reweighted
         - `normalize`: constant to which the weights are normalized"""
 
-        X_df, _, weights, neg_df, dropped_X = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
+        X_df, _, weights, neg_df, _ = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
         X = self.scaler.transform(X_df)
         data = torch.tensor(X, dtype=torch.float32)
         data = DataLoader(data, batch_size=512, shuffle=False)
@@ -350,85 +351,49 @@ class GANReweighter(SingleNNReweighter):
 
         pass
 
-
-
 class MultipleXGBReweighter(SingleXGBReweighter):
     def prep_data(self, drop_kwd, drop_neg_wgts=True):
         """Preprocess the data into xgboost matrices.
         Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
-        X_target, _, wgt_tar, neg_tar = self.clean_data(self.tar_data, drop_kwd, self.weight_column, label=1, drop_neg_wgts=drop_neg_wgts)
-        X_original, _, wgt_ori, neg_ori = self.clean_data(self.ori_data, drop_kwd, self.weight_column, label=0, drop_neg_wgts=drop_neg_wgts)
+        X_target, _, wgt_tar, _, _ = self.clean_data(self.tar_data, drop_kwd, self.weight_column, label=1, drop_neg_wgts=drop_neg_wgts)
+        X_original, _, wgt_ori, _, _ = self.clean_data(self.ori_data, drop_kwd, self.weight_column, label=0, drop_neg_wgts=drop_neg_wgts)
 
         self.X_tar_train, self.X_tar_test, self.wgt_tar_train, self.wgt_tar_test = train_test_split(X_target, wgt_tar, test_size=0.3, random_state=42)
         self.X_ori_train, self.X_ori_test, self.wgt_ori_train, self.wgt_ori_test = train_test_split(X_original, wgt_ori, test_size=0.3, random_state=42)
     
-    def train(self, n_estimator, lr, max_depth, min_samples_leaf, gb_args={'subsample': 0.4}):
+    def train(self, n_estimator, lr, max_depth, min_samples_leaf, save=True, savename="MultiXGBmodel.pkl", gb_args={'subsample': 0.4, 'max_features': 0.75}):
+        """Train the reweighting model.
+        
+        Parameters:
+        - `n_estimator`: Number of boosting rounds (50-100)
+        - `lr`: Learning rate
+        - `max_depth`: Maximum depth of the trees"""
         model = GBReweighter(n_estimators=n_estimator, learning_rate=lr, max_depth=max_depth, min_samples_leaf=min_samples_leaf, gb_args=gb_args)
         model.fit(self.X_ori_train, self.X_tar_train, self.wgt_ori_train, self.wgt_tar_train)
         self._model = model
-#     def preprocess_data(self, drop_kwd: 'list[str]' = [], drop_neg_wgts=True):
-#         """Preprocess the data by dropping columns containing the keywords in `drop_kwd`."""
-#         if drop_neg_wgts:
-#             self.ori_data = self.ori_data[self.ori_data[self.weight_column] > 0]
-#             self.tar_data = self.tar_data[self.tar_data[self.weight_column] > 0]
-
-#         self.ori_weight = self.ori_data[self.weight_column]
-#         self.tar_weight = self.tar_data[self.weight_column]
-
-#         self.ori_data = drop_likes(self.ori_data, drop_kwd)
-#         self.tar_data = drop_likes(self.tar_data, drop_kwd)
-            
-#         self.ori_data.drop(columns=[self.weight_column], inplace=True)
-#         self.tar_data.drop(columns=[self.weight_column], inplace=True)
-    
-#     def gridSearch(self, param_grid, scoring='roc_auc', cv=5, n_jobs=-1):
-#         estimator = reweight.GBReweighter()
-#         grid_search = GridSearchCV(estimator, param_grid, scoring=scoring, cv=cv, n_jobs=n_jobs)
-    
-#     def fit_rwgt(self, **kwargs) -> 'reweight.GBReweighter':
-#         """Fit the reweighter on the original and target data."""
-#         self.reweighter = reweight.GBReweighter(**kwargs)
-#         ori_train, ori_test, wo_train, wo_test = train_test_split(self.ori_data, self.ori_weight)
-#         tar_train, tar_test, wt_train, wt_test = train_test_split(self.tar_data, self.tar_weight)
-
-#         self.reweighter.fit(ori_train, tar_train, wo_train, wt_train)
-
-#         self.o_train = ori_train
-#         self.o_test = ori_test
-#         self.wo_train = wo_train
-#         self.wo_test = wo_test
-
-#         self.t_train = tar_train
-#         self.t_test = tar_test
-#         self.wt_train = wt_train
-#         self.wt_test = wt_test
-
-#         return self.reweighter
-    
-#     def add_test_data(self, ori_test, tar_test, ori_wgt, tar_wgt):
-#         self.o_test = pd.concat([self.o_test, ori_test], ignore_index=True)
-#         self.wo_test = pd.concat([self.wo_test, ori_wgt], ignore_index=True)
-#         self.t_test = pd.concat([self.t_test, tar_test], ignore_index=True)
-#         self.wt_test = pd.concat([self.wt_test, tar_wgt], ignore_index=True)
-
-#     def get_new_weights_train(self):
-#         """Get the new weights for the original training data."""
-#         return self.reweighter.predict_weights(self.o_train, self.wo_train)
-    
-#     def get_new_weights_test(self):
-#         return self.reweighter.predict_weights(self.o_test, self.wo_test)
-    
-#     def pred_n_compare(self, attridict, ratio_ylabel, save_name, title=''):
-#         new_ori_wgt = self.reweighter.predict_weights(self.o_test, self.wo_test)
-#         ori = self.o_test.copy()
-#         ori['weight'] = new_ori_wgt
-#         self.t_test['weight'] = self.wt_test
         
-#         self.visualizer.plot_shape([ori, self.t_test], ['Reweighted', 'Target'], attridict, ratio_ylabel=ratio_ylabel, save_name=f'{save_name}_rwgt', title=title)
+        if save:
+            with open(pjoin(self.results_dir, savename), 'wb') as f:
+                pickle.dump(model, f)
+        
+        self._modelname = savename.split('.')[0]
 
-#         ori['weight'] = self.wo_test
-#         self.visualizer.plot_shape([ori, self.t_test], ['Original', 'Target'], attridict, ratio_ylabel=ratio_ylabel, save_name=f'{save_name}_ori', title=title)
-    
+    def reweight(self, original, normalize, drop_kwd, save_results=False, save_name=''):
+        X, _, weights, neg_df, dropped_X = self.clean_data(original, drop_kwd, self.weight_column, label=0, drop_neg_wgts=True)
+
+        new_weights = self._model.predict_weights(X, weights)
+        normalize = normalize - neg_df[self.weight_column].sum()
+        new_weights = new_weights * normalize / new_weights.sum()
+
+        X = pd.concat([X, dropped_X], axis=1)
+        X[self.weight_column] = new_weights
+        reweighted = pd.concat([X, neg_df], axis=0)
+
+        if save_results:
+            reweighted.to_csv(pjoin(self.results_dir, save_name))
+        
+        return reweighted
+   
 # class DataLoader():
 #     def __init__(self, data:'pd.DataFrame', target_column):
 #         """

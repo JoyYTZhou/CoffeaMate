@@ -46,7 +46,7 @@ class ReweighterBase():
         return df, dropped
     
     @staticmethod
-    def clean_data(df_original, drop_kwd, wgt_col, label=None, drop_wgts=True, drop_neg_wgts=True) -> tuple['pd.DataFrame', 'pd.Series', 'pd.Series', 'pd.DataFrame']:
+    def clean_data(df_original, drop_kwd, wgt_col, label=None, drop_wgts=True, drop_neg_wgts=True) -> tuple['pd.DataFrame', 'pd.Series', 'pd.Series', 'pd.DataFrame', 'pd.DataFrame']:
         """Clean the data by dropping columns containing the keywords in `drop_kwd`.
 
         Parameters:
