@@ -337,6 +337,8 @@ class PostProcessor():
             if not(group in new_meta):
                 new_meta[group] = meta_dict[group].copy()
             for ds, dsitems in meta_dict[group].items(): 
+                if not (ds in new_meta[group]):
+                    new_meta[group][ds] = meta_dict[group][ds].copy()
                 if not resolved_df.filter(like=dsitems['shortname']).empty:
                     nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
                     new_meta[group][ds]['nwgt'] = nwgt
