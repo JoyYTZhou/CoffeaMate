@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import LabelEncoder
 
 def add_hidden_layer(layers, in_dim, hidden_dims, activation):
     """Add hidden layers to the model."""
@@ -50,7 +51,7 @@ class ReweighterBase():
         """Clean the data by dropping columns containing the keywords in `drop_kwd`.
 
         Parameters:
-        - `label`: Label column
+        - `label`: Label for the data. If None, return None.
         
         Return
         - `X`: Features, pandas DataFrame

@@ -129,6 +129,22 @@ class SingleXGBReweighter(ReweighterBase):
         
         return reweighted
     
+class MultiClassXGBReweighter(ReweighterBase):
+    def __init__(self, ori_data, tar_data, weight_column, results_dir):
+        super().__init__(ori_data, tar_data, weight_column, results_dir)
+    
+    
+    def prep_data(self, drop_kwd, drop_neg_wgts=True):
+        """Preprocess the data into xgboost matrices.
+        Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
+        X, y, weights = self.prep_ori_tar(self.ori_data, self.tar_data, drop_kwd, self.weight_column, drop_neg_wgts)
+        print("X columns: ")
+        print(X.columns)
+
+        X_train, X_test, self.y_train, self.y_test, self.w_train, self.w_test = train_test_split(X, y, weights, test_size=0.3, random_state=42)
+        self.dtrain = xgb.DMatrix(X_train, label=self.y_train, weight=self.w_train)
+        self.dtest = xgb.DMatrix(X_test, label=self.y_test, weight=self.w_test)
+
 class SingleNNReweighter(ReweighterBase):
     def __init__(self, ori_data, tar_data, weight_column, results_dir):
         super().__init__(ori_data, tar_data, weight_column, results_dir)
