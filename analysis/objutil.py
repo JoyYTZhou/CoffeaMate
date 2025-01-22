@@ -46,6 +46,7 @@ class Object:
     @property
     def selcfg(self):
         return self._selcfg
+
     @selcfg.setter
     def selcfg(self, value):
         self._selcfg = weakref.proxy(value)
@@ -62,7 +63,7 @@ class Object:
     def mapcfg(self):
         return self._mapcfg
         
-    def custommask(self, propname: 'str', op, func=None):
+    def custommask(self, propname: 'str', op, value, func=None):
         """Create custom mask based on input.
         
         Parameters
@@ -76,13 +77,16 @@ class Object:
         """
         if self.selcfg.get(propname, None) is None:
             raise ValueError(f"threshold value {propname} is not given for object {self.name}")
-        if not f'{self.name}_{propname}' in self.events.fields:
-            if self.mapcfg.get(propname, None) is None:
-                raise ValueError(f"Nanoaodname is not given for {propname} of object {self.name}")
-            else:
-                aodname = self.mapcfg[propname]
-        else:
-            aodname = f'{self.name}_{propname}' 
+        
+        aodname = self.mapcfg.get(propname, None)
+        if aodname is None:
+            print(f"Consider adding the nanoaodname for {propname} in AOD namemap configuration file.")
+            aodname = f'{self.name}_{propname}'
+            if not aodname in self.events.fields:
+                aodname = propname
+                if not propname in self.events.fields:
+                    raise ValueError(f"Nanoaodname is not given for {propname} of object {self.name}")
+
         selval = self.selcfg[propname]
         aodarr = self.events[aodname]
         if func is not None:
@@ -124,6 +128,16 @@ class Object:
         mask = (sum_charge < ak.num(aodarr, axis=1))
         return mask
     
+    def trigObjmask(self, bit, trigger_obj, threshold=0.5, **kwargs):
+        """Match Object to Trigger Object.
+        
+        Parameters
+        - `bit`: trigger bit to be matched
+        - `trigger_obj`: trigger object to be matched. Array of Objects.
+        - `threshold`: threshold of dR for the matching
+        """
+        pass
+    
     def dRwSelf(self, threshold, **kwargs):
         """Haphazard way to select pairs of objects"""
         object_lv = self.getfourvec(**kwargs)
@@ -136,7 +150,7 @@ class Object:
         object_lv = self.getfourvec(**kwargs)
         return Object.dRoverlap(vec, object_lv, threshold)
 
-    def OSwSelf(self, threshold, **kwargs):
+    def OSwSelf(self, **kwargs):
         zipped = self.getzipped(**kwargs)
         leading = zipped[:,0]
         subleading = zipped[:,1:]
@@ -257,3 +271,52 @@ class Object:
         if namemap: to_be_zipped.update({name: events[nanoaodname] 
                        for name, nanoaodname in namemap.items()})
         return to_be_zipped
+
+# For NANOAOD V12
+trigger_obj_map = {"id": "TrigObj_id", "eta": "TrigObj_eta", "phi": "TrigObj_phi", "pt": "TrigObj_pt",
+                   "filterBits": "TrigObj_filterBits", "charge": "TrigObj_l1charge"}
+
+class TriggerObject(Object):
+    """Trigger Object class for handling trigger object selections, meant as an observer of the events.
+
+    Attributes
+    - `name`: name of the object
+    - `events`: a weak proxy of the events 
+    - `selcfg`: selection configuration for the object, {key=abbreviation, value=threshold}
+    """
+
+    def __init__(self, events, selcfg, weakrefEvt=True):
+        """Construct an object from provided events with given selection configuration.
+        
+        Parameters
+        - `name`: AOD prefix name of the object, e.g. Electron, Muon, Jet
+        kwargs: 
+        - `selcfg`: selection configuration for the object
+        """
+        self._name = "TrigObj"
+        self.__weakref = weakrefEvt
+        self._selcfg = selcfg
+        self.events = events
+        self._mapcfg = trigger_obj_map
+        self.fields = list(self.mapcfg.keys())
+        self._maskcollec = {}
+    
+    def custommask(self, propname, op, value, func=None):
+        """Create custom mask based on input."""
+        mask = super().custommask(propname, op, value, func)
+        self._maskcollec.append(mask)
+        
+    def bitmask(self, bit):
+        """Create mask based on trigger bit."""
+        aodarr = self.events[self.mapcfg['filterBits']]
+        return (aodarr & bit) > 0
+
+    def passedTrigObj(self):
+        mask = ak.all(ak.stack(self._maskcollec), axis=0)
+        pass
+
+    
+    
+    
+    
+
