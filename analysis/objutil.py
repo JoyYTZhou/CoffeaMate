@@ -63,7 +63,7 @@ class Object:
     def mapcfg(self):
         return self._mapcfg
         
-    def custommask(self, propname: 'str', op, value, func=None):
+    def custommask(self, propname: 'str', op, func=None):
         """Create custom mask based on input.
         
         Parameters
@@ -80,10 +80,10 @@ class Object:
         
         aodname = self.mapcfg.get(propname, None)
         if aodname is None:
-            print(f"Consider adding the nanoaodname for {propname} in AOD namemap configuration file.")
             aodname = f'{self.name}_{propname}'
             if not aodname in self.events.fields:
                 aodname = propname
+                print(f"Consider adding the nanoaodname for {propname} in AOD namemap configuration file.")
                 if not propname in self.events.fields:
                     raise ValueError(f"Nanoaodname is not given for {propname} of object {self.name}")
 
