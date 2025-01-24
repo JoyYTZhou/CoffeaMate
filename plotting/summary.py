@@ -11,7 +11,7 @@ class PostProcessor():
     """Class for loading and hadding data from skims/predefined selections produced directly by Processor.
     
     Attributes
-    - `cfg`: the configuration file for post processing of datasets
+    - `cfg`: a configuration dictionary-like object for post processing. Must contain the following entries: INPUTDIR, LOCALOUTPUT, METADATA
     - `inputdir`: the directory where the input files to be post-processed are stored
     - `meta_dict`: the metadata dictionary for all datasets. {Groupname: {Datasetname: {metadata}}}
     - `groups`: list of group names to process. If not provided, will grep from the input directory.
@@ -19,11 +19,11 @@ class PostProcessor():
     - `luminosity`: per-year luminosity info in dictionary, in pb^-1"""
     def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
         """Parameters
-        - `ppcfg`: the configuration file for post processing of datasets"""
+        - `ppcfg`: a configuration dictionary for post processing of datasets"""
         self.cfg = ppcfg
         self.lumi = luminosity
-        self.inputdir = ppcfg.INPUTDIR
-        self.tempdir = ppcfg.LOCALOUTPUT
+        self.inputdir = ppcfg['INPUTDIR']
+        self.tempdir = ppcfg['LOCALOUTPUT']
         self.transferP = ppcfg.get("TRANSFERPATH", None)
         self.__will_trsf = False if self.transferP is None else True
 
@@ -41,7 +41,7 @@ class PostProcessor():
                 FileSysHelper.checkpath(pjoin(self.inputdir, year), createdir=False, raiseError=True)
         
         for year in self.years:
-            with open(pjoin(ppcfg.METADATA, f"{year}.json"), 'r') as f:
+            with open(pjoin(ppcfg['METADATA'], f"{year}.json"), 'r') as f:
                 self.meta_dict[year] = json.load(f)
             if self.__will_trsf: FileSysHelper.checkpath(pjoin(self.transferP, year), createdir=True, raiseError=False)
 
@@ -81,6 +81,11 @@ class PostProcessor():
                         transferP = f"{self.transferP}/{year}/{group}"
                         FileSysHelper.transfer_files(outdir, transferP, remove=True, overwrite=True)
         return results
+    
+    def __update_meta(self):
+        for year in self.years:
+            with open(pjoin(pdir(self.cfg['METADATA']), 'weightedMC', f"{year}.json"), 'r') as f:
+                self.meta_dict[year] = json.load(f)
 
     def __call__(self, output_type=None, outputdir=None):
         """Hadd the root/csv files of the datasets and save to the output directory."""
@@ -100,20 +105,18 @@ class PostProcessor():
         
     def get_yield(self):
         """Get the yield for the resolved cutflow tables. Save to LOCALOUTPUT."""
-        for year in self.years:
-            with open(pjoin(pdir(self.cfg.METADATA), 'weightedMC', f"{year}.json"), 'r') as f:
-                self.meta_dict[year] = json.load(f)
-
+        self.__update_meta()
         regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ'], 'HH': ['ggF']}
         signals = ['HH', 'ZH', 'ZZ']
-        _, combined_dict = self.merge_cf(inputdir=self.transferP, outputdir=self.tempdir)
+        inputdir = self.transferP if self.transferP is not None else self.inputdir
+        _, combined_dict = self.merge_cf(inputdir=inputdir, outputdir=self.tempdir)
         for year, combined in combined_dict.items():
             self.present_yield(combined, signals, pjoin(self.tempdir, year), regroup_dict)
             print(f"Yield results are outputted in {pjoin(self.tempdir, year)}")
     
     def update_wgt_info(self, outputdir) -> None:
         """Output the weight information based on per-year per-dataset xsec to a json file."""
-        new_meta_dir = pjoin(pdir(self.cfg.METADATA), 'weightedMC')
+        new_meta_dir = pjoin(pdir(self.cfg['METADATA']), 'weightedMC')
         FileSysHelper.checkpath(new_meta_dir)
         for year in self.years:
             self.meta_dict[year] = PostProcessor.calc_wgt(pjoin(outputdir, year), self.meta_dict[year],
@@ -209,20 +212,8 @@ class PostProcessor():
                 if self.__will_trsf:
                     transferP = f"{self.transferP}/{year}/{group}"
                     FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
-
-    # not usable for now
-    # @staticmethod
-    # def check_cf(groupnames, base_dir) -> None:
-    #     """Check the cutflow numbers against the number of events in the root files."""
-    #     for group in groupnames:
-    #         query_dir = pjoin(base_dir, group)
-    #         cf = PostProcessor.scale_cf(group, base_dir)[0]
-    #         if check_last_no(cf, f"{process}_raw", glob_files(condorpath, f'{process}*.root')):
-    #             print(f"Cutflow check for {process} passed!")
-    #         else:
-    #             print(f"Discrepancies between cutflow numbers and output number exist for {process}. Please double check selections.")
                 
-    def merge_cf(self, inputdir, outputdir) -> dict:
+    def merge_cf(self, inputdir, outputdir, extra_kwd='') -> dict:
         """Merge all cutflow tables for all processes into one. Save to LOCALOUTPUT.
         Output formatted cutflow table as well. Produces four files: allDatasetCutflow.csv, ResolvedWgtOnly.csv, ResolvedEffOnly.csv.
         The weighting is done by xsection/nwgt * per event weight.
@@ -237,6 +228,8 @@ class PostProcessor():
         resolved_wgted = {}
         combined_wgted = {}
 
+        self.__update_meta()
+
         for year in self.years:
             lumi = self.lumi[year]
             resolved_list = []
@@ -245,7 +238,7 @@ class PostProcessor():
 
             for group in self.groups(year):
                 if FileSysHelper.checkpath(pjoin(inputdir, year, group), createdir=False):
-                    resolved, combined = PostProcessor.scale_cf(group, self.meta_dict[year], pjoin(inputdir, year), lumi)
+                    resolved, combined = PostProcessor.scale_cf(group, self.meta_dict[year], pjoin(inputdir, year), lumi, extra_kwd)
                     resolved_list.append(resolved)
                     combined_list.append(combined)
 
@@ -352,7 +345,7 @@ class PostProcessor():
         return new_meta
 
     @staticmethod
-    def scale_cf(group, meta_dict, datasrcpath, luminosity) -> tuple[pd.DataFrame]:
+    def scale_cf(group, meta_dict, datasrcpath, luminosity, extra_kwd='') -> tuple[pd.DataFrame]:
         """Scale cutflow tables for one group of datasets by xsection * luminosity
 
         Parameters
@@ -362,7 +355,7 @@ class PostProcessor():
         
         Returns
         - tuple of resolved (per channel) cutflow dataframe and combined cutflow (per group) dataframe"""
-        resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0)
+        resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*{extra_kwd}*cf.csv')[0], index_col=0)
         for _, dsitems in meta_dict[group].items():
             dsname = dsitems['shortname']
             per_evt_wgt = 1/dsitems['nwgt'] * dsitems['xsection'] * luminosity
