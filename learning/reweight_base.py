@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 from sklearn.metrics import roc_curve, auc
-from sklearn.preprocessing import LabelEncoder
+
 
 def add_hidden_layer(layers, in_dim, hidden_dims, activation):
     """Add hidden layers to the model."""
@@ -47,17 +47,19 @@ class ReweighterBase():
         return df, dropped
     
     @staticmethod
-    def clean_data(df_original, drop_kwd, wgt_col, label=None, drop_wgts=True, drop_neg_wgts=True) -> tuple['pd.DataFrame', 'pd.Series', 'pd.Series', 'pd.DataFrame', 'pd.DataFrame']:
+    def clean_data(df_original, drop_kwd, wgt_col, drop_wgts=True, drop_neg_wgts=True) -> tuple['pd.DataFrame', 'pd.Series', 'pd.DataFrame', 'pd.DataFrame']:
         """Clean the data by dropping columns containing the keywords in `drop_kwd`.
 
         Parameters:
-        - `label`: Label for the data. If None, return None.
+        - `drop_kwd`: List of keywords to drop.
+        - `wgt_col`: Column name for the weights.
         
         Return
         - `X`: Features, pandas DataFrame
-        - `y`: Labels, pandas Series. If `label` is None, return None.
         - `weights`: Weights, pandas Series
-        - `neg_df`: DataFrame containing the events with negative weights."""
+        - `neg_df`: DataFrame containing the events with negative weights.
+        - `dropped_X`: DataFrame containing the dropped columns.
+        """
         df = df_original.copy()
         neg_df = df[df[wgt_col] < 0]
         df = df[df[wgt_col] > 0] if drop_neg_wgts else df
@@ -67,19 +69,23 @@ class ReweighterBase():
         if drop_wgts: drop_kwd.append(wgt_col)
         X, dropped_X = ReweighterBase.drop_likes(df, drop_kwd)
 
-        if label is not None: y = pd.Series([label] * len(df))
-        else: y = None
-
         weights = df[wgt_col]
         
-        return X, y, weights, neg_df, dropped_X
+        return X, weights, neg_df, dropped_X
+    
+    @staticmethod
+    def int_label(label, length):
+        """Return the label as a pandas Series"""
+        return pd.Series([label]*length)
     
     @staticmethod
     def prep_ori_tar(ori, tar, drop_kwd, wgt_col, drop_neg_wgts=True, drop_wgts=True):
         """Preprocess the original and target data by dropping columns containing the keywords in `drop_kwd`."""
         
-        X_ori, y_ori, w_ori, _, _= ReweighterBase.clean_data(ori, drop_kwd, wgt_col, label=0, drop_neg_wgts=drop_neg_wgts, drop_wgts=drop_wgts)
-        X_tar, y_tar, w_tar, _, _ = ReweighterBase.clean_data(tar, drop_kwd, wgt_col, label=1, drop_neg_wgts=drop_neg_wgts, drop_wgts=drop_wgts)
+        X_ori, w_ori, _, _= ReweighterBase.clean_data(ori, drop_kwd, wgt_col, drop_neg_wgts=drop_neg_wgts, drop_wgts=drop_wgts)
+        y_ori = ReweighterBase.int_label(0, len(X_ori))
+        X_tar, w_tar, _, _ = ReweighterBase.clean_data(tar, drop_kwd, wgt_col, drop_neg_wgts=drop_neg_wgts, drop_wgts=drop_wgts)
+        y_tar = ReweighterBase.int_label(1, len(X_tar))
         
         return pd.concat([X_ori, X_tar], ignore_index=True, axis=0), pd.concat([y_ori, y_tar], ignore_index=True, axis=0), pd.concat([w_ori, w_tar], ignore_index=True, axis=0)
     

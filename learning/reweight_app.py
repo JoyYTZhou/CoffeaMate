@@ -1,5 +1,5 @@
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve, auc
+from sklearn.metrics import accuracy_score
 import pandas as pd
 import numpy as np
 import os
@@ -12,6 +12,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from hep_ml.reweight import GBReweighter
 import pickle
+from sklearn.preprocessing import LabelEncoder
 
 from src.learning.reweight_base import ReweighterBase, WeightedDataset, Generator, Discriminator
 pjoin = os.path.join
@@ -33,6 +34,7 @@ def weighted_bce_loss(predictions, targets, weights):
 class SingleXGBReweighter(ReweighterBase):
     def __init__(self, ori_data, tar_data, weight_column, results_dir):
         super().__init__(ori_data, tar_data, weight_column, results_dir)
+        self.metric = 'logloss'
 
     def prep_data(self, drop_kwd, drop_neg_wgts=True):
         """Preprocess the data into xgboost matrices.
@@ -44,6 +46,12 @@ class SingleXGBReweighter(ReweighterBase):
         X_train, X_test, self.y_train, self.y_test, self.w_train, self.w_test = train_test_split(X, y, weights, test_size=0.3, random_state=42)
         self.dtrain = xgb.DMatrix(X_train, label=self.y_train, weight=self.w_train)
         self.dtest = xgb.DMatrix(X_test, label=self.y_test, weight=self.w_test)
+    
+    def __define_params(self, max_depth, booster) -> dict:
+        """Define the hyperparameters for the XGBoost model."""
+        self.__params = {"objective": "binary:logistic", "eta": 0.05, "eval_metric": self.metric, "nthread": 4,
+                            "subsample": 0.7, "colsample_bytree": 0.8, "seed": 42, "booster": booster, "max_depth": max_depth}
+        return self.__params
 
     def boostingSearch(self, max_depth, num_round, seed=42, booster='gbtree') -> None:
         """Perform grid search to find the best hyperparameters for the XGBoost model.
@@ -53,25 +61,25 @@ class SingleXGBReweighter(ReweighterBase):
         `num_round`: List of integers containing the number of boosting rounds.
         `booster`: String indicating the type of booster. 'gbtree' for tree-based models, 'dart' for dart models."""
         
-        params = {"objective": "binary:logistic", "eta": 0.05, "eval_metric": 'logloss', "nthread": 4, 
-                  "subsample": 0.7, "colsample_bytree": 0.8,
-                  "seed": seed, "booster": booster, "max_depth": max_depth}
+        params = self.__define_params(max_depth, booster)
+        metric = self.metric
+        
         cv_results = xgb.cv(
             params=params,
             dtrain=self.dtrain,
-            metrics=['logloss', 'auc', 'rmse'],
+            metrics=[metric, 'auc', 'rmse'],
             num_boost_round=num_round,
             nfold=6,  # Number of CV folds
             early_stopping_rounds=20,  # Stop if no improvement after 10 rounds
             as_pandas=True,  # Return results as a pandas DataFrame
             verbose_eval=20  # Print results every 20 rounds
         )
-        best_round = cv_results['test-logloss-mean'].idxmin()
+        
+        best_round = cv_results[f'test-{metric}-mean'].idxmin()
         print(f"Optimal number of boosting rounds: {best_round}")
         
         self.__cv_results = cv_results
         self.__boost_round = best_round
-        self.__params = params
     
     def train(self, save=False, savename='SingleXGBmodel.json'):
         """Train the XGBoost model. 
@@ -111,9 +119,9 @@ class SingleXGBReweighter(ReweighterBase):
         - `original`: pandas DataFrame containing the original data to be reweighted
         - `normalize`: constant to which the weights are normalized"""
 
-        X, y, weights, neg_df, dropped_X = self.clean_data(original, drop_kwd, self.weight_column, label=0, drop_neg_wgts=True)
+        X, weights, neg_df, dropped_X = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
 
-        data = xgb.DMatrix(X, label=y, weight=weights)
+        data = xgb.DMatrix(X, weight=weights)
         y_pred = self._model.predict(data)
         
         new_weights = weights * y_pred / (1 - y_pred)
@@ -129,21 +137,40 @@ class SingleXGBReweighter(ReweighterBase):
         
         return reweighted
     
-class MultiClassXGBReweighter(ReweighterBase):
+class MultiClassXGBReweighter(SingleXGBReweighter):
     def __init__(self, ori_data, tar_data, weight_column, results_dir):
         super().__init__(ori_data, tar_data, weight_column, results_dir)
+        self.encoder = LabelEncoder()
+        self.metric = 'mlogloss'
     
-    
-    def prep_data(self, drop_kwd, drop_neg_wgts=True):
-        """Preprocess the data into xgboost matrices.
-        Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
-        X, y, weights = self.prep_ori_tar(self.ori_data, self.tar_data, drop_kwd, self.weight_column, drop_neg_wgts)
-        print("X columns: ")
-        print(X.columns)
+    def prep_data(self, drop_kwd, label_col, drop_neg_wgts=True):
+        """Preprocess the data into xgboost matrices for multi-class classification."""
+        X_ori, w_ori, _, dropped_ori = ReweighterBase.clean_data(self.ori_data, drop_kwd, self.weight_column, drop_neg_wgts=drop_neg_wgts)
+        X_tar, w_tar, _, dropped_tar = ReweighterBase.clean_data(self.tar_data, drop_kwd, self.weight_column, drop_neg_wgts=drop_neg_wgts)
 
-        X_train, X_test, self.y_train, self.y_test, self.w_train, self.w_test = train_test_split(X, y, weights, test_size=0.3, random_state=42)
+        X = pd.concat([X_ori, X_tar], axis=0, ignore_index=True)
+        dropped = pd.concat([dropped_ori, dropped_tar], axis=0, ignore_index=True)
+        w = pd.concat([w_ori, w_tar], axis=0, ignore_index=True)
+
+        y = self.encoder.fit_transform(dropped[label_col])
+
+        X_train, X_test, self.y_train, self.y_test, self.w_train, self.w_test = train_test_split(X, y, w, test_size=0.3, random_state=42)
         self.dtrain = xgb.DMatrix(X_train, label=self.y_train, weight=self.w_train)
         self.dtest = xgb.DMatrix(X_test, label=self.y_test, weight=self.w_test)
+    
+    def __define_params(self, max_depth, booster):
+        params = {
+            "objective": "multi:softprob",
+            "num_class": len(self.encoder.classes_),
+            "eta": 0.05,
+            "eval_metric": 'mlogloss',
+            "nthread": 4,
+            "subsample": 0.7,
+            "colsample_bytree": 0.8,
+            "seed": 42,
+            "booster": booster,
+            "max_depth": max_depth
+        }
 
 class SingleNNReweighter(ReweighterBase):
     def __init__(self, ori_data, tar_data, weight_column, results_dir):
@@ -268,7 +295,7 @@ class SingleNNReweighter(ReweighterBase):
         - `original`: pandas DataFrame containing the original data to be reweighted
         - `normalize`: constant to which the weights are normalized"""
 
-        X_df, _, weights, neg_df, _ = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
+        X_df, weights, neg_df, _ = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
         X = self.scaler.transform(X_df)
         data = torch.tensor(X, dtype=torch.float32)
         data = DataLoader(data, batch_size=512, shuffle=False)
@@ -371,8 +398,8 @@ class MultipleXGBReweighter(SingleXGBReweighter):
     def prep_data(self, drop_kwd, drop_neg_wgts=True):
         """Preprocess the data into xgboost matrices.
         Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
-        X_target, _, wgt_tar, _, _ = self.clean_data(self.tar_data, drop_kwd, self.weight_column, label=1, drop_neg_wgts=drop_neg_wgts)
-        X_original, _, wgt_ori, _, _ = self.clean_data(self.ori_data, drop_kwd, self.weight_column, label=0, drop_neg_wgts=drop_neg_wgts)
+        X_target, wgt_tar, _, _ = self.clean_data(self.tar_data, drop_kwd, self.weight_column, drop_neg_wgts=drop_neg_wgts)
+        X_original, wgt_ori, _, _ = self.clean_data(self.ori_data, drop_kwd, self.weight_column, drop_neg_wgts=drop_neg_wgts)
 
         self.X_tar_train, self.X_tar_test, self.wgt_tar_train, self.wgt_tar_test = train_test_split(X_target, wgt_tar, test_size=0.3, random_state=42)
         self.X_ori_train, self.X_ori_test, self.wgt_ori_train, self.wgt_ori_test = train_test_split(X_original, wgt_ori, test_size=0.3, random_state=42)
@@ -395,7 +422,7 @@ class MultipleXGBReweighter(SingleXGBReweighter):
         self._modelname = savename.split('.')[0]
 
     def reweight(self, original, normalize, drop_kwd, save_results=False, save_name=''):
-        X, _, weights, neg_df, dropped_X = self.clean_data(original, drop_kwd, self.weight_column, label=0, drop_neg_wgts=True)
+        X, weights, neg_df, dropped_X = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
 
         new_weights = self._model.predict_weights(X, weights)
         normalize = normalize - neg_df[self.weight_column].sum()
