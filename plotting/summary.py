@@ -109,6 +109,7 @@ class PostProcessor():
         _, combined_dict = self.merge_cf(inputdir=self.transferP, outputdir=self.tempdir)
         for year, combined in combined_dict.items():
             self.present_yield(combined, signals, pjoin(self.tempdir, year), regroup_dict)
+            print(f"Yield results are outputted in {pjoin(self.tempdir, year)}")
     
     def update_wgt_info(self, outputdir) -> None:
         """Output the weight information based on per-year per-dataset xsec to a json file."""
