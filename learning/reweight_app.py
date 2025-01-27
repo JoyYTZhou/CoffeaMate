@@ -164,7 +164,51 @@ class MultiClassXGBReweighter(SingleXGBReweighter):
         """Print the classification report for multi-class classification."""
         print("\nClassification Report:")
         print(classification_report(y_test, y_pred, target_names=self.encoder.classes_, sample_weight=sample_wgt))
-
+    
+    def reweight(self, original, normalize, drop_kwd, save_results=False, save_name='') -> 'pd.DataFrame':
+        """Reweight the original dataset using multi-class predictions.
+        
+        Parameters:
+        - original: Original DataFrame to be reweighted
+        - normalize: Target normalization (sum of weights)
+        - drop_kwd: Keywords for columns to be dropped during preprocessing
+        - save_results: Whether to save the reweighted DataFrame
+        - save_name: Filename for saving results
+        
+        Returns:
+        - pd.DataFrame: Reweighted DataFrame
+        """
+        X, weights, neg_df, dropped_X = ReweighterBase.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
+        
+        # Get probability predictions for each class
+        data = xgb.DMatrix(X, weight=weights)
+        class_probabilities = self._model.predict(data)
+        
+        # Calculate new weights based on the predicted probabilities
+        # Using the sum of (p_target / p_original) for each class
+        n_classes = len(self.encoder.classes_)
+        weight_ratios = np.zeros(len(X))
+        
+        for i in range(n_classes):
+            # Add small epsilon to avoid division by zero
+            class_prob = np.clip(class_probabilities[:, i], 1e-7, 1-1e-7)
+            weight_ratios += class_prob / (1 - class_prob)
+        
+        new_weights = weights * weight_ratios / n_classes
+        
+        # Normalize the weights
+        normalize -= neg_df[self.weight_column].sum()
+        new_weights = new_weights * normalize / new_weights.sum()
+        
+        # Reconstruct the DataFrame with new weights
+        X = pd.concat([X, dropped_X], axis=1)
+        X[self.weight_column] = new_weights
+        reweighted = pd.concat([X, neg_df], axis=0)
+        
+        if save_results:
+            reweighted.to_csv(pjoin(self.results_dir, save_name))
+        
+        return reweighted
 
 class MultipleXGBReweighter(SingleXGBReweighter):
     def prep_data(self, drop_kwd, drop_neg_wgts=True):
