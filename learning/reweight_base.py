@@ -3,8 +3,9 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+import seaborn as sns
 from torch.utils.data import Dataset
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, confusion_matrix
 
 
 def add_hidden_layer(layers, in_dim, hidden_dims, activation):
@@ -23,7 +24,7 @@ class ReweighterBase():
     - `weight_column`: Column name for the weights.
     - `ori_weight`: Weights for the original data.
     - `tar_weight`: Weights for the target data.
-    - `results_dir`: Directory to save the results."""
+    - `results_dir`: Base directory to save the results, e.g. plots."""
     def __init__(self, ori_data:'pd.DataFrame', tar_data:'pd.DataFrame', weight_column, results_dir):
         """
         Parameters:
@@ -126,19 +127,68 @@ class ReweighterBase():
         
     @staticmethod
     def plot_roc(pred, label, weight, save, save_path, title='ROC Curve'):
-        """Plot the ROC curve."""
-        fpr, tpr, _ = roc_curve(label, pred, sample_weight=weight)
-        auc_score = auc(fpr, tpr)
+        """Plot the ROC curve for both binary and multi-class classification.
+        
+        Parameters:
+        - pred: Model predictions. For binary classification, a 1D array of probabilities.
+                For multi-class, a 2D array where each column represents class probabilities.
+        - label: True labels. For binary classification, a 1D array.
+                For multi-class, a 1D array with class indices.
+        - weight: Sample weights
+        - save: Boolean indicating whether to save the plot
+        - save_path: Path where to save the plot
+        - title: Title of the plot
+        """
+        plt.figure(figsize=(10, 8))
+        
+        pred = np.array(pred)
+        label = np.array(label)
+        weight = np.array(weight)
+        
+        if len(pred.shape) == 2:
+            n_classes = pred.shape[1]
+            for i in range(n_classes):
+                binary_label = (label == i).astype(int)
+                fpr, tpr, _ = roc_curve(binary_label, pred[:, i], sample_weight=weight)
+                auc_score = auc(fpr, tpr)
+                plt.plot(fpr, tpr, label=f'Class {i} (AUC = {auc_score:.2f})')
+                print(f'ROC AUC Score for Class {i}: {auc_score:.3f}')
+        
+        else:
+            fpr, tpr, _ = roc_curve(label, pred, sample_weight=weight)
+            auc_score = auc(fpr, tpr)
+            plt.plot(fpr, tpr, label=f'AUC = {auc_score:.2f}')
+            print(f'ROC AUC Score: {auc_score:.3f}')
+            plt.plot([0, 1], [0, 1], 'k--', label='Random')
+            plt.xlabel('False Positive Rate')
+            plt.ylabel('True Positive Rate')
+            plt.title(title)
+            plt.legend()
+        
+        if save:
+            plt.savefig(save_path)
+            plt.close()
 
-        plt.plot(fpr, tpr, label=f'AUC = {auc_score:.2f}')
-        plt.plot([0, 1], [0, 1], 'k--')
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title(title)
-        plt.legend()
-        if save: plt.savefig(save_path)
-        print('ROC AUC Score: ', auc_score)
+    @staticmethod
+    def plot_confusion(pred, label, weight, classes, save, save_path):
+        """Plot the confusion matrix for both binary and multi-class classification.
+        
+        Parameters:
+        - pred: Model predictions. For binary classification, a 1D array of probabilities.
+                For multi-class, a 2D array
+        - classes: List of class names"""
+        cm = confusion_matrix(label, pred, sample_weight=weight)
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(cm, annot=True, fmt='.2f', 
+                    xticklabels=classes, yticklabels=classes)
+        plt.title('Confusion Matrix')
+        plt.xlabel('Predicted')
+        plt.ylabel('True')
 
+        if save:
+            plt.savefig(save_path)
+        plt.close()
+        
 class WeightedDataset(Dataset):
     """Dataset class for weighted data."""
     def __init__(self, dataframe, feature_columns, weight_column):

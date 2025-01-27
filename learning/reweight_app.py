@@ -13,22 +13,24 @@ import matplotlib.pyplot as plt
 from hep_ml.reweight import GBReweighter
 import pickle
 from sklearn.preprocessing import LabelEncoder
+import xgboost as xgb
+from os.path import join as pjoin
+from sklearn.metrics import accuracy_score, classification_report
 
 from src.learning.reweight_base import ReweighterBase, WeightedDataset, Generator, Discriminator
 pjoin = os.path.join
 
 def check_device():
     if torch.cuda.is_available():
-        device = torch.device('cuda')  # NVIDIA GPU
+        device = torch.device('cuda')
     elif torch.backends.mps.is_available():
-        device = torch.device('mps')   # Apple Silicon GPU
+        device = torch.device('mps')
     else:
-        device = torch.device('cpu')   # Fallback to CPU
+        device = torch.device('cpu')
     print(f"Using device: {device}")
     return device
 
 def weighted_bce_loss(predictions, targets, weights):
-    """Compute the weighted binary cross-entropy loss."""
     return torch.mean(weights * nn.BCELoss(reduction='none')(predictions, targets))
 
 class SingleXGBReweighter(ReweighterBase):
@@ -37,8 +39,6 @@ class SingleXGBReweighter(ReweighterBase):
         self.metric = 'logloss'
 
     def prep_data(self, drop_kwd, drop_neg_wgts=True):
-        """Preprocess the data into xgboost matrices.
-        Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
         X, y, weights = self.prep_ori_tar(self.ori_data, self.tar_data, drop_kwd, self.weight_column, drop_neg_wgts)
         print("X columns: ")
         print(X.columns)
@@ -48,19 +48,11 @@ class SingleXGBReweighter(ReweighterBase):
         self.dtest = xgb.DMatrix(X_test, label=self.y_test, weight=self.w_test)
     
     def __define_params(self, max_depth, booster) -> dict:
-        """Define the hyperparameters for the XGBoost model."""
         self.__params = {"objective": "binary:logistic", "eta": 0.05, "eval_metric": self.metric, "nthread": 4,
                             "subsample": 0.7, "colsample_bytree": 0.8, "seed": 42, "booster": booster, "max_depth": max_depth}
         return self.__params
 
     def boostingSearch(self, max_depth, num_round, seed=42, booster='gbtree') -> None:
-        """Perform grid search to find the best hyperparameters for the XGBoost model.
-        
-        Parameters:
-        `max_depth`: List of integers containing the maximum depth of the trees.
-        `num_round`: List of integers containing the number of boosting rounds.
-        `booster`: String indicating the type of booster. 'gbtree' for tree-based models, 'dart' for dart models."""
-        
         params = self.__define_params(max_depth, booster)
         metric = self.metric
         
@@ -69,10 +61,10 @@ class SingleXGBReweighter(ReweighterBase):
             dtrain=self.dtrain,
             metrics=[metric, 'auc', 'rmse'],
             num_boost_round=num_round,
-            nfold=6,  # Number of CV folds
-            early_stopping_rounds=20,  # Stop if no improvement after 10 rounds
-            as_pandas=True,  # Return results as a pandas DataFrame
-            verbose_eval=20  # Print results every 20 rounds
+            nfold=6,
+            early_stopping_rounds=20,
+            as_pandas=True,
+            verbose_eval=20
         )
         
         best_round = cv_results[f'test-{metric}-mean'].idxmin()
@@ -82,10 +74,6 @@ class SingleXGBReweighter(ReweighterBase):
         self.__boost_round = best_round
     
     def train(self, save=False, savename='SingleXGBmodel.json'):
-        """Train the XGBoost model. 
-        
-        Parameters:
-        - `save`: Boolean indicating whether to save the model."""
         watchlist = [(self.dtrain, 'train'), (self.dtest, 'test')]
         model = xgb.train(params=self.__params, dtrain=self.dtrain, num_boost_round=self.__boost_round, evals=watchlist, verbose_eval=40)
         if save:
@@ -94,7 +82,6 @@ class SingleXGBReweighter(ReweighterBase):
         self._modelname = savename.split('.')[0]
     
     def evaluate(self, save=True):
-        """Evaluate the model on the test data."""
         y_pred = self._model.predict(self.dtest)
         self.plot_roc(y_pred, self.y_test, self.w_test, save, save_path=pjoin(self.results_dir, f'{self._modelname}_roc.png'))
         
@@ -107,18 +94,11 @@ class SingleXGBReweighter(ReweighterBase):
         print('Accuracy: ', accuracy_score(self.y_test, y_pred_binary))
     
     def load_model(self, model_path):
-        """Load the model from a saved file."""
         self._model = xgb.Booster()
         self._model.load_model(model_path)
         self._modelname = model_path.split('.')[0]
     
     def reweight(self, original, normalize, drop_kwd, save_results=False, save_name='') -> 'pd.DataFrame':
-        """Reweight the original data.
-        
-        Parameters
-        - `original`: pandas DataFrame containing the original data to be reweighted
-        - `normalize`: constant to which the weights are normalized"""
-
         X, weights, neg_df, dropped_X = self.clean_data(original, drop_kwd, self.weight_column, drop_neg_wgts=True)
 
         data = xgb.DMatrix(X, weight=weights)
@@ -142,7 +122,7 @@ class MultiClassXGBReweighter(SingleXGBReweighter):
         super().__init__(ori_data, tar_data, weight_column, results_dir)
         self.encoder = LabelEncoder()
         self.metric = 'mlogloss'
-    
+
     def prep_data(self, drop_kwd, label_col, drop_neg_wgts=True):
         """Preprocess the data into xgboost matrices for multi-class classification."""
         X_ori, w_ori, _, dropped_ori = ReweighterBase.clean_data(self.ori_data, drop_kwd, self.weight_column, drop_neg_wgts=drop_neg_wgts)
@@ -157,7 +137,7 @@ class MultiClassXGBReweighter(SingleXGBReweighter):
         X_train, X_test, self.y_train, self.y_test, self.w_train, self.w_test = train_test_split(X, y, w, test_size=0.3, random_state=42)
         self.dtrain = xgb.DMatrix(X_train, label=self.y_train, weight=self.w_train)
         self.dtest = xgb.DMatrix(X_test, label=self.y_test, weight=self.w_test)
-    
+
     def __define_params(self, max_depth, booster):
         params = {
             "objective": "multi:softprob",
@@ -171,12 +151,51 @@ class MultiClassXGBReweighter(SingleXGBReweighter):
             "booster": booster,
             "max_depth": max_depth
         }
+        self.__params = params
+        return params
 
+    def evaluate(self, save=True):
+        """Evaluate the multi-class XGBoost model using various metrics.
+        
+        Parameters:
+        - save: Boolean indicating whether to save the evaluation plots
+        """
+        y_pred_proba = self._model.predict(self.dtest)
+        y_pred = np.argmax(y_pred_proba, axis=1)
+        
+        accuracy = accuracy_score(self.y_test, y_pred)
+        print(f'Overall Accuracy: {accuracy:.4f}')
+        
+        # Plot feature importance
+        ax = xgb.plot_importance(self._model, max_num_features=10)
+        ax.figure.tight_layout()
+        if save:
+            ax.figure.savefig(pjoin(self.results_dir, f'{self._modelname}_feature_importance.png'))
+        
+        self.plot_roc(
+            pred=y_pred_proba,
+            label=self.y_test,
+            weight=self.w_test,
+            save=save,
+            save_path=pjoin(self.results_dir, f'{self._modelname}_roc_curves.png'),
+            title='Multi-class ROC Curves'
+        )
+        
+        self.plot_confusion(y_pred, self.y_test, self.w_test, self.encoder.classes_, save, pjoin(self.results_dir, f'{self._modelname}_confusion_matrix.png'))
+        
+        # Print classification report
+        self.print_classfication(y_pred, self.y_test, self.w_test)
+    
+    def print_classfication(self, y_pred, y_test, sample_wgt):
+        """Print the classification report for multi-class classification."""
+        print("\nClassification Report:")
+        print(classification_report(y_test, y_pred, target_names=self.encoder.classes_, sample_weight=sample_wgt))
+ 
 class SingleNNReweighter(ReweighterBase):
     def __init__(self, ori_data, tar_data, weight_column, results_dir):
         super().__init__(ori_data, tar_data, weight_column, results_dir)
         self.scaler = MinMaxScaler()
-    
+
     def prep_data(self, drop_kwd, drop_neg_wgts=True):
         """Preprocess the data into TensorDataset objects.
         Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
@@ -190,10 +209,10 @@ class SingleNNReweighter(ReweighterBase):
         self.dataset = TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32).view(-1, 1), torch.tensor(w_train, dtype=torch.float32))
         self.val_dataset = TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32).view(-1, 1), torch.tensor(w_val, dtype=torch.float32))
         self.features = features
-    
+
     def train(self, num_epochs, hidden_dims, batch_size, lr, save=True, savename='SingleNNmodel.pth', save_interval=30):
         """Train the discriminator model.
-        
+
         Parameters:
         - `num_epochs`: Number of epochs
         - `hidden_dims`: List of integers containing the number of hidden units in each layer.
@@ -227,7 +246,7 @@ class SingleNNReweighter(ReweighterBase):
                 weighted_loss.backward()
                 optimizer.step()
                 running_loss += weighted_loss.item()
-            
+
             epoch_loss = running_loss / len(train_loader)
             train_losses.append(epoch_loss)
 
@@ -243,37 +262,37 @@ class SingleNNReweighter(ReweighterBase):
 
             val_loss = val_running_loss / len(val_loader)
             val_losses.append(weighted_val_loss.item())
-            
+
             if epoch % 10 == 0:
                 print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {epoch_loss}, Val Loss: {val_loss}")
-            
+
             if (epoch + 1) % save_interval == 0 and save:
                 save_path = f"{savename.split('.')[0]}_{epoch+1}.pth"
                 torch.save(model.state_dict(), pjoin(self.results_dir, save_path))
                 print(f"Model saved at {save_path}")
-        
+
         self.history = {'train': train_losses, 'val': val_losses}
         self.model = model
 
         if save:
             torch.save(model.state_dict(), pjoin(self.results_dir, savename))
             print(f"Final Model saved to {savename}")
-        
+
         self._name = savename.split('.')[0]
-    
+
     def load_model(self, model_name, hidden_dim):
         """Load the model from a saved file."""
         model = Discriminator(len(self.features), hidden_dim)
         model.load_state_dict(torch.load(pjoin(self.results_dir, model_name)))
         self.model = model
         self._name = model_name.split('.')[0]
-    
+
     def evaluate(self):
         """Compute the AUC score for the model."""
         device = check_device()
         self.compute_nn_auc(self.model, DataLoader(self.val_dataset, batch_size=64, shuffle=False), device, True, pjoin(self.results_dir, f'{self._name}_val_roc.png'), 'Validation ROC Curve')
         self.compute_nn_auc(self.model, DataLoader(self.dataset, batch_size=64, shuffle=False), device, True, pjoin(self.results_dir, f'{self._name}_train_roc.png'), 'Training ROC Curve')
-    
+
     def visualize(self, save=False):
         """Visualize the training and validation losses."""
         plt.figure(figsize=[12, 7])
@@ -290,7 +309,7 @@ class SingleNNReweighter(ReweighterBase):
 
     def reweight(self, original, normalize, drop_kwd, save_results=False, save_name='') -> 'pd.DataFrame':
         """Reweight the original data.
-        
+
         Parameters
         - `original`: pandas DataFrame containing the original data to be reweighted
         - `normalize`: constant to which the weights are normalized"""
@@ -303,7 +322,7 @@ class SingleNNReweighter(ReweighterBase):
         device = check_device()
         model = self.model.to(device)
         model.eval()
-        
+
         new_weights = torch.zeros(len(weights), dtype=torch.float32)
         start_idx = 0
 
@@ -313,28 +332,28 @@ class SingleNNReweighter(ReweighterBase):
                 outputs = model(batch.to(device)).cpu()
                 new_weights[start_idx:start_idx+batch_size] = outputs.squeeze()
             start_idx += batch_size
-        
+
         new_weights = new_weights.numpy()
-        
+
         epsilon = 1e-6  # Small value to prevent division by zero
         new_weights = np.clip(new_weights, epsilon, 1 - epsilon)
 
         new_weights = weights * new_weights / (1 - new_weights)
         normalize -= neg_df[self.weight_column].sum()
         new_weights = new_weights * normalize / new_weights.sum()
-        
+
         X_df[self.weight_column] = new_weights
         reweighted = pd.concat([X_df, neg_df], ignore_index=True)
 
         if save_results:
             reweighted.to_csv(pjoin(self.results_dir, save_name))
-        
+
         return reweighted
 
 class GANReweighter(SingleNNReweighter):
     def __init__(self, ori_data, tar_data, weight_column, results_dir):
         super().__init__(ori_data, tar_data, weight_column, results_dir)
-    
+
     def prep_data(self, drop_kwd, drop_neg_wgts=True) -> tuple[WeightedDataset, pd.DataFrame]:
         """Preprocess the data into WeightedDataset objects.
         Drop columns containing the keywords in `drop_kwd` and negatively weighted events if `drop_neg_wgts` is True."""
@@ -348,20 +367,20 @@ class GANReweighter(SingleNNReweighter):
         noise_df, _, _, _, _ = self.clean_data(self.ori_data, drop_kwd, self.weight_column, None, False, drop_neg_wgts)
         noise_df[features] = self.scaler.transform(noise_df[features])
         noise_df["weight"] /= noise_df["weight"].sum()
-        
+
         self.target_dataset = target_dataset
         self.noise_df = noise_df
         self.feature_cols = features
 
         return self.target_dataset, self.noise_df
-    
+
     def train(self, num_epochs, hidden_dims, batch_size):
         mps_device = torch.device('mps')
 
         target_loader = DataLoader(self.tar_data, batch_size, shuffle=True)
         noise_data = self.noise_df[self.feature_cols].values()
         noise_weights = self.noise_df[self.weight_column].values()
-        
+
         input_dim = len(self.feature_cols)
         # generator = Generator(input_dim, input_dim, hidden_dims).to(mps_device)
         discriminator = Discriminator(input_dim, hidden_dims).to(mps_device)
@@ -379,7 +398,7 @@ class GANReweighter(SingleNNReweighter):
                 batch_size = real_samples.shape[0]
 
                 optimizer_D.zero_grad()
-                
+
                 real_labels = torch.ones(batch_size, 1).to(mps_device)
                 real_predictions = discriminator(real_samples)
                 real_loss = weighted_bce_loss(real_predictions, real_labels, real_weights)
@@ -390,7 +409,7 @@ class GANReweighter(SingleNNReweighter):
                 fake_labels = torch.zeros(batch_size, 1).to(mps_device)
                 fake_predictions = discriminator(noise)
                 fake_loss = weighted_bce_loss(fake_predictions, fake_labels, fake_weights)
-                
+
 
         pass
 
@@ -403,10 +422,10 @@ class MultipleXGBReweighter(SingleXGBReweighter):
 
         self.X_tar_train, self.X_tar_test, self.wgt_tar_train, self.wgt_tar_test = train_test_split(X_target, wgt_tar, test_size=0.3, random_state=42)
         self.X_ori_train, self.X_ori_test, self.wgt_ori_train, self.wgt_ori_test = train_test_split(X_original, wgt_ori, test_size=0.3, random_state=42)
-    
+
     def train(self, n_estimator, lr, max_depth, min_samples_leaf, save=True, savename="MultiXGBmodel.pkl", gb_args={'subsample': 0.4, 'max_features': 0.75}):
         """Train the reweighting model.
-        
+
         Parameters:
         - `n_estimator`: Number of boosting rounds (50-100)
         - `lr`: Learning rate
@@ -414,11 +433,11 @@ class MultipleXGBReweighter(SingleXGBReweighter):
         model = GBReweighter(n_estimators=n_estimator, learning_rate=lr, max_depth=max_depth, min_samples_leaf=min_samples_leaf, gb_args=gb_args)
         model.fit(self.X_ori_train, self.X_tar_train, self.wgt_ori_train, self.wgt_tar_train)
         self._model = model
-        
+
         if save:
             with open(pjoin(self.results_dir, savename), 'wb') as f:
                 pickle.dump(model, f)
-        
+
         self._modelname = savename.split('.')[0]
 
     def reweight(self, original, normalize, drop_kwd, save_results=False, save_name=''):
@@ -434,9 +453,9 @@ class MultipleXGBReweighter(SingleXGBReweighter):
 
         if save_results:
             reweighted.to_csv(pjoin(self.results_dir, save_name))
-        
+
         return reweighted
-   
+
 # class DataLoader():
 #     def __init__(self, data:'pd.DataFrame', target_column):
 #         """
@@ -451,30 +470,30 @@ class MultipleXGBReweighter(SingleXGBReweighter):
 #         self.y_train = None
 #         self.y_test = None
 #         self.scaler = StandardScaler()
-       
+
 #     def preprocess_data(self, drop_kwd: 'list[str]' = [], keep_kwd: 'list[str]' = []):
 #         self.y = self.data[self.target_column]
 
 #         for kwd in keep_kwd:
 #             self.data = self.data.filter(like=kwd)
-        
+
 #         for kwd in drop_kwd:
 #             self.data.drop(columns=self.data.filter(like=kwd).columns, inplace=True)
-        
-        
+
+
 #         self.X = self.data.drop(columns=[self.target_column])
 #         self.X = self.scaler.fit_transform(self.X)
-        
+
 #     def split_data(self, test_size=0.3, random_state=None):
 #         self.X_train, self.X_test, self.y_train, self.y_test = \
 #             train_test_split(self.X, self.y, test_size=test_size, random_state=random_state)
-            
+
 #     def get_train_data(self, if_torch=True):
-#         if if_torch: 
+#         if if_torch:
 #             return torch.tensor(self.X_train.to_numpy(), dtype=torch.float32), torch.tensor(self.y_train.to_numpy(), dtype=torch.long)
 #         else:
 #             return self.X_train, self.y_train
-    
+
 #     def get_test_data(self, if_torch=False):
 #         if if_torch:
 #             return torch.tensor(self.X_test, dtype=torch.float32), torch.tensor(self.y_test, dtype=torch.long)
@@ -492,14 +511,14 @@ class MultipleXGBReweighter(SingleXGBReweighter):
 #         self.criterion = nn.CrossEntropyLoss()
 #         self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
 #         self.train_loader = None
-    
+
 #     def fit(self, X_train, y_train, batch_size=32, epochs=50):
 #         X_train_tensor = X_train
-#         y_train_tensor = y_train 
+#         y_train_tensor = y_train
 
 #         train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
 #         self.train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        
+
 #         for epoch in range(epochs):
 #             for inputs, labels in self.train_loader:
 #                 self.optimizer.zero_grad()
@@ -511,19 +530,19 @@ class MultipleXGBReweighter(SingleXGBReweighter):
 #             print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
 
 #         print('Training finished!')
-    
+
 #     def forward(self, x):
 #         return self.model(x)
-    
+
 #     def predict(self, X_test):
 #         X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
-        
+
 #         with torch.no_grad():
 #             outputs = self.model(X_test_tensor)
 #             _, predicted = torch.max(outputs, 1)
-        
+
 #         return predicted.numpy()
-    
+
 #     def evaluate(self, X_test, y_test):
 #         predicted = self.predict(X_test)
 #         accuracy = (predicted == y_test).mean()
@@ -545,17 +564,17 @@ class MultipleXGBReweighter(SingleXGBReweighter):
 #     region_B = df.query(cri1 + " and not (" + cri2 + ")")
 #     region_C = df.query("not (" + cri1 + ") and " + cri2)
 #     region_D = df.query("not (" + cri1 + ") and not (" + cri2 + ")")
-    
+
 #     N_A = region_A[weight_column].sum()
 #     N_B = region_B[weight_column].sum()
 #     N_C = region_C[weight_column].sum()
 #     N_D = region_D[weight_column].sum()
-    
+
 #     if N_D == 0:
 #         raise Warning("No events in region D. Cannot estimate background for region A.")
 #         return None
 #     N_A_background = (N_B * N_C) / N_D
-    
+
 #     return N_A_background
 
 # def binaryBDTReweighter(X_train, y_train, X_test):
@@ -577,10 +596,10 @@ class MultipleXGBReweighter(SingleXGBReweighter):
 
 # def XGBweighter(original_train, target_train, original_test, target_test, original_weight, target_weight, draw_cols):
 #     """Reference: https://github.com/arogozhnikov/hep_ml/blob/master/notebooks/DemoReweighting.ipynb"""
-#     reweighter = reweight.GBReweighter(n_estimators=50, learning_rate=0.1, max_depth=3, min_samples_leaf=1000, 
+#     reweighter = reweight.GBReweighter(n_estimators=50, learning_rate=0.1, max_depth=3, min_samples_leaf=1000,
 #                                    gb_args={'subsample': 0.4})
 #     reweighter.fit(original_train, target_train, original_weight, target_weight)
 
 #     gb_weights_test = reweighter.predict_weights(original_test)
 #     draw_distributions(original_test, target_test, gb_weights_test, draw_cols)
-    
+
