@@ -11,22 +11,58 @@ from src.analysis.objutil import Object
 from src.utils.filesysutil import FileSysHelper, pjoin, pdir, pbase
 from src.utils.cutflowutil import load_csvs
 
-colors = list(mpl.colormaps['Set2'].colors)
-
-class CSVPlotter():
-    """Plot the histograms and other visualizations from the csv files.
+class PlotStyle:
+    """Handles basic plot styling and setup"""
+    COLORS = list(mpl.colormaps['Set2'].colors)
     
-    Attributes
-    - `meta_dict`: the metadata dictionary, {group: {datasetname: {shortname, per_evt_wgt, ...}}}
-    - `data_dict`: the dictionary of dataframes"""
+    @staticmethod
+    def setup_cms_style(ax, lumi=None, year=None):
+        """Apply CMS style to an axis"""
+        hep.cms.label(ax=ax, loc=2, label='Work in Progress', 
+                     fontsize=11, com=13.6, lumi=lumi, year=year)
+        ax.tick_params(axis='both', which='major', labelsize=10, length=0)
+        
+    @staticmethod
+    def create_figure(n_row=1, n_col=1, figsize=None):
+        """Create figure with default sizing"""
+        if figsize is None:
+            figsize = (8*n_col, 5*n_row)
+        return plt.subplots(n_row, n_col, figsize=figsize)
+    
+class HistogramHelper:
+    """Handles histogram operations"""
+    @staticmethod
+    def make_histogram(data, bins, range, weights=None, density=False):
+        """Create histogram with proper overflow handling"""
+        if isinstance(bins, int):
+            bins = np.linspace(*range, bins+1)
+            data = np.clip(data, bins[0], bins[-1])
+        return np.histogram(data, bins=bins, weights=weights, density=density)
+
+    @staticmethod
+    def calc_ratio_and_errors(num, den, num_err, den_err):
+        """Calculate ratio and its error"""
+        ratio = np.nan_to_num(num / den, nan=0., posinf=0.)
+        ratio_err = np.nan_to_num(
+            ratio * np.sqrt((num_err/num)**2 + (den_err/den)**2), 
+            nan=0., posinf=0.
+        )
+        return ratio, ratio_err
+
+class CSVPlotter:
+    """Simplified plotter for CSV data"""
     def __init__(self, outdir):
         self.outdir = outdir
-        FileSysHelper.checkpath(self.outdir)
-    
-    def __set_meta(self, metadata_path):
-        with open(metadata_path, 'r') as f: 
-            self.meta_dict = json.load(f)
+        FileSysHelper.checkpath(outdir)
+        self.meta_dict = None
         self.data_dict = {}
+        self.sig_group = None
+        self.bkg_group = None
+        
+    def load_metadata(self, metadata_path):
+        """Load metadata from JSON file"""
+        with open(metadata_path, 'r') as f:
+            self.meta_dict = json.load(f)
         self.labels = list(self.meta_dict.keys())
     
     def __set_group(self, sig_group, bkg_group):
@@ -59,8 +95,8 @@ class CSVPlotter():
         flat_wgt = 1/self.meta_dict[group][ds]['nwgt'] * multiply * self.meta_dict[group][ds]['xsection'] * luminosity
         return flat_wgt
     
-    def postprocess_csv(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
-        """Reweight the datasets to the desired xsection * luminosity by adding a column `weight` and save the processed dataframes to csv files. 
+    def process_datasets(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
+        """Reweight the datasets to the desired xsection * luminosity by adding a column `weight` and save the processed dataframes to csv files.
         
         Parameters
         - `datasource`: the directory of the group subdirectories containing different csv output files.
@@ -71,40 +107,72 @@ class CSVPlotter():
         
         Return 
         - `grouped`: the concatenated dataframe"""
-        list_of_df = []
         FileSysHelper.checkpath(postp_output)
-        self.__set_meta(metadata_path)
-
-        def add_wgt(dfs, rwfac, ds, group):
-            df = dfs[0]
-            if df.empty: return None
-            df['weight'] = df[per_evt_wgt] * rwfac
-            df['dataset'] = ds
-            df['group'] = group 
-            if extraprocess: return extraprocess(df)
-            else: return df
+        self.load_metadata(metadata_path)
+        list_of_df = []
 
         for group in self.labels:
-            load_dir = pjoin(datasource, group) 
-            if not FileSysHelper.checkpath(load_dir, createdir=False): continue
-            cf_dict = {}
-            cf_df = load_csvs(load_dir, f'{group}*cf.csv')[0]
-            for ds in self.meta_dict[group].keys():
-                rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor, luminosity)
-                dsname = self.meta_dict[group][ds]['shortname']
-                df = load_csvs(load_dir, f'{dsname}*out*', func=add_wgt, rwfac=rwfac, ds=dsname, group=group)
-                FileSysHelper.checkpath(f'{postp_output}/{group}')
-                if df is not None: 
-                    list_of_df.append(df)
-                    self.__addextcf(cf_dict, df, dsname, per_evt_wgt)
-                else:
-                    cf_dict[f'{dsname}_raw'] = 0
-                    cf_dict[f'{dsname}_wgt'] = 0
+            load_dir = pjoin(datasource, group)
+            if not FileSysHelper.checkpath(load_dir, createdir=False):
+                continue
+                
+            cf_dict, cf_df = self.__process_group(
+                group, load_dir, postp_output, per_evt_wgt,
+                extraprocess, selname, signals, sig_factor, luminosity
+            )
+            
+            self.__save_cutflow(cf_df, cf_dict, selname, postp_output, group)
+            
+            if cf_dict:
+                list_of_df.extend([df for df in self.data_dict.get(group, {}).values() if df is not None])
+
+        return pd.concat(list_of_df, axis=0).reset_index().drop('index', axis=1)
+    
+    def __process_group(self, group, load_dir, postp_output, per_evt_wgt, extraprocess, selname, signals, sig_factor, luminosity):
+        """Process a single group of datasets."""
+        cf_dict = {}
+        cf_df = load_csvs(load_dir, f'{group}*cf.csv')[0]
+        self.data_dict[group] = {}
+        
+        for ds in self.meta_dict[group].keys():
+            df = self.__process_dataset(
+                group, ds, load_dir, postp_output,
+                per_evt_wgt, extraprocess, signals,
+                sig_factor, luminosity
+            )
+            
+            dsname = self.meta_dict[group][ds]['shortname']
+            if df is not None:
+                self.data_dict[group][dsname] = df
+                self.__addextcf(cf_dict, df, dsname, per_evt_wgt)
+            else:
+                cf_dict[f'{dsname}_raw'] = 0
+                cf_dict[f'{dsname}_wgt'] = 0
+                
+        return cf_dict, cf_df
+    
+    def __process_dataset(self, group, ds, load_dir, postp_output, per_evt_wgt, extraprocess, signals, sig_factor, luminosity):
+        """Process a single dataset."""
+        rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor, luminosity)
+        dsname = self.meta_dict[group][ds]['shortname']
+        
+        def add_wgt(dfs, rwfac, ds, group):
+            df = dfs[0]
+            if df.empty:
+                return None
+            df['weight'] = df[per_evt_wgt] * rwfac
+            df['dataset'] = ds
+            df['group'] = group
+            return extraprocess(df) if extraprocess else df
+        
+        FileSysHelper.checkpath(f'{postp_output}/{group}')
+        return load_csvs(load_dir, f'{dsname}*out*', func=add_wgt, rwfac=rwfac, ds=dsname, group=group)
+    
+    def __save_cutflow(self, cf_df, cf_dict, selname, postp_output, group):
+        """Save the cutflow dataframe to a CSV file."""
+        if cf_dict:
             cf_df = pd.concat([cf_df, pd.DataFrame(cf_dict, index=[selname])])
             cf_df.to_csv(pjoin(postp_output, group, f'{group}_{selname.replace(" ", "")}_cf.csv'))
-
-        grouped = pd.concat(list_of_df, axis=0).reset_index().drop('index', axis=1)
-        return grouped
 
     @iterwgt
     def getdata(self, process, ds, file_type='.root'):
@@ -209,6 +277,15 @@ class CSVPlotter():
             ObjectPlotter.plot_var(ax, b_hists, bins, blabels, x_range, **kwargs)
 
         return order
+    
+    def plot_SvB(self, evts, attridict, bgroup, sgroup, title='', save_name='', lumi=220, **kwargs):
+        """Plot the signal and background histograms."""
+        self.__set_group(sgroup, bgroup)
+        for att, options in attridict.items():
+            xlabel = options['plot'].get('xlabel', '')
+            fig, ax = ObjectPlotter.set_style('', xlabel, title, lumi=lumi)
+            self.plot_SvBHist(ax[0], evts, att, options, **kwargs)
+            fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'), dpi=300, bbox_inches='tight', pad_inches=0.1)
 
     def plot_fourRegions(self, regionA, regionB, regionC, regionD, attridict, bgroup, sgroup, title='', save_name='', lumi=220, **kwargs):
         """Plot the signal and background histograms for the four regions."""
@@ -354,7 +431,7 @@ class ObjectPlotter():
         """
         s_colors = ['red', 'blue', 'forestgreen']
         hep.histplot(bkg_hists, bins=bin_edges, label=bkg_label, ax=ax, histtype='fill', alpha=0.6, stack=True, linewidth=1)
-        hep.histplot(sig_hists, bins=bin_edges, ax=ax, color=s_colors, label=sig_label, stack=False, histtype='step', alpha=1.0, linewidth=1.5)
+        hep.histplot(sig_hists, bins=bin_edges, ax=ax, color=s_colors[0: len(sig_hists)], label=sig_label, stack=False, histtype='step', alpha=1.0, linewidth=1.5)
         ax.set_xlim(*xrange)
         ax.set_ylim(bottom=0)
         ax.legend(fontsize=12, loc='upper right')
