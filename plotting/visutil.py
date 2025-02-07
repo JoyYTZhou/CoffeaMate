@@ -1,6 +1,5 @@
 import mplhep as hep
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import json
@@ -10,44 +9,7 @@ from src.utils.datautil import arr_handler, iterwgt
 from src.analysis.objutil import Object
 from src.utils.filesysutil import FileSysHelper, pjoin, pdir, pbase
 from src.utils.cutflowutil import load_csvs
-
-class PlotStyle:
-    """Handles basic plot styling and setup"""
-    COLORS = list(mpl.colormaps['Set2'].colors)
-    
-    @staticmethod
-    def setup_cms_style(ax, lumi=None, year=None):
-        """Apply CMS style to an axis"""
-        hep.cms.label(ax=ax, loc=2, label='Work in Progress', 
-                     fontsize=11, com=13.6, lumi=lumi, year=year)
-        ax.tick_params(axis='both', which='major', labelsize=10, length=0)
-        
-    @staticmethod
-    def create_figure(n_row=1, n_col=1, figsize=None):
-        """Create figure with default sizing"""
-        if figsize is None:
-            figsize = (8*n_col, 5*n_row)
-        return plt.subplots(n_row, n_col, figsize=figsize)
-    
-class HistogramHelper:
-    """Handles histogram operations"""
-    @staticmethod
-    def make_histogram(data, bins, range, weights=None, density=False):
-        """Create histogram with proper overflow handling"""
-        if isinstance(bins, int):
-            bins = np.linspace(*range, bins+1)
-            data = np.clip(data, bins[0], bins[-1])
-        return np.histogram(data, bins=bins, weights=weights, density=density)
-
-    @staticmethod
-    def calc_ratio_and_errors(num, den, num_err, den_err):
-        """Calculate ratio and its error"""
-        ratio = np.nan_to_num(num / den, nan=0., posinf=0.)
-        ratio_err = np.nan_to_num(
-            ratio * np.sqrt((num_err/num)**2 + (den_err/den)**2), 
-            nan=0., posinf=0.
-        )
-        return ratio, ratio_err
+from src.plotting.plothelpers import HistogramHelper, PlotStyle
 
 class CSVPlotter:
     """Simplified plotter for CSV data"""
@@ -185,38 +147,52 @@ class CSVPlotter:
             if rootfile: self.data_dict[process][ds] = rootfile
         else:
             raise FileNotFoundError(f"Check if there are any files of specified pattern in {self._datadir}.")
-   
+    
     def get_hist(self, evts: 'pd.DataFrame', att, options, group: 'dict'=None, **kwargs) -> tuple[list, list, list[int, int], list, list]:
         """Histogram an attribute of the object for the given dataframe for groups of datasets. 
         Return sorted histograms based on the total counts.
         
         Parameters
+        - `evts`: DataFrame containing the events to histogram
+        - `att`: attribute to histogram
+        - `options`: dictionary containing histogram options
         - `group`: the group of datasets to be plotted. {groupname: [list of datasets]}
-        - `kwargs`: additional arguments for the `ObjectPlotter.hist_arr` function
+        - `kwargs`: additional histogram parameters
         
         Returns
         - `hist_list`: a sorted list of histograms
         - `bins`: the bin edges
         - `bin_range`: the range of the histogram
         - `pltlabel`: the sorted labels of the datasets
-        - `b_colors`: the colors of the datasets"""
+        - `b_colors`: the colors of the datasets
+        """
         histopts = options['hist']
         bins = histopts.get('bins', 40)
-        bin_range = histopts.get('range', (0,200))
+        bin_range = histopts.get('range', (0, 200))
+        
         pltlabel = list(group.keys()) if group is not None else self.labels
+        b_colors = PlotStyle.COLORS[:len(pltlabel)]
+        
         hist_list = []
-        b_colors = colors[0:len(pltlabel)]
         for label in pltlabel:
             proc_list = group[label] if group is not None else [label]
             thisdf = evts[evts['group'].isin(proc_list)]
-            thishist, bins = ObjectPlotter.hist_arr(thisdf[att], bins, bin_range, thisdf['weight'], **kwargs)
-            hist_list.append(thishist)
-        
+            
+            counts, edges = HistogramHelper.make_histogram(
+                data=thisdf[att],
+                bins=bins,
+                range=bin_range,
+                weights=thisdf['weight'],
+                density=kwargs.get('density', False)
+            )
+            hist_list.append(counts)
+            bins = edges  # Update bins in case they were modified
+            
         assert len(hist_list) == len(pltlabel), "The number of histograms and labels must be equal."
         assert len(hist_list) == len(b_colors), "The number of histograms and colors must be equal."
 
         return hist_list, bins, bin_range, pltlabel, b_colors
-    
+
     @staticmethod
     def get_order(hist_list) -> list:
         """Order the histograms based on the total counts."""
@@ -299,7 +275,6 @@ class CSVPlotter:
             self.plot_SvBHist(ax=axes[0,1], evts=regionB, att=att, attoptions=options, order=order, **kwargs)
             self.plot_SvBHist(ax=axes[1,0], evts=regionC, att=att, attoptions=options, order=order, **kwargs)
             self.plot_SvBHist(ax=axes[1,1], evts=regionD, att=att, attoptions=options, order=order, **kwargs)
-                
 
             fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'), dpi=300, bbox_inches='tight', pad_inches=0.1)
         
