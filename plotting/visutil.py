@@ -204,213 +204,213 @@ class CSVPlotter:
     def order_list(list_of_obj, order) -> list:
         """Order the list of lists based on the order."""
         return [list_of_obj[i] for i in order]
-    
+
     @staticmethod
     def plot_shape(list_of_evts: list[pd.DataFrame], labels, attridict: dict, ratio_ylabel, outdir, hist_ylabel='Normalized', title='', save_suffix='') -> None:
         """Compare the (normalized) shape of the object attribute for two different dataframes, with ratio panel attached.
         
         Parameters
         - `list_of_evts`: the list of dataframes to be histogrammed and compared"""
-
         assert len(list_of_evts) >= 2, "The number of dataframes must be at least 2."
         assert 'weight' in list_of_evts[0].columns, "The weight column must be present in the dataframe."
 
         for att, options in attridict.items():
             pltopts = options['plot'].copy()
-            fig, axs, ax2s = ObjectPlotter.set_style_with_ratio(title, pltopts.pop('xlabel', ''), hist_ylabel, ratio_ylabel)
-            ax = axs[0]
-            ax2 = ax2s[0]
+            fig, axs, ax2s = PlotStyle.create_ratio_figure(
+                title=title,
+                x_label=pltopts.pop('xlabel', ''),
+                top_ylabel=hist_ylabel,
+                bottom_ylabel=ratio_ylabel
+            )
+            
             hist_list = []
+            wgt_list = []
             bins = options['hist']['bins']
             bin_range = options['hist']['range']
-            wgt_list = []
+            
             for evts in list_of_evts:
-                thishist, bins = ObjectPlotter.hist_arr(evts[att], bins, bin_range, evts['weight'], density=False, keep_overflow=False)
-                hist_list.append(thishist)
+                counts, edges = HistogramHelper.make_histogram(
+                    data=evts[att],
+                    bins=bins,
+                    range=bin_range,
+                    weights=evts['weight'],
+                    density=False
+                )
+                hist_list.append(counts)
                 wgt_list.append(evts['weight'])
-            ObjectPlotter.plot_var_with_err(ax, ax2, hist_list, wgt_list, bins, labels, bin_range, **pltopts)
+                bins = edges
+            
+            ObjectPlotter.plot_var_with_err(
+                ax=axs[0], ax2=ax2s[0],
+                hist_list=hist_list,
+                wgt_list=wgt_list,
+                bins=bins,
+                label=labels,
+                xrange=bin_range,
+                **pltopts
+            )
 
             fig.savefig(pjoin(outdir, f'{att}{save_suffix}.png'), dpi=400, bbox_inches='tight')
-    
+
     def plot_SvBHist(self, ax, evts, att, attoptions, **kwargs) -> list:
-        """Plot the signal and background histograms.
+        """Plot the signal and background histograms."""
+        b_hists, bins, x_range, blabels, _ = self.get_hist(
+            evts, att, attoptions, self.bkg_group
+        )
         
-        Parameters
-        - `ax`: matplotlib axis object
-        - `att`: the attribute to be plotted
-        - `attoptions`: the options for the attribute to be plotted
-        
-        Return
-        - `order`: the order of the histograms"""
-        b_hists, bins, x_range, blabels, _ = self.get_hist(evts, att, attoptions, self.bkg_group)
         order = kwargs.pop('order', CSVPlotter.get_order(b_hists))
         b_hists, blabels = CSVPlotter.order_list(b_hists, order), CSVPlotter.order_list(blabels, order)
         
         if self.sig_group is not None:
-            s_hists, bins, x_range, slabels, _ = self.get_hist(evts, att, attoptions, self.sig_group, **kwargs)
-            ObjectPlotter.plotSigVBkg(ax, s_hists, b_hists, bins, slabels, blabels, x_range, **kwargs)  
+            # Get signal histograms
+            s_hists, bins, x_range, slabels, _ = self.get_hist(
+                evts, att, attoptions, self.sig_group, **kwargs
+            )
+            ObjectPlotter.plotSigVBkg(
+                ax=ax,
+                sig_hists=s_hists,
+                bkg_hists=b_hists,
+                bin_edges=bins,
+                sig_label=slabels,
+                bkg_label=blabels,
+                xrange=x_range,
+                **kwargs
+            )
         else:
-            ObjectPlotter.plot_var(ax, b_hists, bins, blabels, x_range, **kwargs)
+            ObjectPlotter.plot_var(
+                ax=ax,
+                hist=b_hists,
+                bin_edges=bins,
+                label=blabels,
+                xrange=x_range,
+                **kwargs
+            )
 
         return order
     
     def plot_SvB(self, evts, attridict, bgroup, sgroup, title='', save_name='', lumi=220, **kwargs):
         """Plot the signal and background histograms."""
         self.__set_group(sgroup, bgroup)
+        
         for att, options in attridict.items():
             xlabel = options['plot'].get('xlabel', '')
-            fig, ax = ObjectPlotter.set_style('', xlabel, title, lumi=lumi)
-            self.plot_SvBHist(ax[0], evts, att, options, **kwargs)
-            fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'), dpi=300, bbox_inches='tight', pad_inches=0.1)
+            fig, axes = PlotStyle.create_figure()
+            PlotStyle.setup_cms_style(axes, lumi=lumi)
+            PlotStyle.setup_axis(axes, xlabel=xlabel, title=title)  # Added title parameter here
+            self.plot_SvBHist(axes, evts, att, options, **kwargs)
+            
+            fig.savefig(
+                pjoin(self.outdir, f'{att}{save_name}.png'),
+                dpi=300,
+                bbox_inches='tight',
+                pad_inches=0.1
+            )
 
     def plot_fourRegions(self, regionA, regionB, regionC, regionD, attridict, bgroup, sgroup, title='', save_name='', lumi=220, **kwargs):
         """Plot the signal and background histograms for the four regions."""
         self.__set_group(sgroup, bgroup)
+        
+        regions = [regionA, regionB, regionC, regionD]
+        subtitles = ['Region A (OS, 2b)', 'Region B (OS, 1b)',
+                    'Region C (SS, 2b)', 'Region D (SS, 1b)']
+        
         for att, options in attridict.items():
             xlabel = options['plot'].get('xlabel', '')
-            subtitles = ['Region A (OS, 2b)', 'Region B (OS, 1b)', 'Region C (SS, 2b)', 'Region D (SS, 1b)']
-            fig, axes = ObjectPlotter.set_style(title, [xlabel] * 4, subtitles, n_row=2, n_col=2, lumi=lumi)
+            fig, axes = PlotStyle.create_figure(n_row=2, n_col=2)
 
-            order = self.plot_SvBHist(ax=axes[0,0], evts=regionA, att=att, attoptions=options,  **kwargs)
-            self.plot_SvBHist(ax=axes[0,1], evts=regionB, att=att, attoptions=options, order=order, **kwargs)
-            self.plot_SvBHist(ax=axes[1,0], evts=regionC, att=att, attoptions=options, order=order, **kwargs)
-            self.plot_SvBHist(ax=axes[1,1], evts=regionD, att=att, attoptions=options, order=order, **kwargs)
-
-            fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'), dpi=300, bbox_inches='tight', pad_inches=0.1)
+            if title: fig.suptitle(title)
+            
+            for ax, subtitle in zip(axes.flat, subtitles):
+                PlotStyle.setup_cms_style(ax, lumi=lumi)
+                PlotStyle.setup_axis(ax, xlabel=xlabel, title=subtitle)
+            
+            order = None
+            for idx, region in enumerate(regions):
+                ax = axes.flat[idx]
+                order = self.plot_SvBHist(
+                    ax=ax,
+                    evts=region,
+                    att=att,
+                    attoptions=options,
+                    order=order,
+                    **kwargs
+                )
+            
+            fig.savefig(
+                pjoin(self.outdir, f'{att}{save_name}.png'),
+                dpi=300,
+                bbox_inches='tight',
+                pad_inches=0.1
+            )
+    
         
 class ObjectPlotter():
-    def __init__(self):
-        pass
-    
-    @staticmethod
-    def set_style_with_ratio(title: 'str', x_label, top_ylabel, bottom_ylabel, num_figure=1, set_log=False, lumi=None):
-        """Set the style of the plot to CMS HEP with ratio plot as bottom panel.
-        
-        Parameters
-        - `title`: the title of the plot
-        - `x_label`: (str or list of str) the xlabel of the plot
-        - `top_ylabel`: the ylabel of the top panel
-        - `bottom_ylabel`: the ylabel of the bottom panel
-        - `num_figure`: the number of figures (each with two panels top-down) to be plotted"""
-        fig = plt.figure(figsize=(8*num_figure, 6))
-        fig.suptitle(title, fontsize=14)
-        hep.style.use("CMS")
-        gs = fig.add_gridspec(2, 1*num_figure, height_ratios=(4, 1))
-        ax2s = [None] * num_figure
-        axs = [None] * num_figure
-        x_label = [x_label] if not isinstance(x_label, list) else x_label
-        top_ylabel = [top_ylabel] if not isinstance(top_ylabel, list) else top_ylabel
-        bottom_ylabel = [bottom_ylabel] if not isinstance(bottom_ylabel, list) else bottom_ylabel
-        for i in range(num_figure):
-            ax2s[i] = fig.add_subplot(gs[1,i])
-            axs[i] = fig.add_subplot(gs[0,i], sharex=ax2s[i])
-            hep.cms.label(ax=axs[i], loc=2, label='Work in Progress', fontsize=11, com=13.6, lumi=lumi)
-            axs[i].set_ylabel(top_ylabel[i], fontsize=12)
-            axs[i].tick_params(axis='both', which='major', labelsize=10, length=0, labelbottom=False)
-            ax2s[i].yaxis.get_offset_text().set_fontsize(11)  # Adjust the font size as needed
-            ax2s[i].set_ylabel(bottom_ylabel[i], fontsize=11)
-            ax2s[i].set_xlabel(x_label[i], fontsize=12)
-            ax2s[i].tick_params(axis='both', which='major', labelsize=10, length=0)
-            if set_log: ax2s[i].set_yscale('log')
-
-        fig.subplots_adjust(hspace=0.15)
-        
-        return fig, axs, ax2s
-
-
-    @staticmethod
-    def set_style(title, xlabel='', subtitles='', n_row=1, n_col=1, year=None, lumi=220) -> tuple:
-        """Set the style of the plot to CMS HEP.
-        
-        Return 
-        - `fig`: the figure object
-        - `axes`: the axes object"""
-
-        fig, axes = plt.subplots(n_row, n_col, figsize=(8*n_col, 5*n_row))
-        fig.suptitle(title, fontsize=14)
-        hep.style.use("CMS")
-
-        if not isinstance(axes, np.ndarray):
-            axes = np.array([axes])
-            xlabel = [xlabel] if isinstance(xlabel, str) else xlabel
-            subtitles = [subtitles] if isinstance(subtitles, str) else subtitles
-
-        for i, ax in enumerate(axes.flat):
-            hep.cms.label(ax=ax, loc=2, label='Work in Progress', fontsize=11, com=13.6, lumi=lumi, year=year)
-            ax.set_xlabel(xlabel[i], fontsize=12)
-            ax.set_ylabel("Events", fontsize=12)
-            ax.set_prop_cycle('color', colors)
-            ax.tick_params(axis='both', which='major', labelsize=10, length=0)
-            ax.set_title(subtitles[i], fontsize=12)
-            for spine in ax.spines.values():
-                spine.set_linewidth(0.5)
-        return fig, axes
-
     @staticmethod
     def plot_var(ax, hist, bin_edges: np.ndarray, label, xrange, **kwargs):
-        """A wrapper around the histplot function in mplhep to plot the histograms.
-        
-        Parameters
-        - `hist`: np.ndarray object as histogram, or a list of histograms
-        - `bin_edges`: the bin edges
-        """
+        """Plot histograms on an axis"""
         hep.histplot(hist, bins=bin_edges, label=label, ax=ax, linewidth=1.5, **kwargs)
         ax.legend(fontsize=12, loc='upper right')
         ax.set_xlim(*xrange)
-        ax.legend(fontsize=12, loc='upper right')
     
     @staticmethod
     def plot_var_with_err(ax, ax2, hist_list, wgt_list, bins, label, xrange, **kwargs):
-        """Plot the histograms with error bars in a second panel.
-        
-        Parameters
-        - `hist_list`: the list of histograms (un-normalized)
-        - `wgt_list`: the list of weights array"""
+        """Plot histograms with error bars and ratio panel"""
         bin_width = bins[1] - bins[0]
-
-        color = colors[0:len(hist_list)]
-
+        colors = PlotStyle.COLORS[:len(hist_list)]
+        
         norm_hist_list = []
         norm_err_list = []
         for hist, wgt in zip(hist_list, wgt_list):
-            norm_hist_list.append(hist / (np.sum(wgt) * bin_width))
-            norm_err_list.append(np.sqrt(hist) / (np.sum(wgt) * bin_width))
-    
-        ObjectPlotter.plot_var(ax, norm_hist_list, bins, label, xrange, histtype='step', alpha=1.0, color=color, **kwargs) 
-
-        np.seterr(divide='ignore', invalid='ignore')
-
+            norm_hist, norm_err = HistogramHelper.normalize_histogram(hist, wgt, bin_width)
+            norm_hist_list.append(norm_hist)
+            norm_err_list.append(norm_err)
+        
+        ObjectPlotter.plot_var(ax, norm_hist_list, bins, label, xrange,
+            histtype='step', alpha=1.0, color=colors, **kwargs
+        )
+        
         error_x = (bins[:-1] + bins[1:])/2
-
+        ObjectPlotter._plot_ratio_panel(ax2, hist_list, norm_hist_list, norm_err_list, error_x, colors)
+    
+    @staticmethod
+    def _plot_ratio_panel(ax2, hist_list, norm_hist_list, norm_err_list, error_x, colors):
+        """Plot the ratio panel"""
         if len(hist_list) == 2:
-            ratio = np.nan_to_num(hist_list[1] / hist_list[0], nan=0., posinf=0.)
-            ratio_err = np.nan_to_num(ratio * np.sqrt((norm_err_list[0]/norm_hist_list[0])**2 + (norm_err_list[1]/norm_hist_list[1])**2), nan=0., posinf=0.)
+            ratio, ratio_err = HistogramHelper.calc_ratio_and_errors(
+                hist_list[1], hist_list[0],
+                norm_err_list[1], norm_err_list[0]
+            )
             ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color='black')
         else:
             for i in range(1, len(hist_list)):
-                ratio = np.nan_to_num(hist_list[i] / hist_list[0], nan=0., posinf=0.)
-                ratio_err = np.nan_to_num(ratio * np.sqrt((norm_err_list[i]/norm_hist_list[i])**2 + (norm_err_list[0]/norm_hist_list[0])**2), nan=0., posinf=0.)
-                ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color=color[i])
+                ratio, ratio_err = HistogramHelper.calc_ratio_and_errors(
+                    hist_list[i], hist_list[0],
+                    norm_err_list[i], norm_err_list[0]
+                )
+                ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color=colors[i])
+        
         ax2.axhline(1, color='gray', linestyle='--', linewidth=1)
         ax2.set_ylim(0.5, 1.5)
     
     @staticmethod
     def plotSigVBkg(ax, sig_hists, bkg_hists, bin_edges, sig_label, bkg_label, xrange, **kwargs):
-        """Plot the signal and background histograms.
-        
-        Parameters
-        - `ax`: the axis to be plotted
-        - `sig_hists`: the signal histograms
-        - `bkg_hists`: the background histograms
-        - `bin_edges`: the bin edges
-        """
-        s_colors = ['red', 'blue', 'forestgreen']
-        hep.histplot(bkg_hists, bins=bin_edges, label=bkg_label, ax=ax, histtype='fill', alpha=0.6, stack=True, linewidth=1)
-        hep.histplot(sig_hists, bins=bin_edges, ax=ax, color=s_colors[0: len(sig_hists)], label=sig_label, stack=False, histtype='step', alpha=1.0, linewidth=1.5)
+        """Plot signal and background histograms"""
+        hep.histplot(
+            bkg_hists, bins=bin_edges, label=bkg_label,
+            ax=ax, histtype='fill', alpha=0.6,
+            stack=True, linewidth=1
+        )
+        hep.histplot(
+            sig_hists, bins=bin_edges, ax=ax,
+            color=PlotStyle.SIGNAL_COLORS[:len(sig_hists)],
+            label=sig_label, stack=False,
+            histtype='step', alpha=1.0, linewidth=1.5
+        )
         ax.set_xlim(*xrange)
         ax.set_ylim(bottom=0)
         ax.legend(fontsize=12, loc='upper right')
-        
+
+  
     @staticmethod
     def hist_arr(arr, bins: int, range: list[int, int], weights=None, density=False, keep_overflow=True) -> tuple[np.ndarray, np.ndarray]:
         """Wrapper around numpy histogram function to deal with overflow.
