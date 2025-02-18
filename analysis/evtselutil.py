@@ -138,4 +138,5 @@ class TriggerEventSelections(BaseEventSelections):
             if value:
                 self.objsel.add(trigname, events[trigname])
             else:
-                self.objsel.add(trigname, events[~trigname])
+                inverted = ~events[trigname]
+                self.objsel.add(trigname, inverted)
