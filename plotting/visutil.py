@@ -369,25 +369,26 @@ class ObjectPlotter():
         )
         
         error_x = (bins[:-1] + bins[1:])/2
-        ObjectPlotter._plot_ratio_panel(ax2, hist_list, norm_hist_list, norm_err_list, error_x, colors)
-    
+
+        ObjectPlotter._plot_ratio_panel(ax2, norm_hist_list, norm_err_list, error_x, colors)
+
     @staticmethod
-    def _plot_ratio_panel(ax2, hist_list, norm_hist_list, norm_err_list, error_x, colors):
+    def _plot_ratio_panel(ax2, norm_hist_list, norm_err_list, error_x, colors):
         """Plot the ratio panel"""
-        if len(hist_list) == 2:
+        if len(norm_hist_list) == 2:
             ratio, ratio_err = HistogramHelper.calc_ratio_and_errors(
-                hist_list[1], hist_list[0],
+                norm_hist_list[1], norm_hist_list[0],
                 norm_err_list[1], norm_err_list[0]
             )
             ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color='black')
         else:
-            for i in range(1, len(hist_list)):
+            for i in range(1, len(norm_hist_list)):
                 ratio, ratio_err = HistogramHelper.calc_ratio_and_errors(
-                    hist_list[i], hist_list[0],
+                    norm_hist_list[i], norm_hist_list[0],
                     norm_err_list[i], norm_err_list[0]
                 )
                 ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color=colors[i])
-        
+
         ax2.axhline(1, color='gray', linestyle='--', linewidth=1)
         ax2.set_ylim(0.5, 1.5)
     

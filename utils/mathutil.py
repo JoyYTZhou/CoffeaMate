@@ -1,6 +1,8 @@
 # adapted from https://github.com/bu-cms/projectcoffea/blob/master/projectcoffea/helpers/helpers.py
 import numpy as np
 import os
+import pandas as pd
+from scipy.stats import pearsonr
 from src.analysis.objutil import Object
 
 pjoin = os.path.join
@@ -58,6 +60,84 @@ class MathUtil:
         df[f'{sys_name}_eta'] = inv_sys.eta
         df[f'{sys_name}_phi'] = inv_sys.phi
         df[f'{sys_name}_mass'] = inv_sys.mass
+
+class ABCDUtil:
+    def __init__(self, dfA, dfB, dfC, dfD, weight=None):
+        self.dfA = dfA
+        self.dfB = dfB
+        self.dfC = dfC
+        self.dfD = dfD
+        self.weight = weight
+    
+    def get_all_stats(self):
+        """Get all stats of the ABCD method."""
+        print(self.ABCD_table(self.dfA, self.dfB, self.dfC, self.dfD, weight=self.weight))
+        print("====================================")
+        print("The closure stats for Events (Raw): ")
+        print(self.ABCD_closure(len(self.dfA), len(self.dfB), len(self.dfC), len(self.dfD)))
+        print("====================================")
+        print("The closure stats for Events (Weighted): ")
+        print(self.ABCD_closure(self.dfA['weight'].sum(), self.dfB['weight'].sum(), self.dfC['weight'].sum(), self.dfD['weight'].sum()))
+        
+    @staticmethod
+    def ABCD_closure(N_A, N_B, N_C, N_D) -> pd.DataFrame:
+        """Calculate the closure of the ABCD method."""
+        N_A_Pred = int(N_B * N_C / N_D)
+        sigma = N_A_Pred * np.sqrt(1/N_B + 1/N_C + 1/N_D) 
+        deviation = (N_A - N_A_Pred) / sigma
+        difference = abs((N_A - N_A_Pred)/N_A) * 100
+        pull = (N_A - N_A_Pred) / np.sqrt(N_A + N_A_Pred)
+        ratio = N_A_Pred / N_A
+        results = {
+            'Metric': [
+                'Predicted events in A',
+                'Prediction/Actual ratio',
+                'Pull significance',
+                'Deviation',
+                'Percentage difference'
+            ],
+            'Value': [
+                f'{N_A_Pred} ± {sigma:.2f}',
+                f'{ratio:.3f}',
+                f'{pull:.3f}',
+                f'{deviation:.3f}',
+                f'{difference:.1f}%'
+            ]
+        }
+        return pd.DataFrame(results).set_index('Metric')
+    
+    @staticmethod
+    def ABCD_plot(dfA, dfB, dfC, dfD):
+        """Plot the ABCD method."""
+        pass
+
+    @staticmethod
+    def ABCD_table(dfA, dfB, dfC, dfD, weight=None) -> pd.DataFrame:
+        """Print the ABCD method report."""
+        count_A = len(dfA)
+        count_B = len(dfB)
+        count_C = len(dfC)
+        count_D = len(dfD)
+
+        if weight is None:
+            table = {
+                'Region': ['Region A', 'Region B', 'Region C', 'Region D'],
+                'Events': [count_A, count_B, count_C, count_D]
+            }
+        else:
+            table = {
+                'Region': ['Region A', 'Region B', 'Region C', 'Region D'],
+                'Events (Raw)': [count_A, count_B, count_C, count_D],
+                'Events (Weighted)': [int(dfA[weight].sum()), int(dfB[weight].sum()), int(dfC[weight].sum()), int(dfD[weight].sum())]
+            }
+        return pd.DataFrame(table).set_index('Region')
+    
+    @staticmethod
+    def pearson_corr(df, X, Y):
+        df['X_num'] = df[X].astype(int)
+        corr_coeff, pval = pearsonr(df['X_num'], df[Y])
+        print(f'Pearson Correlation Coefficient: {corr_coeff}')
+        print(f'P-value: {pval}')
 
 def poisson_errors(obs, alpha=1 - 0.6827) -> tuple[np.ndarray, np.ndarray]:
     """
