@@ -16,7 +16,7 @@ class Processor:
     """Process individual file or filesets given strings/dicts belonging to one dataset.
     
     Attributes
-    - `rtcfg`: runtime configuration object
+    - `rtcfg`: runtime configuration object, dict-like
     - `dsdict`: dictionary containing file information
     - `dataset`: dataset name
     - `evtsel_kwargs`: keyword arguments for event selection class
@@ -164,8 +164,12 @@ class Processor:
     def writeak(self, passed: 'ak.Array', suffix, fields=None) -> int:
         """Writes an awkward array to a root file. Wrapper around ak_to_root."""
         rc = 0
+        outputname = pjoin(self.outdir, f'{self.dataset}_{suffix}.root') 
+        if len(passed) == 0:
+            print(f"Warning: No events passed the selection, writing an empty placeholder ROOT file {outputname}")
+            self.write_empty(outputname)
         if fields is None:
-            ak_to_root(pjoin(self.outdir, f'{self.dataset}_{suffix}.root'), passed, tree_name='Events',
+            ak_to_root(outputname, passed, tree_name='Events',
                        counter_name=lambda counted: 'n' + counted, 
                        field_name=lambda outer, inner: inner if outer == "" else outer + "_" + inner,
                        storage_options=None, compression="ZLIB", compression_level=1, title="", initial_basket_capacity=50, resize_factor=5)
@@ -186,3 +190,9 @@ class Processor:
         with open(finame, 'wb') as f:
             pickle.dump(passed, f)
         return 0
+    
+    @staticmethod
+    def write_empty(filename):
+        """Creates an empty ROOT file as a placeholder."""
+        with uproot.recreate(filename):
+            pass  # Do nothing, just create an empty file
