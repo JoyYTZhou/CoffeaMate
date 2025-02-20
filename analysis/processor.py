@@ -7,7 +7,7 @@ import pandas as pd
 import dask_awkward as dak
 import dask
 import awkward as ak
-import gc
+import gc, psutil
 
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper
 from src.analysis.evtselutil import BaseEventSelections
