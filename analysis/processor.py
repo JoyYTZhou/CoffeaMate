@@ -49,19 +49,19 @@ class Processor:
         self.filehelper.checkpath(self.outdir)
         self.filehelper.checkpath(self.copydir)
     
-    def loadfile_remote(self, fileargs: dict) -> ak.Array:
+    def loadfile_remote(self, fileargs: dict, **kwargs) -> ak.Array:
         """This is a wrapper function around uproot._dask.
         
         - `fileargs`: {"files": {filename1: fileinfo1}, ...}"""
         if self.rtcfg.get("DELAYED_OPEN", True):
-            events = uproot.dask(**fileargs)
+            events = uproot.dask(**fileargs, **kwargs)
         else:
             print(f"Loading {list(fileargs['files'].keys())[0]}")
             filename = list(fileargs['files'].keys())[0]
             # temporary solution
             if not filename.endswith(":Events"):
                 filename += ":Events"
-            events = uproot.open(filename).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
+            events = uproot.open(filename, **kwargs).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
         return events
     
     def loadfile_local(self, fileargs: dict) -> ak.Array:

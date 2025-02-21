@@ -2,27 +2,31 @@
 import dask
 import pandas as pd
 import awkward as ak
-
+from typing import Optional
 from src.utils.coffeautil import weightedSelection
 from src.analysis.objutil import Object
+from functools import lru_cache
 
 class BaseEventSelections:
-    """Base class for event selections.
-    """
-    def __init__(self, trigcfg, objselcfg, mapcfg, sequential=True) -> None:
-        """Initialize the event selection object with the given selection configurations.
+    def __init__(self, 
+                 trigcfg: dict[str, bool], 
+                 objselcfg: dict[str, dict[str, float]], 
+                 mapcfg: dict[str, dict[str, str]], 
+                 sequential: bool = True) -> None:
+        """Initialize the event selection object.
         
-        Parameters
-        - `trigcfg`: trigger configuration, {key=triggername, value=bool (whether to apply)}
-        - `objselcfg`: object selection configuration, {key=AODPrefix, value={key=abbreviation, value=threshold}}. AODPrefix example: Electron, Muon, Jet
-        - `mapcfg`: mapping configuration, {key=AODPrefix, value={key=abbreviation, value=nanoaodname}}
-        - `sequential`: whether the selections will be applied sequentially"""
+        Args:
+            trigcfg: Trigger configuration mapping trigger names to boolean flags
+            objselcfg: Object selection configuration mapping AOD prefixes to selection criteria
+            mapcfg: Mapping configuration for converting between AOD and NANOAOD names
+            sequential: Whether selections should be applied sequentially
+        """
         self._trigcfg = trigcfg
         self._objselcfg = objselcfg
         self._mapcfg = mapcfg
         self._sequential = sequential
-        self.objsel = None
-        self.objcollect = {}
+        self.objsel: Optional[weightedSelection] = None
+        self.objcollect: dict = {}
         self.cfno = None
         self.cfobj = None
     
@@ -32,6 +36,15 @@ class BaseEventSelections:
     def __call__(self, events, wgtname='Generator_weight', **kwargs):
         """Apply all the selections in line on the events"""
         return self.callevtsel(events, wgtname=wgtname, **kwargs)
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.objsel = None
+        self.objcollect.clear()
+        self.cfno = None
+        self.cfobj = None
 
     @property
     def trigcfg(self):
@@ -83,13 +96,10 @@ class BaseEventSelections:
             return result
         else:
             return self.objcollect_to_df() 
-
+    
+    @lru_cache(maxsize=32)
     def cf_to_df(self) -> pd.DataFrame:
-        """Return a dataframe for a single EventSelections.cutflow object.
-        DASK GETS COMPUTED!
-        :return: cutflow df
-        :rtype: pandas.DataFrame
-        """
+        """Return a dataframe for a single EventSelections.cutflow object."""
         row_names = self.cfno.labels
         dfdata = {}
         if self.cfno.wgtevcutflow is not None:
@@ -97,12 +107,14 @@ class BaseEventSelections:
             dfdata['wgt'] = wgt_number
         number = dask.compute(self.cfno.nevcutflow)[0]
         dfdata['raw'] = number
-        df_cf = pd.DataFrame(dfdata, index=row_names)
-        return df_cf
-
+        return pd.DataFrame(dfdata, index=row_names)
+    
     def objcollect_to_df(self) -> pd.DataFrame:
         """Return a dataframe for the collected objects."""
-        listofdf = [Object.object_to_df(zipped, prefix+'_') for prefix, zipped in self.objcollect.items()]
+        # Pre-allocate list with known size
+        listofdf = [None] * len(self.objcollect)
+        for i, (prefix, zipped) in enumerate(self.objcollect.items()):
+            listofdf[i] = Object.object_to_df(zipped, f"{prefix}_")
         return pd.concat(listofdf, axis=1)
     
     def selobjhelper(self, events: ak.Array, name, obj: Object, mask: 'ak.Array') -> tuple[Object, ak.Array]:
