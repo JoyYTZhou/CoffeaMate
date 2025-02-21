@@ -70,11 +70,11 @@ class Processor:
         if filename.endswith(":Events"): filename = list(fileargs['files'].keys())[0].split(":Events")[0]
         XRootDHelper.copy_local(filename, pjoin(self.copydir, "copy.root"))
         new_filename = pjoin(self.copydir, "copy.root")
-        new_filename += ":Events"
         new_fileargs = {"files": {new_filename: fileargs['files'][filename]}}
         if self.rtcfg.get("DELAYED_OPEN", True):
             events = uproot.dask(**new_fileargs, **kwargs)
         else:
+            new_filename += ":Events"
             events = uproot.open(new_filename, **kwargs).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
         return events
 
