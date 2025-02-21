@@ -75,7 +75,7 @@ class Processor:
             events = uproot.dask(**new_fileargs, **kwargs)
         else:
             new_filename += ":Events"
-            events = uproot.open(new_filename, **kwargs).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
+            events = uproot.open(new_filename).arrays(**kwargs)
         return events
 
     def runfiles(self, write_npz=False, **kwargs):
