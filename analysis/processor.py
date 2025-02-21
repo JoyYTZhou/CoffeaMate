@@ -139,6 +139,7 @@ class Processor:
 
         if self.transfer is not None:
             self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True)
+            print(f"Files transferred to: {self.transfer}" )
         return rc
 
     def writedask(self, passed, suffix, parquet=False, fields=None) -> int:
