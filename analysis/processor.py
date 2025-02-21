@@ -1,30 +1,20 @@
 # This file contains the Processor class, which is used to process individual files or filesets.
 # The behavior of the Processor class is highly dependent on run time configurations and the event selection class used.
 import uproot._util
-import uproot, pickle
+import uproot, pickle, gc
 from uproot.writing._dask_write import ak_to_root
 import pandas as pd
 import dask_awkward as dak
 import dask
 import awkward as ak
-import gc, psutil
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
 
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper
 from src.analysis.evtselutil import BaseEventSelections
 
 class Processor:
-    """Process individual file or filesets given strings/dicts belonging to one dataset.
-    
-    Attributes
-    - `rtcfg`: runtime configuration object, dict-like
-    - `dsdict`: dictionary containing file information
-    - `dataset`: dataset name
-    - `evtsel_kwargs`: keyword arguments for event selection class
-    - `evtselclass`: event selection class
-    - `transfer`: transfer object
-    - `filehelper`: file system helper object
-    - `outdir`: output directory
-    - `evtsel`: event selection object alive"""
+    """Process individual file or filesets given strings/dicts belonging to one dataset."""
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
         """
         Parameters
@@ -39,6 +29,7 @@ class Processor:
         self.transfer = transferP
         self.filehelper = FileSysHelper()
         self.initdir()
+        self.copy_queue = Queue(maxsize=2)
     
     def initdir(self) -> None:
         """Initialize the output directory and copy directory if necessary.
@@ -49,33 +40,37 @@ class Processor:
         self.filehelper.checkpath(self.outdir)
         self.filehelper.checkpath(self.copydir)
     
-    def loadfile_remote(self, fileargs: dict, **kwargs) -> ak.Array:
-        """This is a wrapper function around uproot._dask.
-        
-        - `fileargs`: {"files": {filename1: fileinfo1}, ...}"""
-        if self.rtcfg.get("DELAYED_OPEN", True):
+    def loadfile(self, fileargs: dict, copy_local: bool = False, **kwargs) -> ak.Array:
+        """Load a ROOT file either directly or after copying locally.
+
+        Parameters
+        - fileargs: {"files": {filename1: fileinfo1}, ...}
+        - copy_local: if True, copy the file locally before loading
+        - kwargs: additional arguments passed to uproot.open() or uproot.dask()
+
+        Returns
+        - events as an awkward array
+        """
+        filename = list(fileargs['files'].keys())[0]
+        suffix = fileargs['files'][filename]['uuid']
+
+        if copy_local:
+            if filename.endswith(":Events"):
+                filename = filename.split(":Events")[0]
+            XRootDHelper.copy_local(filename, pjoin(self.copydir, f"{suffix}.root"))
+            filename = pjoin(self.copydir, f"{suffix}.root")
+            fileargs = {"files": {filename: fileargs['files'][list(fileargs['files'].keys())[0]]}}
+
+        delayed_open = self.rtcfg.get("DELAYED_OPEN", True)
+        if delayed_open:
             events = uproot.dask(**fileargs, **kwargs)
         else:
-            print(f"Loading {list(fileargs['files'].keys())[0]}")
-            filename = list(fileargs['files'].keys())[0]
-            # temporary solution
+            print(f"Loading {filename}")
             if not filename.endswith(":Events"):
                 filename += ":Events"
-            events = uproot.open(filename, **kwargs).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
-        return events
-    
-    def loadfile_local(self, fileargs: dict, **kwargs) -> ak.Array:
-        """Copy the file to the copy directory and load it."""
-        filename = list(fileargs['files'].keys())[0]
-        if filename.endswith(":Events"): filename = list(fileargs['files'].keys())[0].split(":Events")[0]
-        XRootDHelper.copy_local(filename, pjoin(self.copydir, "copy.root"))
-        new_filename = pjoin(self.copydir, "copy.root")
-        new_fileargs = {"files": {new_filename: fileargs['files'][filename]}}
-        if self.rtcfg.get("DELAYED_OPEN", True):
-            events = uproot.dask(**new_fileargs, **kwargs)
-        else:
-            new_filename += ":Events"
-            events = uproot.open(new_filename).arrays(**kwargs)
+            events = uproot.open(filename, **kwargs).arrays(
+                filter_name=self.rtcfg.get("FILTER_NAME", None)
+            )
         return events
 
     def runfiles(self, write_npz=False, **kwargs):
