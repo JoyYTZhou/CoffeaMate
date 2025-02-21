@@ -64,7 +64,7 @@ class Processor:
             events = uproot.open(filename, **kwargs).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
         return events
     
-    def loadfile_local(self, fileargs: dict) -> ak.Array:
+    def loadfile_local(self, fileargs: dict, **kwargs) -> ak.Array:
         """Copy the file to the copy directory and load it."""
         filename = list(fileargs['files'].keys())[0]
         if filename.endswith(":Events"): filename = list(fileargs['files'].keys())[0].split(":Events")[0]
@@ -73,9 +73,9 @@ class Processor:
         new_filename += ":Events"
         new_fileargs = {"files": {new_filename: fileargs['files'][filename]}}
         if self.rtcfg.get("DELAYED_OPEN", True):
-            events = uproot.dask(**new_fileargs)
+            events = uproot.dask(**new_fileargs, **kwargs)
         else:
-            events = uproot.open(new_filename).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
+            events = uproot.open(new_filename, **kwargs).arrays(filter_name=self.rtcfg.get("FILTER_NAME", None))
         return events
 
     def runfiles(self, write_npz=False, **kwargs):
