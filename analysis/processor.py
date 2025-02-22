@@ -194,6 +194,9 @@ class Processor:
                     if events is not None:
                         future_events[suffix] = executor.submit(evtsel, events)
                         events = future_events[suffix].result()
+                        
+                        if hasattr(events, 'persist'):
+                            events.persist()
 
                         future_cf.append(executor.submit(writeCF, evtsel, suffix, self.outdir, self.dataset))
                         future_evts.append(executor.submit(self.writeevts, events, suffix, **kwargs))
@@ -213,7 +216,6 @@ class Processor:
         if self.transfer:
             for cutflow_file in cutflow_files:
                 self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True)
-        
 
         if not self.rtcfg.get("REMOTE_LOAD", True):
             self.filehelper.remove_files(self.copydir)
