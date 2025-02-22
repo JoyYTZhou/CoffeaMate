@@ -103,15 +103,51 @@ class Processor:
             )
         return events
 
-    def runfiles(self, write_npz=False, **kwargs):
-        """Run test selections on file dictionaries.
+    def run_skims(self, write_npz=False, readkwargs={}, writekwargs={}, **kwargs) -> int:
+        """Process files in parallel. Must involve copying files to a local directory. Most suitable for remote processing and skimming operations."""
+        print(f"Expected to see {len(self.dsdict['files'])} outputs")
+        rc = 0
 
-        Parameters
-        - write_npz: if write cutflow out
-        
-        Returns
-        - number of failed files
-        """
+        events_list = parallel_copy_and_load(
+            fileargs={"files": self.dsdict["files"]},
+            copydir=self.copydir,
+            rtcfg=self.rtcfg,
+            read_args=readkwargs
+        )
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+
+            future_events = {}  # For event selection
+            future_cf = []  # For cutflow writing
+            future_evts = []  # For event writing
+
+            for events, suffix in events_list:
+                try:
+                    self.evtsel = self.evtselclass(**self.evtsel_kwargs)
+                    if events is not None:
+                        future_events[suffix] = executor.submit(self.evtsel, events)
+                        future_events[suffix] = future_events[suffix].result()
+                        future_cf.append(executor.submit(self.writeCF, suffix, write_npz=write_npz))
+                        future_evts.append(executor.submit(self.writeevts, events, suffix, **kwargs))
+                    else:
+                        rc += 1
+                        gc.collect()
+                        continue
+                except Exception as e:
+                    print(f"Error encountered for file with suffix {suffix} in {self.dataset}: {e}")
+                    rc += 1
+                    gc.collect()
+
+            concurrent.futures.wait(future_cf)
+            concurrent.futures.wait(future_evts)
+
+        if not self.rtcfg.get("REMOTE_LOAD", True):
+            self.filehelper.remove_files(self.copydir)
+
+        return rc
+
+    def runfiles_sequential(self, write_npz=False, **kwargs) -> int:
+        """Process files sequentially."""
         print(f"Expected to see {len(self.dsdict['files'])} outputs")
         rc = 0
         for filename, fileinfo in self.dsdict["files"].items():
@@ -136,7 +172,7 @@ class Processor:
         return rc
     
     def writeCF(self, suffix, **kwargs) -> str:
-        """Write the cutflow to a file. Transfer the file if necessary"""
+        """Write the cutflow to a file."""
         if kwargs.get('write_npz', False):
             npzname = pjoin(self.outdir, f'cutflow_{suffix}.npz')
             self.evtsel.cfobj.to_npz(npzname)

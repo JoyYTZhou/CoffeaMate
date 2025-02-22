@@ -33,7 +33,7 @@ class BaseEventSelections:
     def __del__(self):
         print(f"Deleting instance of {self.__class__.__name__}")
     
-    def __call__(self, events, wgtname='Generator_weight', **kwargs):
+    def __call__(self, events, wgtname='Generator_weight', **kwargs) -> ak.Array:
         """Apply all the selections in line on the events"""
         return self.callevtsel(events, wgtname=wgtname, **kwargs)
     
@@ -72,7 +72,7 @@ class BaseEventSelections:
         """
         pass
 
-    def callevtsel(self, events, wgtname, compute=False):
+    def callevtsel(self, events, wgtname, compute=False) -> ak.Array:
         """Apply all the selections in line on the events
         Parameters
         
