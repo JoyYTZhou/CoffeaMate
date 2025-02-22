@@ -44,6 +44,73 @@ def parallel_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3):
 
     return results
 
+def compute_dask_array(passed) -> ak.Array:
+    """Compute the dask array and handle zero-length partitions."""
+    if hasattr(passed, 'npartitions'):
+        passed = passed.persist()
+
+        length_calcs = [dask.delayed(len)(passed.partitions[i]) for i in range(passed.npartitions)]
+        lengths = dask.compute(*length_calcs)
+
+        has_zero_lengths = any(l == 0 for l in lengths)
+
+        if not has_zero_lengths:
+            print("No zero-arrays found, using uproot.dask_write directly")
+            return passed
+        else:
+            print("Found zero-length partitions, filtering them out")
+            valid_indices = [i for i, l in enumerate(lengths) if l > 0]
+            if not valid_indices:
+                print("No valid partitions found, skipping write")
+                return None
+            else:
+                print("Valid indices: ", valid_indices)
+                valid_partitions = [passed.partitions[i] for i in valid_indices]
+                valid_data = dak.concatenate(valid_partitions)
+                computed_data = dask.compute(valid_data)[0]
+                return computed_data
+
+def write_dask_array(computed_array, outdir, dataset, suffix, write_args={}) -> int:
+    """Write array using appropriate method based on type."""
+    write_options = {
+        "initial_basket_capacity": 50,
+        "resize_factor": 1.5,
+        "compression": "ZLIB",
+        "compression_level": 1
+    }
+
+    if isinstance(computed_array, dak.Array):
+        uproot.dask_write(
+            computed_array, destination=outdir, tree_name="Events", compute=True,
+            prefix=f'{dataset}_{suffix}', **write_options, **write_args )
+    else:
+        output_path = pjoin(outdir, f'{dataset}_{suffix}.root')
+        ak_to_root(
+            output_path, 
+            computed_array,
+            tree_name="Events",
+            title="",
+            counter_name=lambda counted: 'n' + counted,
+            field_name=lambda outer, inner: inner if outer == "" else outer + "_" + inner,
+            storage_options=None,
+            **write_options
+        )
+    return 0
+
+def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
+    """Write the cutflow to a file."""
+    if write_npz:
+        npzname = pjoin(outdir, f'cutflow_{suffix}.npz')
+        evtsel.cfobj.to_npz(npzname)
+    cutflow_name = f'{dataset}_{suffix}_cutflow.csv'
+    cutflow_df = evtsel.cf_to_df() 
+    output_name = pjoin(outdir, cutflow_name)
+    cutflow_df.to_csv(output_name)
+    print("Cutflow written to local!")
+    return cutflow_name
+    # if self.transfer is not None:
+    #    self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_name, remove=True, overwrite=True)
+
 class Processor:
     """Process individual file or filesets given strings/dicts belonging to one dataset."""
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
@@ -123,15 +190,15 @@ class Processor:
 
             for events, suffix in events_list:
                 try:
-                    self.evtsel = self.evtselclass(**self.evtsel_kwargs)
+                    evtsel = self.evtselclass(**self.evtsel_kwargs)
                     if events is not None:
-                        future_events[suffix] = executor.submit(self.evtsel, events)
-                        future_events[suffix] = future_events[suffix].result()
-                        future_cf.append(executor.submit(self.writeCF, suffix, write_npz=write_npz))
+                        future_events[suffix] = executor.submit(evtsel, events)
+                        events = future_events[suffix].result()
+
+                        future_cf.append(executor.submit(writeCF, evtsel, suffix, self.outdir, self.dataset))
                         future_evts.append(executor.submit(self.writeevts, events, suffix, **kwargs))
                     else:
                         rc += 1
-                        gc.collect()
                         continue
                 except Exception as e:
                     print(f"Error encountered for file with suffix {suffix} in {self.dataset}: {e}")
@@ -140,6 +207,13 @@ class Processor:
 
             concurrent.futures.wait(future_cf)
             concurrent.futures.wait(future_evts)
+        
+        cutflow_files = [f.result() for f in future_cf]
+        
+        if self.transfer:
+            for cutflow_file in cutflow_files:
+                self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True)
+        
 
         if not self.rtcfg.get("REMOTE_LOAD", True):
             self.filehelper.remove_files(self.copydir)
@@ -170,21 +244,6 @@ class Processor:
                 gc.collect()
             if not remote_load: self.filehelper.remove_files(self.copydir)
         return rc
-    
-    def writeCF(self, suffix, **kwargs) -> str:
-        """Write the cutflow to a file."""
-        if kwargs.get('write_npz', False):
-            npzname = pjoin(self.outdir, f'cutflow_{suffix}.npz')
-            self.evtsel.cfobj.to_npz(npzname)
-        cutflow_name = f'{self.dataset}_{suffix}_cutflow.csv'
-        cutflow_df = self.evtsel.cf_to_df() 
-        output_name = pjoin(self.outdir, cutflow_name)
-        cutflow_df.to_csv(output_name)
-        print("Cutflow written to local!")
-        return output_name
-        # if self.transfer is not None:
-        #     self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_name, remove=True, overwrite=True)
-        # return 0
     
     def writeevts(self, passed, suffix, **kwargs) -> int:
         """Write the events to a file, filename formated as {dataset}_{suffix}*."""
