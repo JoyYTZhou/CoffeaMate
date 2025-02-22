@@ -7,9 +7,42 @@ import pandas as pd
 import dask_awkward as dak
 import dask
 import awkward as ak
+import concurrent.futures
 
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper
 from src.analysis.evtselutil import BaseEventSelections
+
+def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
+        """Handles file copying and loading"""
+        suffix = fileinfo['uuid']
+        dest_file = pjoin(copydir, f"{suffix}.root")
+        
+        XRootDHelper.copy_local(filename, dest_file)
+        
+        delayed_open = rtcfg.get("DELAYED_OPEN", True)
+        if delayed_open:
+            return (uproot.dask(files={dest_file: fileinfo}, **read_args), suffix)
+        else:
+            print(f"Loading {dest_file}")
+            return (uproot.open(dest_file + ":Events").arrays(**read_args), suffix)
+
+def parallel_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3):
+    """Runs file copying and loading in parallel"""
+    results = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_file = {
+            executor.submit(process_file, filename, fileinfo, copydir, rtcfg, read_args): filename
+            for filename, fileinfo in fileargs['files'].items()
+        }
+        
+        for future in concurrent.futures.as_completed(future_to_file):
+            try:
+                results.append(future.result())
+            except Exception as e:
+                print(f"Error processing {future_to_file[future]}: {e}")
+
+    return results
 
 class Processor:
     """Process individual file or filesets given strings/dicts belonging to one dataset."""
@@ -102,18 +135,20 @@ class Processor:
             if not remote_load: self.filehelper.remove_files(self.copydir)
         return rc
     
-    def writeCF(self, suffix, **kwargs) -> int:
+    def writeCF(self, suffix, **kwargs) -> str:
         """Write the cutflow to a file. Transfer the file if necessary"""
         if kwargs.get('write_npz', False):
             npzname = pjoin(self.outdir, f'cutflow_{suffix}.npz')
             self.evtsel.cfobj.to_npz(npzname)
         cutflow_name = f'{self.dataset}_{suffix}_cutflow.csv'
         cutflow_df = self.evtsel.cf_to_df() 
-        cutflow_df.to_csv(pjoin(self.outdir, cutflow_name))
+        output_name = pjoin(self.outdir, cutflow_name)
+        cutflow_df.to_csv(output_name)
         print("Cutflow written to local!")
-        if self.transfer is not None:
-            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_name, remove=True, overwrite=True)
-        return 0
+        return output_name
+        # if self.transfer is not None:
+        #     self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_name, remove=True, overwrite=True)
+        # return 0
     
     def writeevts(self, passed, suffix, **kwargs) -> int:
         """Write the events to a file, filename formated as {dataset}_{suffix}*."""
