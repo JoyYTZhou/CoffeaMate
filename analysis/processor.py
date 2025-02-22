@@ -7,8 +7,6 @@ import pandas as pd
 import dask_awkward as dak
 import dask
 import awkward as ak
-from concurrent.futures import ThreadPoolExecutor
-from queue import Queue
 
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper
 from src.analysis.evtselutil import BaseEventSelections
@@ -29,7 +27,6 @@ class Processor:
         self.transfer = transferP
         self.filehelper = FileSysHelper()
         self.initdir()
-        self.copy_queue = Queue(maxsize=2)
     
     def initdir(self) -> None:
         """Initialize the output directory and copy directory if necessary.
