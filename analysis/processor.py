@@ -176,18 +176,11 @@ class Processor:
         rc = 0
 
         events_list = parallel_copy_and_load(
-            fileargs={"files": self.dsdict["files"]},
-            copydir=self.copydir,
-            rtcfg=self.rtcfg,
-            read_args=readkwargs
-        )
+            fileargs={"files": self.dsdict["files"]}, copydir=self.copydir,
+            rtcfg=self.rtcfg, read_args=readkwargs)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-
-            future_events = {}  # For event selection
-            future_cf = []  # For cutflow writing
-            future_evts = []  # For event writing
-
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future_cf, future_events, future_evts = [], {}, []
             for events, suffix in events_list:
                 try:
                     evtsel = self.evtselclass(**self.evtsel_kwargs)
@@ -206,7 +199,6 @@ class Processor:
                 except Exception as e:
                     print(f"Error encountered for file with suffix {suffix} in {self.dataset}: {e}")
                     rc += 1
-                    gc.collect()
 
             concurrent.futures.wait(future_cf)
             concurrent.futures.wait(future_evts)
