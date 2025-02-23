@@ -3,7 +3,7 @@ import dask
 import pandas as pd
 import awkward as ak
 from typing import Optional
-from src.utils.coffeautil import weightedSelection
+from src.utils.coffeautil import weightedSelection, weightedCutflow
 from src.analysis.objutil import Object
 from functools import lru_cache
 
@@ -72,7 +72,7 @@ class BaseEventSelections:
         """
         pass
 
-    def callevtsel(self, events, wgtname, compute=False) -> ak.Array:
+    def callevtsel(self, events, wgtname, compute=False) -> tuple[ak.Array, 'BaseEventSelections']:
         """Apply all the selections in line on the events
         Parameters
         
@@ -93,9 +93,9 @@ class BaseEventSelections:
                 result = (passed, vetoed)
             else:
                 result = passed
-            return result
+            return result, self
         else:
-            return self.objcollect_to_df() 
+            return self.objcollect_to_df(), self
     
     @lru_cache(maxsize=32)
     def cf_to_df(self) -> pd.DataFrame:

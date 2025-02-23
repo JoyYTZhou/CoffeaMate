@@ -179,9 +179,18 @@ class Processor:
             fileargs={"files": self.dsdict["files"]}, copydir=self.copydir,
             rtcfg=self.rtcfg, read_args=readkwargs)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future_cf, future_events, future_evts = [], {}, []
-            for events, suffix in events_list:
+        print(f"Loaded {len(events_list)} files")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            future_events = {suffix: executor.submit(self.evtselclass(**self.evtsel_kwargs), events) for events, suffix in events_list}
+            concurrent.futures.wait(future_events.values())
+            passed_results = {suffix: future.result() for suffix, future in future_events.items()}
+
+            future_cf, future_evts = [], []
+            # future_cf, future_events, future_evts = [], {}, []
+            for suffix, future in future_events.items():
+                future.add_done_callback(lambda f, suffix=suffix: future_cf.append(executor.submit(writeCF, f.result(), suffix, self.outdir, self.dataset)))
+            # for events, suffix in events_list:
                 try:
                     evtsel = self.evtselclass(**self.evtsel_kwargs)
                     if events is not None:
