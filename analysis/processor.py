@@ -1,7 +1,7 @@
 # This file contains the Processor class, which is used to process individual files or filesets.
 # The behavior of the Processor class is highly dependent on run time configurations and the event selection class used.
 import uproot._util
-import uproot, pickle, gc
+import uproot, pickle, gc, logging
 from uproot.writing._dask_write import ak_to_root
 import pandas as pd
 import dask_awkward as dak
@@ -27,7 +27,6 @@ def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
                 print(f"Loaded {dest_file} with size {events.nbytes}")
             return (events, suffix)
         else:
-            print(f"Loading {dest_file}")
             return (uproot.open(dest_file + ":Events").arrays(**read_args), suffix)
 
 def parallel_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3):
@@ -44,6 +43,8 @@ def parallel_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3):
             try:
                 results.append(future.result())
             except Exception as e:
+                logging.error("error called from process_file")
+                logging.error(f"Error processing {future_to_file[future]}: {e}")
                 print(f"Error processing {future_to_file[future]}: {e}")
 
     return results
