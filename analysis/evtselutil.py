@@ -88,12 +88,7 @@ class BaseEventSelections:
             raise NotImplementedError("Events selections not set, this is base selection!")
         if not self.objcollect:
             passed = events[self.cfno.maskscutflow[-1]]
-            if compute: 
-                vetoed = events[~(self.objsel.all())]
-                result = (passed, vetoed)
-            else:
-                result = passed
-            return result, self
+            return passed, self
         else:
             return self.objcollect_to_df(), self
     
