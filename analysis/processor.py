@@ -21,7 +21,10 @@ def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
         
         delayed_open = rtcfg.get("DELAYED_OPEN", True)
         if delayed_open:
-            return (uproot.dask(files={dest_file: fileinfo}, **read_args), suffix)
+            events = uproot.dask(files={dest_file: fileinfo}, **read_args).persist()
+            if hasattr(events, 'nbytes'):
+                print(f"Loaded {dest_file} with size {events.nbytes}")
+            return (events, suffix)
         else:
             print(f"Loading {dest_file}")
             return (uproot.open(dest_file + ":Events").arrays(**read_args), suffix)
