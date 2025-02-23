@@ -17,14 +17,26 @@ def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
     suffix = fileinfo['uuid']
     dest_file = pjoin(copydir, f"{suffix}.root")
     
+    logging.debug(f"Copying {filename} to {dest_file}")
     XRootDHelper.copy_local(filename, dest_file)
     
     delayed_open = rtcfg.get("DELAYED_OPEN", True)
     if delayed_open:
-        # events = uproot.dask(files={dest_file: fileinfo}, **read_args).persist()
+        # First create the dask array
         events = uproot.dask(files={dest_file: fileinfo}, **read_args)
-        if hasattr(events, 'nbytes'):
-            print(f"Loaded {dest_file} with size {events.nbytes}")
+        
+        # Check if it has partitions and decide whether to persist
+        if hasattr(events, 'npartitions'):
+            nparts = events.npartitions
+            logging.debug(f"File {suffix} has {nparts} partitions")
+            
+            # Persist if number of partitions is below threshold
+            if nparts <= 7:  # You can adjust this threshold
+                logging.debug(f"Persisting events for {suffix} ({nparts} partitions)")
+                events = events.persist()
+            else:
+                logging.debug(f"Skipping persist for {suffix} due to high partition count ({nparts})")
+        
         return (events, suffix)
     else:
         return (uproot.open(dest_file + ":Events").arrays(**read_args), suffix)
