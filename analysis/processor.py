@@ -13,21 +13,21 @@ from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper
 from src.analysis.evtselutil import BaseEventSelections
 
 def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
-        """Handles file copying and loading"""
-        suffix = fileinfo['uuid']
-        dest_file = pjoin(copydir, f"{suffix}.root")
-        
-        XRootDHelper.copy_local(filename, dest_file)
-        
-        delayed_open = rtcfg.get("DELAYED_OPEN", True)
-        if delayed_open:
-            # events = uproot.dask(files={dest_file: fileinfo}, **read_args).persist()
-            events = uproot.dask(files={dest_file: fileinfo}, **read_args)
-            if hasattr(events, 'nbytes'):
-                print(f"Loaded {dest_file} with size {events.nbytes}")
-            return (events, suffix)
-        else:
-            return (uproot.open(dest_file + ":Events").arrays(**read_args), suffix)
+    """Handles file copying and loading"""
+    suffix = fileinfo['uuid']
+    dest_file = pjoin(copydir, f"{suffix}.root")
+    
+    XRootDHelper.copy_local(filename, dest_file)
+    
+    delayed_open = rtcfg.get("DELAYED_OPEN", True)
+    if delayed_open:
+        # events = uproot.dask(files={dest_file: fileinfo}, **read_args).persist()
+        events = uproot.dask(files={dest_file: fileinfo}, **read_args)
+        if hasattr(events, 'nbytes'):
+            print(f"Loaded {dest_file} with size {events.nbytes}")
+        return (events, suffix)
+    else:
+        return (uproot.open(dest_file + ":Events").arrays(**read_args), suffix)
 
 def parallel_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3):
     """Runs file copying and loading in parallel"""
