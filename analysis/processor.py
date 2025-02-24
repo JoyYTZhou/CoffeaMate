@@ -55,8 +55,7 @@ def parallel_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3):
             try:
                 results.append(future.result())
             except Exception as e:
-                logging.error("error called from process_file")
-                logging.error(f"Error processing {future_to_file[future]}: {e}")
+                logging.exception(f"Error copying and loading {future_to_file[future]}: {e}")
     return results
 
 def compute_dask_array(passed) -> ak.Array:
@@ -124,10 +123,8 @@ def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
     cutflow_df = evtsel.cf_to_df() 
     output_name = pjoin(outdir, cutflow_name)
     cutflow_df.to_csv(output_name)
-    print("Cutflow written to local!")
+    logging.debug("Cutflow written to %s", output_name)
     return cutflow_name
-    # if self.transfer is not None:
-    #    self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_name, remove=True, overwrite=True)
 
 class Processor:
     """Process individual file or filesets given strings/dicts belonging to one dataset."""
@@ -180,7 +177,7 @@ class Processor:
         if delayed_open:
             events = uproot.dask(**fileargs, **kwargs)
         else:
-            print(f"Loading {filename}")
+            logging.debug("Loading %s", filename)
             if not filename.endswith(":Events"):
                 filename += ":Events"
             events = uproot.open(filename, **kwargs).arrays(
@@ -221,7 +218,7 @@ class Processor:
                         rc += 1
                         continue
                 except Exception as e:
-                    print(f"Error encountered for file with suffix {suffix} in {self.dataset}: {e}")
+                    logging.exception(f"Error encountered for file with suffix {suffix} in {self.dataset}: {e}")
                     rc += 1
 
             concurrent.futures.wait(future_cf)
@@ -257,7 +254,7 @@ class Processor:
                     rc += 1
                 del events
             except Exception as e:
-                print(f"Error encountered for file index {suffix} in {self.dataset}: {e}")
+                logging.exception(f"Error encountered when sequentially processing file index {suffix} in {self.dataset}: {e}")
                 rc += 1
                 gc.collect()
             if not remote_load: self.filehelper.remove_files(self.copydir)
@@ -296,7 +293,7 @@ class Processor:
                 try:
                     uproot.dask_write(passed, destination=self.outdir, tree_name="Events", compute=True, prefix=f'{self.dataset}_{suffix}')
                 except MemoryError:
-                    print(f"dask_write encountered error: MemoryError for file index {suffix}.")
+                    logging.exception(f"MemoryError encountered in writing outputs with dask_write() for file index {suffix}.")
                     rc = 1
         else:
             dak.to_parquet(passed, destination=self.outdir, prefix=f'{self.dataset}_{suffix}')
