@@ -32,7 +32,8 @@ def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
             
             # Persist if number of partitions is below threshold
             if nparts <= 8:  # You can adjust this threshold
-                logging.debug(f"Persisting events for {suffix} ({nparts} partitions)")
+                logging.debug("Not persisting events")
+                # logging.debug(f"Persisting events for {suffix} ({nparts} partitions)")
                 # events = events.persist()
             else:
                 logging.debug(f"Skipping persist for {suffix} due to high partition count ({nparts})")
