@@ -31,7 +31,7 @@ def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
             logging.debug(f"File {suffix} has {nparts} partitions")
             
             # Persist if number of partitions is below threshold
-            if nparts <= 7:  # You can adjust this threshold
+            if nparts <= 8:  # You can adjust this threshold
                 logging.debug(f"Persisting events for {suffix} ({nparts} partitions)")
                 events = events.persist()
             else:
@@ -57,8 +57,6 @@ def parallel_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3):
             except Exception as e:
                 logging.error("error called from process_file")
                 logging.error(f"Error processing {future_to_file[future]}: {e}")
-                print(f"Error processing {future_to_file[future]}: {e}")
-
     return results
 
 def compute_dask_array(passed) -> ak.Array:
@@ -72,20 +70,23 @@ def compute_dask_array(passed) -> ak.Array:
         has_zero_lengths = any(l == 0 for l in lengths)
 
         if not has_zero_lengths:
-            print("No zero-arrays found, using uproot.dask_write directly")
+            logging.debug("No zero-arrays found, using uproot.dask_write directly")
             return passed
         else:
-            print("Found zero-length partitions, filtering them out")
+            logging.debug("Found zero-length partitions, filtering them out")
             valid_indices = [i for i, l in enumerate(lengths) if l > 0]
             if not valid_indices:
-                print("No valid partitions found, skipping write")
+                logging.debug("No valid partitions found, skipping write")
                 return None
             else:
-                print("Valid indices: ", valid_indices)
+                logging.debug("Valid indices: %s", valid_indices)
                 valid_partitions = [passed.partitions[i] for i in valid_indices]
                 valid_data = dak.concatenate(valid_partitions)
                 computed_data = dask.compute(valid_data)[0]
                 return computed_data
+    else:
+        logging.debug(f"passed is of type {type(passed)}")
+        return passed
 
 def write_dask_array(computed_array, outdir, dataset, suffix, write_args={}) -> int:
     """Write array using appropriate method based on type."""
@@ -189,14 +190,14 @@ class Processor:
 
     def run_skims(self, write_npz=False, readkwargs={}, writekwargs={}, **kwargs) -> int:
         """Process files in parallel. Must involve copying files to a local directory. Most suitable for remote processing and skimming operations."""
-        print(f"Expected to see {len(self.dsdict['files'])} outputs")
+        logging.debug("Expected to see %d outputs", len(self.dsdict['files']))
         rc = 0
 
         events_list = parallel_copy_and_load(
             fileargs={"files": self.dsdict["files"]}, copydir=self.copydir,
             rtcfg=self.rtcfg, read_args=readkwargs)
 
-        print(f"Loaded {len(events_list)} files")
+        logging.debug("Loaded %d files", len(events_list))
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             future_events = {suffix: executor.submit(self.evtselclass(**self.evtsel_kwargs), events) for events, suffix in events_list}
@@ -213,9 +214,6 @@ class Processor:
                     if events is not None:
                         future_events[suffix] = executor.submit(evtsel, events)
                         events = future_events[suffix].result()
-                        
-                        if hasattr(events, 'persist'):
-                            events.persist()
 
                         future_cf.append(executor.submit(writeCF, evtsel, suffix, self.outdir, self.dataset))
                         future_evts.append(executor.submit(self.writeevts, events, suffix, **kwargs))
