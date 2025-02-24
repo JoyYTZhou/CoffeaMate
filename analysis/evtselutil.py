@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import dask
+import dask, logging
 import pandas as pd
 import awkward as ak
 from typing import Optional
@@ -74,7 +74,7 @@ class BaseEventSelections:
         
         :return: passed events, vetoed events
         """
-        print(f"Processing events with {len(events)} entries!")
+        logging.debug(f"Performing selections on events with {len(events)} entries!")
         self.objsel = weightedSelection(events[wgtname])
         self.triggersel(events)
         self.setevtsel(events)
