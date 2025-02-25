@@ -145,6 +145,7 @@ def compute_and_write_skimmed(passed, outdir, dataset, suffix, write_args={}) ->
         return write_dask_array(computed_array, outdir, dataset, suffix, write_args)
     else:
         write_empty_root(pjoin(outdir, f'{dataset}_{suffix}.root'))
+        return 0
 
 def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
     """Write the cutflow to a file. 
