@@ -5,12 +5,13 @@ import uproot, pickle, gc, logging, threading
 from uproot.writing._dask_write import ak_to_root
 import pandas as pd
 import dask_awkward as dak
-import dask
+import dask, psutil
 import awkward as ak
 import concurrent.futures
 
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper
 from src.analysis.evtselutil import BaseEventSelections
+from src.utils.testutils import log_memory
 
 def write_empty_root(filename):
     """Creates an empty ROOT file as a placeholder."""
@@ -223,6 +224,8 @@ class Processor:
     def run_skims(self, write_npz=False, max_workers=2, readkwargs={}, writekwargs={}, **kwargs) -> int:
         logging.debug(f"Expected to see {len(self.dsdict['files'])} outputs")
         rc = 0
+        process = psutil.Process()
+        
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_loaded = parallel_copy_and_load(
                 fileargs={"files": self.dsdict["files"]},
@@ -232,6 +235,8 @@ class Processor:
                 read_args=readkwargs)
             
             future_cf, future_writes, future_passed = [], [], {}
+
+            log_memory(process, "before processing")
             
             for future in concurrent.futures.as_completed(future_loaded.values()):
                 filename = next(f for f, future in future_loaded.items() if future == future)
@@ -242,11 +247,14 @@ class Processor:
                 except Exception as e:
                     logging.exception(f"Error copying and loading {filename}: {e}")
                     gc.collect()
+            
+            log_memory(process, "after loading")
                 
             for future in concurrent.futures.as_completed(future_passed.values()):
                 suffix = next(s for s, f in future_passed.items() if f == future)
 
                 try:
+                    log_memory(process, f"before computing/writing {suffix}")
                     passed, evtsel_state = future.result()
 
                     future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
@@ -267,6 +275,8 @@ class Processor:
             
             del future_cf, future_writes, future_passed, future_loaded
             gc.collect()
+
+            log_memory(process, "after computing + writing")
         
             if self.transfer:
                 for cutflow_file in cutflow_files:
