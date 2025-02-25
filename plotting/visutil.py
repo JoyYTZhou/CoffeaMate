@@ -8,7 +8,7 @@ from src.utils.datautil import arr_handler, iterwgt
 from src.analysis.objutil import Object
 from src.utils.filesysutil import FileSysHelper, pjoin, pdir, pbase
 from src.utils.cutflowutil import load_csvs
-from src.plotting.plothelpers import HistogramHelper, PlotStyle
+from src.utils.plotutil import HistogramHelper, PlotStyle
 
 class CSVPlotter:
     """Simplified plotter for CSV data"""

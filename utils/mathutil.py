@@ -60,6 +60,18 @@ class MathUtil:
         df[f'{sys_name}_eta'] = inv_sys.eta
         df[f'{sys_name}_phi'] = inv_sys.phi
         df[f'{sys_name}_mass'] = inv_sys.mass
+    
+    @staticmethod
+    def add_HT(df, jets:'list', HT_name:'str') -> None:
+        """Add HT column to the dataframe.
+        
+        Parameters
+        - df: DataFrame
+        - jets: List of jet names
+        - HT_name: Name of the HT column
+        """
+        jet_pt_names = [f'{jet}_pt' for jet in jets]
+        df[HT_name] = df[jet_pt_names].sum(axis=1)
 
 class ABCDUtil:
     def __init__(self, dfA, dfB, dfC, dfD, weight=None):
