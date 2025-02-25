@@ -1,7 +1,7 @@
 # This file contains the Processor class, which is used to process individual files or filesets.
 # The behavior of the Processor class is highly dependent on run time configurations and the event selection class used.
 import uproot._util
-import uproot, pickle, gc, logging
+import uproot, pickle, gc, logging, threading
 from uproot.writing._dask_write import ak_to_root
 import pandas as pd
 import dask_awkward as dak
@@ -12,6 +12,11 @@ import concurrent.futures
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper
 from src.analysis.evtselutil import BaseEventSelections
 
+def write_empty_root(filename):
+    """Creates an empty ROOT file as a placeholder."""
+    with uproot.recreate(filename):
+        pass
+        
 def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
     """Handles file copying and loading"""
     suffix = fileinfo['uuid']
@@ -22,15 +27,12 @@ def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
     
     delayed_open = rtcfg.get("DELAYED_OPEN", True)
     if delayed_open:
-        # First create the dask array
         events = uproot.dask(files={dest_file: fileinfo}, **read_args)
         
-        # Check if it has partitions and decide whether to persist
         if hasattr(events, 'npartitions'):
             nparts = events.npartitions
             logging.debug(f"File {suffix} has {nparts} partitions")
             
-            # Persist if number of partitions is below threshold
             if nparts <= 8:  # You can adjust this threshold
                 logging.debug("Not persisting events")
                 # logging.debug(f"Persisting events for {suffix} ({nparts} partitions)")
@@ -42,15 +44,12 @@ def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
     else:
         return (uproot.open(dest_file + ":Events").arrays(**read_args), suffix)
 
-def parallel_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3):
+def submit_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3) -> list:
     """Runs file copying and loading in parallel"""
     results = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_file = {
-            executor.submit(process_file, filename, fileinfo, copydir, rtcfg, read_args): filename
-            for filename, fileinfo in fileargs['files'].items()
-        }
+        future_to_file = parallel_copy_and_load(fileargs, copydir, executor, rtcfg, read_args)
         
         for future in concurrent.futures.as_completed(future_to_file):
             try:
@@ -58,6 +57,11 @@ def parallel_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3):
             except Exception as e:
                 logging.exception(f"Error copying and loading {future_to_file[future]}: {e}")
     return results
+
+def parallel_copy_and_load(fileargs, copydir, executor, rtcfg, read_args) -> dict:
+    """Runs file copying and loading in parallel"""
+    future_to_file = {filename: executor.submit(process_file, filename, fileinfo, copydir, rtcfg, read_args) for filename, fileinfo in fileargs['files'].items()}
+    return future_to_file
 
 def compute_dask_array(passed) -> ak.Array:
     """Compute the dask array and handle zero-length partitions."""
@@ -80,10 +84,13 @@ def compute_dask_array(passed) -> ak.Array:
                 return None
             else:
                 logging.debug("Valid indices: %s", valid_indices)
-                valid_partitions = [passed.partitions[i] for i in valid_indices]
-                valid_data = dak.concatenate(valid_partitions)
-                computed_data = dask.compute(valid_data)[0]
-                return computed_data
+                try:
+                    valid_partitions = [passed.partitions[i] for i in valid_indices]
+                    valid_data = dak.concatenate(valid_partitions)
+                    computed_data = dask.compute(valid_data)[0]
+                    return computed_data
+                except Exception as e:
+                    logging.exception(f"Error encountered in computing partitions: {e}")
     else:
         logging.debug(f"passed is of type {type(passed)}")
         return passed
@@ -98,25 +105,51 @@ def write_dask_array(computed_array, outdir, dataset, suffix, write_args={}) -> 
     }
 
     if isinstance(computed_array, dak.Array):
-        uproot.dask_write(
-            computed_array, destination=outdir, tree_name="Events", compute=True,
-            prefix=f'{dataset}_{suffix}', **write_options, **write_args )
-    else:
+        try:
+            uproot.dask_write(
+                computed_array, destination=outdir, tree_name="Events", compute=True,
+                prefix=f'{dataset}_{suffix}', **write_options, **write_args )
+        except MemoryError:
+            logging.exception(f"MemoryError encountered in writing outputs with dask_write() for file index {suffix}.")
+            return 1
+        except Exception as e:
+            logging.exception(f"Error encountered in writing outputs with dask_write() for file index {suffix}: {e}")
+            return 1
+    elif computed_array is not None:
         output_path = pjoin(outdir, f'{dataset}_{suffix}.root')
-        ak_to_root(
-            output_path, 
-            computed_array,
-            tree_name="Events",
-            title="",
-            counter_name=lambda counted: 'n' + counted,
-            field_name=lambda outer, inner: inner if outer == "" else outer + "_" + inner,
-            storage_options=None,
-            **write_options
-        )
+        try:
+            ak_to_root(
+                output_path, 
+                computed_array,
+                tree_name="Events",
+                title="",
+                counter_name=lambda counted: 'n' + counted,
+                field_name=lambda outer, inner: inner if outer == "" else outer + "_" + inner,
+                storage_options=None,
+                **write_options
+            )
+        except MemoryError:
+            logging.exception(f"MemoryError encountered in writing outputs with ak_to_root() for file index {suffix}.")
+            return 1
+        except Exception as e:
+            logging.exception(f"Error encountered in writing outputs with ak_to_root() for file index {suffix}: {e}")
+    else:
+        raise TypeError("computed_array is not a valid type")
     return 0
 
+def compute_and_write_skimmed(passed, outdir, dataset, suffix, write_args={}) -> int:
+    """Compute and write the skimmed events to a file."""
+    computed_array = compute_dask_array(passed)
+    if computed_array is not None:
+        return write_dask_array(computed_array, outdir, dataset, suffix, write_args)
+    else:
+        write_empty_root(pjoin(outdir, f'{dataset}_{suffix}.root'))
+
 def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
-    """Write the cutflow to a file."""
+    """Write the cutflow to a file. 
+    
+    Return 
+    - the name of the cutflow file"""
     if write_npz:
         npzname = pjoin(outdir, f'cutflow_{suffix}.npz')
         evtsel.cfobj.to_npz(npzname)
@@ -128,6 +161,7 @@ def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
     return cutflow_name
 
 class Processor:
+    write_skim_semaphore = threading.Semaphore(3)
     """Process individual file or filesets given strings/dicts belonging to one dataset."""
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
         """
@@ -186,56 +220,63 @@ class Processor:
             )
         return events
 
-    def run_skims(self, write_npz=False, readkwargs={}, writekwargs={}, **kwargs) -> int:
-        """Process files in parallel. Must involve copying files to a local directory. Most suitable for remote processing and skimming operations."""
-        logging.debug("Expected to see %d outputs", len(self.dsdict['files']))
+    def run_skims(self, write_npz=False, max_workers=2, readkwargs={}, writekwargs={}, **kwargs) -> int:
+        logging.debug(f"Expected to see {len(self.dsdict['files'])} outputs")
         rc = 0
-
-        events_list = parallel_copy_and_load(
-            fileargs={"files": self.dsdict["files"]}, copydir=self.copydir,
-            rtcfg=self.rtcfg, read_args=readkwargs)
-
-        logging.debug("Loaded %d files", len(events_list))
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            future_events = {suffix: executor.submit(self.evtselclass(**self.evtsel_kwargs), events) for events, suffix in events_list}
-            concurrent.futures.wait(future_events.values())
-            passed_results = {suffix: future.result() for suffix, future in future_events.items()}
-
-            future_cf, future_evts = [], []
-            # future_cf, future_events, future_evts = [], {}, []
-            for suffix, future in future_events.items():
-                future.add_done_callback(lambda f, suffix=suffix: future_cf.append(executor.submit(writeCF, f.result(), suffix, self.outdir, self.dataset)))
-            # for events, suffix in events_list:
-                try:
-                    evtsel = self.evtselclass(**self.evtsel_kwargs)
-                    if events is not None:
-                        future_events[suffix] = executor.submit(evtsel, events)
-                        events = future_events[suffix].result()
-
-                        future_cf.append(executor.submit(writeCF, evtsel, suffix, self.outdir, self.dataset))
-                        future_evts.append(executor.submit(self.writeevts, events, suffix, **kwargs))
-                    else:
-                        rc += 1
-                        continue
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_loaded = parallel_copy_and_load(
+                fileargs={"files": self.dsdict["files"]},
+                copydir=self.copydir,
+                executor=executor,
+                rtcfg=self.rtcfg,
+                read_args=readkwargs)
+            
+            future_cf, future_writes, future_passed = [], [], {}
+            
+            for future in concurrent.futures.as_completed(future_loaded.values()):
+                filename = next(f for f, future in future_loaded.items() if future == future)
+                
+                try: 
+                    events, suffix = future.result()
+                    future_passed[suffix] = executor.submit(self.evtselclass(**self.evtsel_kwargs).callevtsel, events)
                 except Exception as e:
-                    logging.exception(f"Error encountered for file with suffix {suffix} in {self.dataset}: {e}")
-                    rc += 1
+                    logging.exception(f"Error copying and loading {filename}: {e}")
+                    gc.collect()
+                
+            for future in concurrent.futures.as_completed(future_passed.values()):
+                suffix = next(s for s, f in future_passed.items() if f == future)
 
-            concurrent.futures.wait(future_cf)
-            concurrent.futures.wait(future_evts)
+                try:
+                    passed, evtsel_state = future.result()
+
+                    future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
+                    future_writes.append(executor.submit(self.writeskimmed, passed, suffix, **writekwargs))
+                except Exception as e:
+                    logging.exception(f"Error processing {suffix}: {e}")
+            
+            cutflow_files = []
+            for future in concurrent.futures.as_completed(future_cf):
+                cutflow_files.append(future.result())
+                del future
+                gc.collect()
+            
+            for future in concurrent.futures.as_completed(future_writes):
+                rc += future.result()
+                del future
+                gc.collect()
+            
+            del future_cf, future_writes, future_passed, future_loaded
+            gc.collect()
         
-        cutflow_files = [f.result() for f in future_cf]
-        
-        if self.transfer:
-            for cutflow_file in cutflow_files:
-                self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True)
+            if self.transfer:
+                for cutflow_file in cutflow_files:
+                    self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True)
+                self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True)
 
-        if not self.rtcfg.get("REMOTE_LOAD", True):
-            self.filehelper.remove_files(self.copydir)
-
+            if not self.rtcfg.get("REMOTE_LOAD", True):
+                self.filehelper.remove_files(self.copydir)
         return rc
-
+    
     def runfiles_sequential(self, write_npz=False, **kwargs) -> int:
         """Process files sequentially."""
         print(f"Expected to see {len(self.dsdict['files'])} outputs")
@@ -279,6 +320,10 @@ class Processor:
             self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True)
             print(f"Files transferred to: {self.transfer}" )
         return rc
+    
+    def writeskimmed(self, passed, suffix, **kwargs) -> int:
+        with self.write_skim_semaphore:
+            return compute_and_write_skimmed(passed, self.outdir, self.dataset, suffix, **kwargs)
 
     def writedask(self, passed, suffix, parquet=False, fields=None) -> int:
         """Wrapper around uproot.dask_write(),
@@ -329,9 +374,3 @@ class Processor:
         with open(finame, 'wb') as f:
             pickle.dump(passed, f)
         return 0
-    
-    @staticmethod
-    def write_empty(filename):
-        """Creates an empty ROOT file as a placeholder."""
-        with uproot.recreate(filename):
-            pass  # Do nothing, just create an empty file
