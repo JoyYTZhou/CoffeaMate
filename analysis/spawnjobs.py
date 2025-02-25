@@ -79,6 +79,15 @@ class JobRunner:
             helper.checkpath(self.transferPBase, createdir=True)
             self.transferPBase = f'{self.transferPBase}/{year}'
             helper.checkpath(self.transferPBase, createdir=True)
+    
+    def submitskims(self, client, **kwargs) -> int:
+        proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass)
+        read_kwargs = {}
+        filter_name = self.rs.get("FILTER_NAME", None)
+        if filter_name:
+            read_kwargs = {"filter_name": filter_name}
+        rc = proc.run_skims(readkwargs=read_kwargs)
+        return rc
         
     def submitjobs(self, client, **kwargs) -> int:
         """Run jobs based on client settings.

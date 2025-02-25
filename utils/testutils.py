@@ -1,5 +1,5 @@
 from dask.distributed import get_client
-import psutil, sys, logging, gc
+import psutil, sys, logging, gc, datetime
 from typing import Any
 
 def analyze_memory():
@@ -87,6 +87,7 @@ def log_dask_status():
 def setup_logging():
     # Enhanced logging format for debugging
     logging.getLogger().handlers.clear()
+    debug_filename = f'debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
     logging.basicConfig(
         filename='debug.log',
         level=logging.DEBUG,
@@ -94,7 +95,7 @@ def setup_logging():
     )
     # Also show logs in console
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.WARNING)
+    console_handler.setLevel(logging.DEBUG)
     logging.getLogger().addHandler(console_handler)
     logging.getLogger("uproot").setLevel(logging.WARNING)
     logging.getLogger("dask").setLevel(logging.DEBUG)
