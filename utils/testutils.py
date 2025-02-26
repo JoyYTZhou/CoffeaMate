@@ -23,8 +23,9 @@ def get_reference(num_refs=10):
         referents = gc.get_referents(obj)
         if len(referents) > num_refs:
             logging.warning(f"Object {obj} has {len(referents)} referents: {referents}")
-        elif isinstance(obj, dask.delayed.Delayed):
-            logging.warning(f"Delayed object: {obj}")
+        elif hasattr(dask, "delayed") and hasattr(dask.delayed, "Delayed"):
+            if isinstance(obj, dask.delayed.Delayed):  
+                logging.warning(f"Delayed object: {obj}")
         elif type(obj).__module__.endswith('analysis.processor'):
             logging.warning(f"Type: {type(obj)}, Size: {sys.getsizeof(obj)} bytes")
             referrers = gc.get_referrers(obj)
