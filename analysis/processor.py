@@ -23,7 +23,7 @@ def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
     suffix = fileinfo['uuid']
     dest_file = pjoin(copydir, f"{suffix}.root")
     
-    logging.debug(f"Copying {filename} to {dest_file}")
+    logging.debug(f"Copying and loading {filename} to {dest_file}")
     XRootDHelper.copy_local(filename, dest_file)
     
     delayed_open = rtcfg.get("DELAYED_OPEN", True)
@@ -223,6 +223,7 @@ class Processor:
         return events
 
     def run_skims(self, write_npz=False, max_workers=2, readkwargs={}, writekwargs={}, **kwargs) -> int:
+        """Process files in parallel. Recommended for skimming."""
         logging.debug(f"Expected to see {len(self.dsdict['files'])} outputs")
         rc = 0
         process = psutil.Process()
