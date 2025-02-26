@@ -96,7 +96,7 @@ def setup_logging():
     )
     # Also show logs in console
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(logging.WARNING)
     logging.getLogger().addHandler(console_handler)
     logging.getLogger("uproot").setLevel(logging.WARNING)
     logging.getLogger("dask").setLevel(logging.DEBUG)
