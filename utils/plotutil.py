@@ -189,8 +189,8 @@ class PlotUtil:
         PlotStyle.setup_axis(ax2, X_label, Y_label_2, f"{Y_label_2} along {X_label}")
         
         # Set y-axis ranges with padding for error bars
-        ax.set_ylim(0, max(ratio + ratio_err) * 1.2)
-        ax2.set_ylim(0, min(1.2, max(percentage + percentage_err) * 1.2))
+        ax.set_ylim(min(ratio - ratio_err) / 1.2, max(ratio + ratio_err) * 1.2)
+        ax2.set_ylim(min(percentage - percentage_err) / 1.2, min(1.2, max(percentage + percentage_err) * 1.2))
         
         plt.tight_layout()
         
