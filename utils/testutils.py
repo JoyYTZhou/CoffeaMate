@@ -2,126 +2,178 @@ from dask.distributed import get_client
 import psutil, sys, logging, gc, dask
 from datetime import datetime
 from typing import Any
+from heapq import nlargest
+from operator import attrgetter, itemgetter
+
+# Common thresholds
+SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
+MAX_OBJECTS = 10  # Maximum number of objects to log
+
+def get_object_size(obj):
+    """Safely get object size"""
+    try:
+        return sys.getsizeof(obj)
+    except Exception:
+        return 0
 
 def get_large_storage():
+    """Log details of top 10 largest collections (>10MB)"""
+    large_objects = []
+    
     for obj in gc.get_objects():
-        if isinstance(obj, (list, dict, tuple)) and sys.getsizeof(obj) > 1024 * 1024 * 20:
-            logging.debug(f"Object Type: {type(obj)}, Size: {sys.getsizeof(obj) / 1e6:.2f} MB")
-            length = len(obj) if isinstance(obj, (list, tuple)) else len(obj.keys())
-            ele_print = min(5, length)
-            if isinstance(obj, list):
-                logging.debug(f"First {ele_print} elements: {obj[:ele_print]}")
-            elif isinstance(obj, dict):
-                logging.debug(f"First {ele_print} keys: {list(obj.keys())[:ele_print]}")
-                logging.debug(f"First {ele_print} values: {list(obj.values())[:ele_print]}")
-            elif isinstance(obj, tuple):
-                logging.debug(f"First {ele_print} elements: {obj[:ele_print]}")
+        if isinstance(obj, (list, dict, tuple)):
+            obj_size = get_object_size(obj)
+            if obj_size > SIZE_THRESHOLD:
+                large_objects.append((obj, obj_size))
+    
+    # Get top 10 largest objects
+    largest_objects = nlargest(MAX_OBJECTS, large_objects, key=itemgetter(1))
+    
+    for obj, size in largest_objects:
+        logging.debug(f"Large object - Type: {type(obj)}, Size: {size / 1e6:.2f} MB")
+        length = len(obj) if isinstance(obj, (list, tuple)) else len(obj.keys())
+        ele_print = min(5, length)
+        if isinstance(obj, list):
+            logging.debug(f"First {ele_print} elements: {obj[:ele_print]}")
+        elif isinstance(obj, dict):
+            logging.debug(f"First {ele_print} keys: {list(obj.keys())[:ele_print]}")
+            logging.debug(f"First {ele_print} values: {list(obj.values())[:ele_print]}")
+        elif isinstance(obj, tuple):
+            logging.debug(f"First {ele_print} elements: {obj[:ele_print]}")
 
 def get_reference(num_refs=10):
-    """Log objects with more than 10 referents"""
+    """Log top 10 largest objects (>10MB) with many referents"""
+    large_objects = []
+    
     for obj in gc.get_objects():
-        referents = gc.get_referents(obj)
-        if len(referents) > num_refs:
-            logging.debug(f"Object {obj} has {len(referents)} referents: {referents}")
-        elif hasattr(dask, "delayed") and hasattr(dask.delayed, "Delayed"):
-            if isinstance(obj, dask.delayed.Delayed):  
-                logging.debug(f"Delayed object: {obj}")
+        obj_size = get_object_size(obj)
+        if obj_size > SIZE_THRESHOLD:
+            referents = gc.get_referents(obj)
+            if len(referents) > num_refs:
+                large_objects.append((obj, obj_size, referents))
+    
+    # Get top 10 largest objects
+    largest_objects = nlargest(MAX_OBJECTS, large_objects, key=itemgetter(1))
+    
+    for obj, size, referents in largest_objects:
+        if hasattr(dask, "delayed") and isinstance(obj, dask.delayed.Delayed):
+            logging.debug(f"Large delayed object: {obj} ({size / 1e6:.2f} MB)")
         elif type(obj).__module__.endswith('analysis.processor'):
-            logging.debug(f"Type: {type(obj)}, Size: {sys.getsizeof(obj)} bytes")
+            logging.debug(f"Large processor object - Type: {type(obj)}, Size: {size / 1e6:.2f} MB")
             referrers = gc.get_referrers(obj)
             logging.debug(f"Referrers: {referrers}")
+        else:
+            logging.debug(f"Large object {obj} ({size / 1e6:.2f} MB) has {len(referents)} referents")
 
 def analyze_memory():
-    """Analyze memory usage by type and find largest objects"""
-    gc.collect()  # Force garbage collection
+    """Analyze top 10 largest memory users by type (>10MB)"""
+    gc.collect()
     objects = gc.get_objects()
-    stats = {}
+    type_stats = {}
 
     # Group objects by type
     for obj in objects:
-        obj_type = type(obj).__name__
-        if obj_type not in stats:
-            stats[obj_type] = {
-                'count': 0,
-                'size': 0,
-                'examples': []
-            }
-        stats[obj_type]['count'] += 1
         try:
-            stats[obj_type]['size'] += sys.getsizeof(obj)
-            if len(stats[obj_type]['examples']) < 3:  # Keep up to 3 examples
-                stats[obj_type]['examples'].append(str(obj)[:100])  # Truncate long strings
-        except Exception as e:
-            logging.debug(f"Error measuring size of {obj_type}: {e}")
-
-    # Sort by size and print
-    sorted_stats = sorted(stats.items(), key=lambda x: x[1]['size'], reverse=True)
-    logging.info("Memory usage by type:")
-    for type_name, type_stats in sorted_stats[:20]:  # Show top 20
-        size_mb = type_stats['size'] / (1024 * 1024)
-        if size_mb > 1:  # Only show objects using more than 1MB
-            logging.info(f"{type_name}: Count={type_stats['count']}, Size={size_mb:.2f}MB")
-            if type_stats['examples']:
-                logging.debug(f"Examples: {type_stats['examples']}")
-
-def find_largest_objects():
-    gc.collect()
-    objects = sorted(gc.get_objects(), key=sys.getsizeof, reverse=True)[:10]
-    for obj in objects:
-        logging.debug(f"Large object: Type={type(obj)}, Size={sys.getsizeof(obj) / 1e6:.2f} MB")
-        logging.debug(f"Referents: {gc.get_referents(obj)}")
-
-def log_memory(process, stage):
-    """Logs memory usage at different stages using a provided psutil.Process() object."""
-    mem_usage = process.memory_info().rss / (1024 * 1024)
-    logging.warning(f"Memory usage at {stage}: {mem_usage:.2f} MB")
-    return mem_usage
+            obj_size = get_object_size(obj)
+            if obj_size > SIZE_THRESHOLD:
+                obj_type = type(obj).__name__
+                if obj_type not in type_stats:
+                    type_stats[obj_type] = {
+                        'count': 0,
+                        'size': 0,
+                        'largest_objects': []
+                    }
+                type_stats[obj_type]['count'] += 1
+                type_stats[obj_type]['size'] += obj_size
+                type_stats[obj_type]['largest_objects'].append((obj, obj_size))
+        except Exception:
+            logging.exception(f"Error processing object: {obj}")
+    
+    # Get top 10 types by total size
+    largest_types = nlargest(MAX_OBJECTS, type_stats.items(), 
+                           key=lambda x: x[1]['size'])
+    
+    logging.info("Top 10 largest object types (>10MB):")
+    for type_name, stats in largest_types:
+        size_mb = stats['size'] / (1024 * 1024)
+        logging.info(f"{type_name}: Count={stats['count']}, Size={size_mb:.2f}MB")
+        
+        # Get top 3 largest objects of this type
+        largest_examples = nlargest(3, stats['largest_objects'], 
+                                  key=itemgetter(1))
+        for obj, obj_size in largest_examples:
+            logging.debug(f"Example ({obj_size / 1e6:.2f}MB): {str(obj)[:100]}")
 
 def log_dask_status():
+    """Log top 10 largest Dask worker memory usage (>10MB)"""
     client = get_client()
     workers = client.scheduler_info()['workers']
 
-    worker_memory = []
-    for worker in workers.values():
+    large_workers = []
+    for worker_id, worker in workers.items():
         try:
-            if 'memory' in worker:
-                worker_memory.append(worker['memory'])
-        except Exception as e:
-            logging.warning(f"Could not get memory info from worker: {e}")
+            if 'memory' in worker and worker['memory'] > SIZE_THRESHOLD:
+                large_workers.append((worker_id, worker['memory']))
+        except Exception:
+            continue
 
-    if worker_memory:
-        logging.warning(f"Dask workers memory: {worker_memory}")
-    else:
-        logging.warning("No memory information available from Dask workers")
+    # Get top 10 workers by memory usage
+    largest_workers = nlargest(MAX_OBJECTS, large_workers, key=itemgetter(1))
+    
+    if largest_workers:
+        logging.warning("Top 10 Dask workers with largest memory:")
+        for worker_id, memory in largest_workers:
+            logging.warning(f"Worker {worker_id}: {memory / 1e6:.2f} MB")
 
-    logging.warning(f"System memory: {psutil.virtual_memory().percent}%")
+    system_memory = psutil.virtual_memory()
+    if system_memory.used > SIZE_THRESHOLD:
+        logging.warning(f"System memory usage: {system_memory.percent}% ({system_memory.used / 1e6:.2f} MB)")
+
+def log_memory_snapshot(snapshot, message):
+    """Log top 10 largest memory statistics (>10MB)"""
+    stats = [stat for stat in snapshot.statistics('lineno') 
+             if stat.size > SIZE_THRESHOLD]
+    largest_stats = nlargest(MAX_OBJECTS, stats, key=attrgetter('size'))
+    
+    if largest_stats:
+        logging.debug(f"Top 10 largest memory objects - {message}")
+        for stat in largest_stats:
+            logging.debug(f"{stat.size / 1e6:.2f}MB: {stat}")
+
+def log_memory_diff(snapshot1, snapshot2, message):
+    """Log top 10 largest memory differences (>10MB)"""
+    stats = [stat for stat in snapshot2.compare_to(snapshot1, 'lineno') 
+             if abs(stat.size_diff) > SIZE_THRESHOLD]
+    largest_diffs = nlargest(MAX_OBJECTS, stats, 
+                           key=lambda x: abs(x.size_diff))
+    
+    if largest_diffs:
+        logging.debug(f"Top 10 largest memory differences - {message}")
+        for stat in largest_diffs:
+            logging.debug(f"{abs(stat.size_diff) / 1e6:.2f}MB: {stat}")
+
+def log_memory(process, stage):
+    """Log memory usage if large enough"""
+    mem_usage = process.memory_info().rss
+    if mem_usage > SIZE_THRESHOLD:
+        logging.warning(f"Memory usage at {stage}: {mem_usage / 1e6:.2f} MB")
+    return mem_usage
 
 def setup_logging(console_level=logging.WARNING, file_level=logging.DEBUG):
-    # Enhanced logging format for debugging
+    """Setup logging with consistent format and levels"""
     logging.getLogger().handlers.clear()
     debug_filename = f'debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
     logging.basicConfig(
-        filename='debug.log',
+        filename=debug_filename,
         level=file_level,
         format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
     )
-    # Also show logs in console
     console_handler = logging.StreamHandler()
     console_handler.setLevel(console_level)
     logging.getLogger().addHandler(console_handler)
+    
+    # Set specific logger levels
     logging.getLogger("uproot").setLevel(logging.WARNING)
     logging.getLogger("dask").setLevel(logging.DEBUG)
     logging.getLogger("distributed").setLevel(logging.DEBUG)
     logging.getLogger("fsspec").setLevel(logging.WARNING)
-
-def log_memory_snapshot(snapshot, message):
-    top_stats = snapshot.statistics('lineno')
-    logging.debug(f"Memory snapshot: {message}")
-    for stat in top_stats[:10]:
-        logging.debug(stat)
-    
-def log_memory_diff(snapshot1, snapshot2, message):
-    top_stats = snapshot2.compare_to(snapshot1, 'lineno')
-    logging.debug(f"[ Memory differences after {message} ]")
-    for stat in top_stats[:10]:
-        logging.debug(stat)
