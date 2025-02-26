@@ -32,11 +32,11 @@ def get_reference(num_refs=10):
             logging.debug(f"Referrers: {referrers}")
 
 def analyze_memory():
-    """Analyze memory usage by type"""
+    """Analyze memory usage by type and find largest objects"""
     gc.collect()  # Force garbage collection
     objects = gc.get_objects()
     stats = {}
-    
+
     # Group objects by type
     for obj in objects:
         obj_type = type(obj).__name__
@@ -48,12 +48,12 @@ def analyze_memory():
             }
         stats[obj_type]['count'] += 1
         try:
-            stats[obj_type]['size'] += get_size(obj)
+            stats[obj_type]['size'] += sys.getsizeof(obj)
             if len(stats[obj_type]['examples']) < 3:  # Keep up to 3 examples
                 stats[obj_type]['examples'].append(str(obj)[:100])  # Truncate long strings
         except Exception as e:
             logging.debug(f"Error measuring size of {obj_type}: {e}")
-    
+
     # Sort by size and print
     sorted_stats = sorted(stats.items(), key=lambda x: x[1]['size'], reverse=True)
     logging.info("Memory usage by type:")
@@ -64,29 +64,12 @@ def analyze_memory():
             if type_stats['examples']:
                 logging.debug(f"Examples: {type_stats['examples']}")
 
-def get_size(obj: Any) -> int:
-    """Get size of object and its members in bytes"""
-    memory_size = 0
-    processed_ids = set()
-
-    def inner_size(obj: Any) -> int:
-        obj_id = id(obj)
-        if obj_id in processed_ids:
-            return 0
-        processed_ids.add(obj_id)
-        
-        size = sys.getsizeof(obj)
-        
-        if isinstance(obj, (tuple, list, set, dict)):
-            size += sum(inner_size(item) for item in obj)
-        elif hasattr(obj, '__dict__'):
-            size += inner_size(obj.__dict__)
-        elif isinstance(obj, dict):
-            size += sum(inner_size(k) + inner_size(v) for k, v in obj.items())
-            
-        return size
-    
-    return inner_size(obj)
+def find_largest_objects():
+    gc.collect()
+    objects = sorted(gc.get_objects(), key=sys.getsizeof, reverse=True)[:10]
+    for obj in objects:
+        logging.debug(f"Large object: Type={type(obj)}, Size={sys.getsizeof(obj) / 1e6:.2f} MB")
+        logging.debug(f"Referents: {gc.get_referents(obj)}")
 
 def log_memory(process, stage):
     """Logs memory usage at different stages using a provided psutil.Process() object."""
