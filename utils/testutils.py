@@ -1,7 +1,20 @@
 from dask.distributed import get_client
-import psutil, sys, logging, gc
+import psutil, sys, logging, gc, dask
 from datetime import datetime
 from typing import Any
+
+def get_reference(num_refs=10):
+    """Log objects with more than 10 referents"""
+    for obj in gc.get_objects():
+        referents = gc.get_referents(obj)
+        if len(referents) > num_refs:
+            logging.warning(f"Object {obj} has {len(referents)} referents: {referents}")
+        elif isinstance(obj, dask.delayed.Delayed):
+            logging.warning(f"Delayed object: {obj}")
+        elif type(obj).__module__.endswith('analysis.processor'):
+            logging.warning(f"Type: {type(obj)}, Size: {sys.getsizeof(obj)} bytes")
+            referrers = gc.get_referrers(obj)
+            logging.debug(f"Referrers: {referrers}")
 
 def analyze_memory():
     """Analyze memory usage by type"""
@@ -85,18 +98,18 @@ def log_dask_status():
 
     logging.warning(f"System memory: {psutil.virtual_memory().percent}%")
 
-def setup_logging():
+def setup_logging(console_level=logging.WARNING, file_level=logging.DEBUG):
     # Enhanced logging format for debugging
     logging.getLogger().handlers.clear()
     debug_filename = f'debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
     logging.basicConfig(
         filename='debug.log',
-        level=logging.DEBUG,
+        level=file_level,
         format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
     )
     # Also show logs in console
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(console_level)
     logging.getLogger().addHandler(console_handler)
     logging.getLogger("uproot").setLevel(logging.WARNING)
     logging.getLogger("dask").setLevel(logging.DEBUG)
