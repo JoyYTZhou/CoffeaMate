@@ -5,7 +5,7 @@ from typing import Any
 
 def get_large_storage():
     for obj in gc.get_objects():
-        if isinstance(obj, (list, dict, tuple)) and sys.getsizeof(obj) > 10_000_000:
+        if isinstance(obj, (list, dict, tuple)) and sys.getsizeof(obj) > 1024 * 1024 * 20:
             logging.debug(f"Object Type: {type(obj)}, Size: {sys.getsizeof(obj) / 1e6:.2f} MB")
             length = len(obj) if isinstance(obj, (list, tuple)) else len(obj.keys())
             ele_print = min(5, length)
@@ -22,12 +22,12 @@ def get_reference(num_refs=10):
     for obj in gc.get_objects():
         referents = gc.get_referents(obj)
         if len(referents) > num_refs:
-            logging.warning(f"Object {obj} has {len(referents)} referents: {referents}")
+            logging.debug(f"Object {obj} has {len(referents)} referents: {referents}")
         elif hasattr(dask, "delayed") and hasattr(dask.delayed, "Delayed"):
             if isinstance(obj, dask.delayed.Delayed):  
-                logging.warning(f"Delayed object: {obj}")
+                logging.debug(f"Delayed object: {obj}")
         elif type(obj).__module__.endswith('analysis.processor'):
-            logging.warning(f"Type: {type(obj)}, Size: {sys.getsizeof(obj)} bytes")
+            logging.debug(f"Type: {type(obj)}, Size: {sys.getsizeof(obj)} bytes")
             referrers = gc.get_referrers(obj)
             logging.debug(f"Referrers: {referrers}")
 
