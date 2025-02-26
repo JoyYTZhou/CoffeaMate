@@ -3,6 +3,20 @@ import psutil, sys, logging, gc, dask
 from datetime import datetime
 from typing import Any
 
+def get_large_storage():
+    for obj in gc.get_objects():
+        if isinstance(obj, (list, dict, tuple)) and sys.getsizeof(obj) > 10_000_000:
+            logging.debug(f"Object Type: {type(obj)}, Size: {sys.getsizeof(obj) / 1e6:.2f} MB")
+            length = len(obj) if isinstance(obj, (list, tuple)) else len(obj.keys())
+            ele_print = min(5, length)
+            if isinstance(obj, list):
+                logging.debug(f"First {ele_print} elements: {obj[:ele_print]}")
+            elif isinstance(obj, dict):
+                logging.debug(f"First {ele_print} keys: {list(obj.keys())[:ele_print]}")
+                logging.debug(f"First {ele_print} values: {list(obj.values())[:ele_print]}")
+            elif isinstance(obj, tuple):
+                logging.debug(f"First {ele_print} elements: {obj[:ele_print]}")
+
 def get_reference(num_refs=10):
     """Log objects with more than 10 referents"""
     for obj in gc.get_objects():
