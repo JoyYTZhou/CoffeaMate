@@ -213,16 +213,16 @@ def analyze_memory():
         except Exception:
             logging.exception(f"Error processing object: {obj}")
     
-    # Get top 10 types by total size
     largest_types = nlargest(MAX_OBJECTS, type_stats.items(), 
                            key=lambda x: x[1]['size'])
     
     logging.info("Top 10 largest object types (>10MB):")
+    if not largest_types:
+        logging.info("No large objects found.")
     for type_name, stats in largest_types:
         size_mb = stats['size'] / (1024 * 1024)
         logging.info(f"{type_name}: Count={stats['count']}, Size={size_mb:.2f}MB")
         
-        # Get top 3 largest objects of this type
         largest_examples = nlargest(3, stats['largest_objects'], 
                                   key=itemgetter(1))
         for obj, obj_size in largest_examples:
