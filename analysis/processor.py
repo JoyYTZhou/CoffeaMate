@@ -147,7 +147,7 @@ class Processor:
             del future_cf, future_writes, future_passed, future_loaded
             gc.collect()
 
-            log_memory(process, "after computing + writing")
+            log_memory(process, "after computing + writing + garbage collection")
         
             if self.transfer:
                 for cutflow_file in cutflow_files:
