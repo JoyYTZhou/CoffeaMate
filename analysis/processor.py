@@ -145,7 +145,6 @@ class Processor:
                 gc.collect()
             
             del future_cf, future_writes, future_passed, future_loaded
-            gc.collect()
 
             log_memory(process, "after computing + writing + garbage collection")
         
