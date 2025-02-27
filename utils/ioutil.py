@@ -90,7 +90,7 @@ def compute_dask_array(passed) -> ak.Array:
         logging.debug(f"passed is of type {type(passed)}")
         return passed
 
-def write_dask_array(computed_array, outdir, dataset, suffix, write_args={}) -> int:
+def write_computed_array(computed_array, outdir, dataset, suffix, write_args={}) -> int:
     """Write array using appropriate method based on type."""
     write_options = {
         "initial_basket_capacity": 50,
@@ -136,7 +136,7 @@ def compute_and_write_skimmed(passed, outdir, dataset, suffix, write_args={}) ->
     """Compute and write the skimmed events to a file."""
     computed_array = compute_dask_array(passed)
     if computed_array is not None:
-        return write_dask_array(computed_array, outdir, dataset, suffix, write_args)
+        return write_computed_array(computed_array, outdir, dataset, suffix, write_args)
     else:
         write_empty_root(pjoin(outdir, f'{dataset}_{suffix}.root'))
         return 0
