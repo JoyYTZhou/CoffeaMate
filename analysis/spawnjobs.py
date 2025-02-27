@@ -141,11 +141,11 @@ class JobLoader():
         self.helper.checkpath(self.jobpath, createdir=True)
         self.out_endpattern = out_endpattern
 
-    def writejobs(self) -> None:
+    def writejobs(self, batch_size=10) -> None:
         """Write job parameters to json file"""
         datafile = glob.glob(pjoin(self.inpath, f'{self.kwd}*json.gz'))
         for file in datafile:
-            self.prepjobs_from_dict(file)
+            self.prepjobs_from_dict(file, batch_size=batch_size)
     
     def prepjobs_from_dict(self, inputdatap, batch_size=5, **kwargs) -> bool:
         """Prepare job files from a group dictionary containing datasets and the files. Job files are created in the jobpath,
