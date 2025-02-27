@@ -9,6 +9,130 @@ from operator import attrgetter, itemgetter
 SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
 MAX_OBJECTS = 10  # Maximum number of objects to log
 
+def track_object_growth(interval=60, duration=600):
+    """Track object count growth over time to identify potential leaks.
+    
+    Args:
+        interval (int): Seconds between checks
+        duration (int): Total tracking duration in seconds
+    """
+    import time
+    type_counts = {}
+    iterations = duration // interval
+    
+    for i in range(iterations):
+        gc.collect()
+        current_counts = {}
+        
+        # Count objects larger than threshold
+        for obj in gc.get_objects():
+            if get_object_size(obj) > SIZE_THRESHOLD:
+                obj_type = type(obj).__name__
+                current_counts[obj_type] = current_counts.get(obj_type, 0) + 1
+        
+        # Compare with previous counts
+        for obj_type, count in current_counts.items():
+            if obj_type in type_counts:
+                if count > type_counts[obj_type]:
+                    logging.warning(f"Potential leak: {obj_type} grew from {type_counts[obj_type]} to {count}")
+            type_counts[obj_type] = count
+            
+        time.sleep(interval)
+
+def find_reference_cycles():
+    """Find reference cycles among large objects."""
+    gc.collect()
+    cycles = []
+    
+    def find_cycle(obj, path, visited):
+        if id(obj) in visited:
+            cycle_start = path.index(obj)
+            cycles.append(path[cycle_start:])
+            return
+        visited.add(id(obj))
+        path.append(obj)
+        
+        for ref in gc.get_referents(obj):
+            if get_object_size(ref) > SIZE_THRESHOLD:
+                find_cycle(ref, path[:], visited)
+    
+    for obj in gc.get_objects():
+        if get_object_size(obj) > SIZE_THRESHOLD:
+            find_cycle(obj, [], set())
+    
+    # Log the largest cycles
+    largest_cycles = nlargest(MAX_OBJECTS, 
+                            [(cycle, sum(get_object_size(obj) for obj in cycle)) 
+                             for cycle in cycles],
+                            key=itemgetter(1))
+    
+    for cycle, total_size in largest_cycles:
+        logging.warning(f"Found reference cycle (total size: {total_size/1e6:.2f}MB):")
+        for obj in cycle:
+            logging.warning(f"  {type(obj).__name__}: {get_object_size(obj)/1e6:.2f}MB")
+
+def monitor_generation_counts():
+    """Monitor objects in different garbage collection generations."""
+    gc.collect()  # Clean up first
+    
+    # Get counts before and after collection
+    counts_before = gc.get_count()
+    gc.collect()
+    counts_after = gc.get_count()
+    
+    for gen in range(3):
+        if counts_before[gen] - counts_after[gen] > 100:  # Significant cleanup
+            logging.warning(f"Generation {gen} cleaned up {counts_before[gen] - counts_after[gen]} objects")
+            
+        # Check surviving large objects in each generation
+        survivors = []
+        for obj in gc.get_objects():
+            if get_object_size(obj) > SIZE_THRESHOLD:
+                survivors.append((obj, get_object_size(obj)))
+        
+        largest_survivors = nlargest(MAX_OBJECTS, survivors, key=itemgetter(1))
+        if largest_survivors:
+            logging.warning(f"Largest surviving objects in generation {gen}:")
+            for obj, size in largest_survivors:
+                logging.warning(f"  {type(obj).__name__}: {size/1e6:.2f}MB")
+
+def track_dask_leaks():
+    """Track potential memory leaks in Dask operations."""
+    client = get_client()
+    initial_workers = client.scheduler_info()['workers']
+    
+    # Track worker memory over time
+    worker_history = {}
+    
+    for worker_id, worker in initial_workers.items():
+        if 'memory' in worker and worker['memory'] > SIZE_THRESHOLD:
+            worker_history[worker_id] = worker['memory']
+    
+    # Check for consistently growing workers
+    current_workers = client.scheduler_info()['workers']
+    growing_workers = []
+    
+    for worker_id, worker in current_workers.items():
+        if 'memory' in worker and worker['memory'] > SIZE_THRESHOLD:
+            if (worker_id in worker_history and 
+                worker['memory'] > worker_history[worker_id] * 1.5):  # 50% growth
+                growing_workers.append((
+                    worker_id,
+                    worker_history[worker_id],
+                    worker['memory']
+                ))
+    
+    # Log the top growing workers
+    largest_growth = nlargest(MAX_OBJECTS, growing_workers, 
+                            key=lambda x: x[2] - x[1])
+    
+    for worker_id, old_mem, new_mem in largest_growth:
+        logging.warning(
+            f"Worker {worker_id} memory grew from "
+            f"{old_mem/1e6:.2f}MB to {new_mem/1e6:.2f}MB"
+        )
+    
+    
 def get_object_size(obj):
     """Safely get object size"""
     try:
