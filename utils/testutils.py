@@ -1,5 +1,6 @@
 from dask.distributed import get_client
-import psutil, sys, logging, gc, dask
+import psutil, sys, logging, gc, dask, os
+from pympler import muppy, summary
 from datetime import datetime
 from typing import Any
 from heapq import nlargest
@@ -9,6 +10,19 @@ from operator import attrgetter, itemgetter
 SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
 MAX_OBJECTS = 10  # Maximum number of objects to log
 
+def analyze_memory_pympler():
+    all_objects = muppy.get_objects()
+    sum_obj = summary.summarize(all_objects)
+
+    # Convert summary to a string
+    summary_str = "\n".join(summary.format_(sum_obj))  # This returns a list of strings
+    logging.info(f"Memory Summary:\n{summary_str}")
+
+def report_rss_memory():
+    process = psutil.Process(os.getpid())
+    memory_usage = process.memory_info().rss / (1024 ** 3)  # Convert to GB
+    logging.info(f"Current RSS memory usage: {memory_usage:.2f} GB")
+    
 def track_object_growth(interval=60, duration=600):
     """Track object count growth over time to identify potential leaks.
     
