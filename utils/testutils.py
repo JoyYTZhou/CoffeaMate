@@ -6,9 +6,64 @@ from typing import Any
 from heapq import nlargest
 from operator import attrgetter, itemgetter
 
-# Common thresholds
 SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
 MAX_OBJECTS = 10  # Maximum number of objects to log
+
+def check_open_files() -> tuple[int, list[str]]:
+    """Check and log details about currently open files with error handling.
+    
+    Returns:
+        tuple: (number of open files, list of file paths)
+    """
+    try:
+        process = psutil.Process()
+        open_files = process.open_files()
+        
+        # Filter and sort by size if possible
+        file_info = []
+        for file in open_files:
+            try:
+                if os.path.exists(file.path):
+                    size = os.path.getsize(file.path)
+                    file_info.append((file, size))
+            except (OSError, IOError) as e:
+                logging.warning(f"Could not get size for {file.path}: {e}")
+        
+        # Sort by size if we have size info
+        if file_info:
+            file_info.sort(key=lambda x: x[1], reverse=True)
+            largest_files = file_info[:MAX_OBJECTS]
+        else:
+            largest_files = [(f, 0) for f in open_files[:MAX_OBJECTS]]
+
+        # Log summary
+        logging.info(f"Total open files: {len(open_files)}")
+        
+        # Log details of largest/first 10 files
+        for file, size in largest_files:
+            try:
+                file_details = {
+                    'path': file.path,
+                    'fd': file.fd,
+                    'mode': file.mode if hasattr(file, 'mode') else 'unknown',
+                    'size': f"{size/1024/1024:.2f}MB" if size > 0 else 'unknown',
+                    'position': file.position if hasattr(file, 'position') else 'unknown'
+                }
+                logging.info(f"Open File Details: {file_details}")
+            except Exception as e:
+                logging.warning(f"Error getting details for file {file.path}: {e}")
+
+        return len(open_files), [f[0].path for f in largest_files]
+
+    except psutil.AccessDenied:
+        logging.error("Access denied when trying to get open files")
+        return 0, []
+    except psutil.NoSuchProcess:
+        logging.error("Process not found")
+        return 0, []
+    except Exception as e:
+        logging.error(f"Unexpected error in check_open_files: {str(e)}")
+        return 0, []
 
 def analyze_memory_pympler():
     all_objects = muppy.get_objects()
