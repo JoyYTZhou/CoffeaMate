@@ -8,7 +8,7 @@ import psutil
 import awkward as ak
 import concurrent.futures
 
-from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper
+from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper, release_mapped_memory
 from src.analysis.evtselutil import BaseEventSelections
 from src.utils.testutils import log_memory, check_and_release_memory
 from src.utils.ioutil import ak_to_root, parallel_copy_and_load, compute_and_write_skimmed
@@ -149,7 +149,6 @@ class Processor:
                             future_passed[suffix] = executor.submit(self.evtselclass(**self.evtsel_kwargs).callevtsel, events)
                         except Exception as e:
                             logging.exception(f"Error copying and loading {filename}: {e}")
-                            gc.collect()
                     
                     log_memory(process, "after loading")
                         
@@ -169,12 +168,10 @@ class Processor:
                     for future in concurrent.futures.as_completed(future_cf):
                         cutflow_files.append(future.result())
                         del future
-                        gc.collect()
                     
                     for future in concurrent.futures.as_completed(future_writes):
                         rc += future.result()
                         del future
-                        gc.collect()
                     
                     del future_cf, future_writes, future_passed, future_loaded
 
@@ -186,9 +183,9 @@ class Processor:
                         self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True)
 
                     if not self.rtcfg.get("REMOTE_LOAD", True):
-                        self.filehelper.close_open_files(self.copydir, "*.root")
-                        self.filehelper.remove_files(self.copydir)
-
+                        self.filehelper.close_open_files_delete(self.copydir, "*.root")
+                
+                release_mapped_memory()
                 check_and_release_memory(process)
                 return rc
             except Exception as e:

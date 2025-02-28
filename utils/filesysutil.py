@@ -1,4 +1,4 @@
-import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch, psutil, logging, time
+import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch, psutil, logging, time, gc, mmap
 from XRootD import client
 from pathlib import Path
 
@@ -16,14 +16,23 @@ def match(pathstr, pattern) -> bool:
     """Match a path with a pattern. Returns True if the path matches the pattern."""
     return fnmatch.fnmatch(pbase(pathstr), pattern)
 
+def release_mapped_memory():
+    """Find and unmap memory-mapped files in Python."""
+    gc.collect()
+    for obj in gc.get_objects():
+        if isinstance(obj, mmap.mmap):
+            obj.close()
+            logging.debug(f"Unmapped memory-mapped file {obj}")
+            time.sleep(1)
+
 class FileSysHelper:
     """Helper class for file system operations. Can be used for both local and remote file systems."""
     def __init__(self) -> None:
         pass
 
     @staticmethod
-    def close_open_files(dirname, pattern, max_retries=3, wait_time=1):
-        """Close all open files in a directory with a specific pattern.
+    def close_open_files_delete(dirname, pattern, max_retries=3, wait_time=1):
+        """Close all open files in a directory with a specific pattern and then delete them.
 
         Parameters
         - `dirname`: directory path
@@ -36,6 +45,7 @@ class FileSysHelper:
         to_delete = glob.glob(pjoin(dirname, pattern))
 
         for file in to_delete:
+            logging.info(f"Checking if file {file} is open...")
             if file in open_files:
                 logging.warning(f"File {file} is open. Attempting to close...")
 
@@ -55,6 +65,8 @@ class FileSysHelper:
                             time.sleep(wait_time)
                 if file in {f.path for f in process.open_files()}:
                     logging.error(f"Failed to close file {file} after {max_retries} attempts")
+            os.remove(file)
+            logging.debug(f"Deleted file {file}")
 
     @staticmethod
     def remove_emptydir(root_dir):
