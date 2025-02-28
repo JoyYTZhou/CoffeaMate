@@ -9,8 +9,13 @@ from operator import attrgetter, itemgetter
 SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
 MAX_OBJECTS = 10  # Maximum number of objects to log
 
-def check_open_files() -> tuple[int, list[str]]:
+def check_open_files(auto_close_threshold: float = 100) -> tuple[int, list[str]]:
     """Check and log details about currently open files with error handling.
+    Optionally close files exceeding size threshold.
+    
+    Args:
+        auto_close_threshold (float): Size threshold in MB to automatically close files.
+                                    Set to None to disable auto-closing.
     
     Returns:
         tuple: (number of open files, list of file paths)
@@ -21,11 +26,30 @@ def check_open_files() -> tuple[int, list[str]]:
         
         # Filter and sort by size if possible
         file_info = []
+        closed_files = []
+        
         for file in open_files:
             try:
                 if os.path.exists(file.path):
                     size = os.path.getsize(file.path)
                     file_info.append((file, size))
+                    
+                    # Check if file should be closed
+                    if (auto_close_threshold is not None and 
+                        size > auto_close_threshold * 1024 * 1024):  # Convert MB to bytes
+                        try:
+                            # Try to close the file using its file descriptor
+                            os.close(file.fd)
+                            closed_files.append((file.path, size))
+                            logging.warning(
+                                f"Closed large file: {file.path} "
+                                f"(size: {size/1024/1024:.2f}MB, fd: {file.fd})"
+                            )
+                        except Exception as close_error:
+                            logging.error(
+                                f"Failed to close file {file.path}: {close_error}"
+                            )
+                            
             except (OSError, IOError) as e:
                 logging.warning(f"Could not get size for {file.path}: {e}")
         
@@ -38,6 +62,10 @@ def check_open_files() -> tuple[int, list[str]]:
 
         # Log summary
         logging.info(f"Total open files: {len(open_files)}")
+        if closed_files:
+            logging.info(f"Automatically closed {len(closed_files)} files exceeding {auto_close_threshold}MB:")
+            for path, size in closed_files:
+                logging.info(f"  - {path} ({size/1024/1024:.2f}MB)")
         
         # Log details of largest/first 10 files
         for file, size in largest_files:
@@ -47,13 +75,19 @@ def check_open_files() -> tuple[int, list[str]]:
                     'fd': file.fd,
                     'mode': file.mode if hasattr(file, 'mode') else 'unknown',
                     'size': f"{size/1024/1024:.2f}MB" if size > 0 else 'unknown',
-                    'position': file.position if hasattr(file, 'position') else 'unknown'
+                    'position': file.position if hasattr(file, 'position') else 'unknown',
+                    'status': 'closed' if file.path in [f[0] for f in closed_files] else 'open'
                 }
-                logging.info(f"Open File Details: {file_details}")
+                logging.info(f"File Details: {file_details}")
             except Exception as e:
                 logging.warning(f"Error getting details for file {file.path}: {e}")
 
-        return len(open_files), [f[0].path for f in largest_files]
+        # Return updated count (excluding closed files) and paths
+        remaining_files = len(open_files) - len(closed_files)
+        active_paths = [f[0].path for f in largest_files 
+                       if f[0].path not in [cf[0] for cf in closed_files]]
+        
+        return remaining_files, active_paths
 
     except psutil.AccessDenied:
         logging.error("Access denied when trying to get open files")
