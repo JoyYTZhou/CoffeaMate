@@ -1,4 +1,4 @@
-import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch
+import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch, psutil, logging
 from XRootD import client
 from pathlib import Path
 
@@ -20,6 +20,20 @@ class FileSysHelper:
     """Helper class for file system operations. Can be used for both local and remote file systems."""
     def __init__(self) -> None:
         pass
+
+    @staticmethod
+    def close_open_files(dirname, pattern):
+        """Close all open files in a directory with a specific pattern."""
+        process = psutil.Process()
+        open_files = {file.path for file in process.open_files()}
+        to_delete = glob.glob(pjoin(dirname, pattern))
+        for file in to_delete:
+            if file in open_files:
+                logging.warning(f"File {file} is open. Closing...")
+                try:
+                    open(file, 'r').close()
+                except Exception as e:
+                    logging.exception(f"Failed to close file {file}: {str(e)}")
 
     @staticmethod
     def remove_emptydir(root_dir):

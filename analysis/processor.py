@@ -154,6 +154,7 @@ class Processor:
                 self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True)
 
             if not self.rtcfg.get("REMOTE_LOAD", True):
+                self.filehelper.close_open_files(self.copydir, "*.root")
                 self.filehelper.remove_files(self.copydir)
         return rc
     
