@@ -84,21 +84,36 @@ def analyze_memory_status(use_pympler=False):
         summary_str = "\n".join(summary.format_(sum_obj))
         logging.info(f"Pympler Memory Summary:\n{summary_str}")
 
-def track_memory(track_objects=True, track_dask=True, interval=60, duration=600):
-    """Combined memory tracking function."""
+def track_memory_all(track_objects=True, track_dask=True, interval=60, duration=600):
+    """Combined memory tracking function.
+    
+    Args:
+        track_objects (bool): Whether to track object memory usage
+        track_dask (bool): Whether to track Dask worker memory
+        interval (int): Seconds between checks
+        duration (int): Total tracking duration in seconds
+    """
     import time
     start_time = time.time()
     end_time = start_time + duration
     
     while time.time() < end_time:
         if track_objects:
-            analyze_memory()
+            # Use the new consolidated function instead of analyze_memory
+            analyze_memory_usage(include_types=True, include_collections=True)
+            # Also get basic memory status
+            analyze_memory_status(use_pympler=False)
         
         if track_dask:
             try:
-                log_dask_status()
+                # Use the new consolidated Dask monitoring function
+                monitor_dask(track_growth=True)
             except Exception as e:
                 logging.error(f"Error tracking Dask status: {e}")
+        
+        # Log current process memory
+        process = psutil.Process()
+        log_memory(process, f"Checkpoint at {time.strftime('%H:%M:%S')}")
         
         time.sleep(interval)
 
