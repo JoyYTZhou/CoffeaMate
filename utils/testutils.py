@@ -111,7 +111,9 @@ def analyze_memory_status(use_pympler=False):
     process = psutil.Process(os.getpid())
     memory_usage = process.memory_info().rss / (1024 ** 3)
     logging.info(f"Current RSS memory usage: {memory_usage:.2f} GB")
-    
+    vms_usage = process.memory_info().vms / (1024 ** 3)
+    logging.info(f"Current VMS memory usage: {vms_usage:.2f} GB")
+
     # System memory status
     system_memory = psutil.virtual_memory()
     if system_memory.used > SIZE_THRESHOLD:
