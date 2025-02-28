@@ -1,5 +1,5 @@
 from dask.distributed import get_client
-import psutil, sys, logging, gc, dask, os
+import psutil, sys, logging, gc, dask, os, ctypes
 from pympler import muppy, summary
 from datetime import datetime
 from typing import Any
@@ -8,6 +8,12 @@ from operator import attrgetter, itemgetter
 
 SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
 MAX_OBJECTS = 10  # Maximum number of objects to log
+
+def force_release_memory():
+    try:
+        ctypes.CDLL('libc.so.6').malloc_trim(0)
+    except Exception as e:
+        logging.exception(f"Error releasing memory: {e}")
 
 def check_open_files(auto_close_threshold: float = 100) -> tuple[int, list[str]]:
     """Check and log details about currently open files with error handling.
