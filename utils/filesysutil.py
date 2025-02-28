@@ -1,4 +1,4 @@
-import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch, psutil, logging
+import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch, psutil, logging, time
 from XRootD import client
 from pathlib import Path
 
@@ -22,18 +22,39 @@ class FileSysHelper:
         pass
 
     @staticmethod
-    def close_open_files(dirname, pattern):
-        """Close all open files in a directory with a specific pattern."""
+    def close_open_files(dirname, pattern, max_retries=3, wait_time=1):
+        """Close all open files in a directory with a specific pattern.
+
+        Parameters
+        - `dirname`: directory path
+        - `pattern`: pattern to match the file name
+        - `max_retries`: maximum number of attempts to close a file
+        - `wait_time`: time to wait between attempts (in seconds)
+        """
         process = psutil.Process()
         open_files = {file.path for file in process.open_files()}
         to_delete = glob.glob(pjoin(dirname, pattern))
+
         for file in to_delete:
             if file in open_files:
-                logging.warning(f"File {file} is open. Closing...")
-                try:
-                    open(file, 'r').close()
-                except Exception as e:
-                    logging.exception(f"Failed to close file {file}: {str(e)}")
+                logging.warning(f"File {file} is open. Attempting to close...")
+
+                for attempt in range(max_retries):
+                    try:
+                        open(file, 'r').close()
+                        # Check if file is still open
+                        current_open = {f.path for f in process.open_files()}
+                        if file not in current_open:
+                            logging.info(f"Successfully closed file {file}")
+                            break
+                        logging.warning(f"Attempt {attempt + 1}/{max_retries}: File {file} still open, waiting {wait_time}s...")
+                        time.sleep(wait_time)
+                    except Exception as e:
+                        logging.exception(f"Attempt {attempt + 1}/{max_retries}: Failed to close file {file}: {str(e)}")
+                        if attempt < max_retries - 1:  # Don't sleep on last attempt
+                            time.sleep(wait_time)
+                if file in {f.path for f in process.open_files()}:
+                    logging.error(f"Failed to close file {file} after {max_retries} attempts")
 
     @staticmethod
     def remove_emptydir(root_dir):
