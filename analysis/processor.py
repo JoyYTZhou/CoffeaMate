@@ -127,75 +127,74 @@ class Processor:
         rc = 0
         process = psutil.Process()
 
-        if frag_threshold is not None and total_files > frag_threshold:
-            batch_dicts = fragment_files(self.dsdict, frag_threshold)
+        batch_dicts = fragment_files(self.dsdict, frag_threshold)
             
-            for batch_dict in batch_dicts:
-                try: 
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                        future_loaded = self.load_for_skims(
-                            fileargs=batch_dict,
-                            executor=executor,
-                            readkwargs=readkwargs)
-                        
-                        future_cf, future_writes, future_passed = [], [], {}
-
-                        log_memory(process, "before processing")
-                        
-                        for future in concurrent.futures.as_completed(future_loaded.values()):
-                            filename = next(f for f, future in future_loaded.items() if future == future)
-                            
-                            try: 
-                                events, suffix = future.result()
-                                future_passed[suffix] = executor.submit(self.evtselclass(**self.evtsel_kwargs).callevtsel, events)
-                            except Exception as e:
-                                logging.exception(f"Error copying and loading {filename}: {e}")
-                                gc.collect()
-                        
-                        log_memory(process, "after loading")
-                            
-                        for future in concurrent.futures.as_completed(future_passed.values()):
-                            suffix = next(s for s, f in future_passed.items() if f == future)
-
-                            try:
-                                log_memory(process, f"before computing/writing {suffix}")
-                                passed, evtsel_state = future.result()
-
-                                future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
-                                future_writes.append(executor.submit(self.writeskimmed, passed, suffix, **writekwargs))
-                            except Exception as e:
-                                logging.exception(f"Error processing {suffix}: {e}")
-                        
-                        cutflow_files = []
-                        for future in concurrent.futures.as_completed(future_cf):
-                            cutflow_files.append(future.result())
-                            del future
-                            gc.collect()
-                        
-                        for future in concurrent.futures.as_completed(future_writes):
-                            rc += future.result()
-                            del future
-                            gc.collect()
-                        
-                        del future_cf, future_writes, future_passed, future_loaded
-
-                        log_memory(process, "after computing + writing + garbage collection")
+        for batch_dict in batch_dicts:
+            try: 
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    future_loaded = self.load_for_skims(
+                        fileargs=batch_dict,
+                        executor=executor,
+                        readkwargs=readkwargs)
                     
-                        if self.transfer:
-                            for cutflow_file in cutflow_files:
-                                self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True)
-                            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True)
+                    future_cf, future_writes, future_passed = [], [], {}
 
-                        if not self.rtcfg.get("REMOTE_LOAD", True):
-                            self.filehelper.close_open_files(self.copydir, "*.root")
-                            self.filehelper.remove_files(self.copydir)
+                    log_memory(process, "before processing")
+                    
+                    for future in concurrent.futures.as_completed(future_loaded.values()):
+                        filename = next(f for f, future in future_loaded.items() if future == future)
+                        
+                        try: 
+                            events, suffix = future.result()
+                            future_passed[suffix] = executor.submit(self.evtselclass(**self.evtsel_kwargs).callevtsel, events)
+                        except Exception as e:
+                            logging.exception(f"Error copying and loading {filename}: {e}")
+                            gc.collect()
+                    
+                    log_memory(process, "after loading")
+                        
+                    for future in concurrent.futures.as_completed(future_passed.values()):
+                        suffix = next(s for s, f in future_passed.items() if f == future)
 
-                    check_and_release_memory(process)
-                    return rc
-                except Exception as e:
-                    logging.exception(f"Error encountered when processing {self.dataset}: {e}")
+                        try:
+                            log_memory(process, f"before computing/writing {suffix}")
+                            passed, evtsel_state = future.result()
+
+                            future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
+                            future_writes.append(executor.submit(self.writeskimmed, passed, suffix, **writekwargs))
+                        except Exception as e:
+                            logging.exception(f"Error processing {suffix}: {e}")
+                    
+                    cutflow_files = []
+                    for future in concurrent.futures.as_completed(future_cf):
+                        cutflow_files.append(future.result())
+                        del future
+                        gc.collect()
+                    
+                    for future in concurrent.futures.as_completed(future_writes):
+                        rc += future.result()
+                        del future
+                        gc.collect()
+                    
+                    del future_cf, future_writes, future_passed, future_loaded
+
+                    log_memory(process, "after computing + writing + garbage collection")
                 
-    
+                    if self.transfer:
+                        for cutflow_file in cutflow_files:
+                            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True)
+                        self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True)
+
+                    if not self.rtcfg.get("REMOTE_LOAD", True):
+                        self.filehelper.close_open_files(self.copydir, "*.root")
+                        self.filehelper.remove_files(self.copydir)
+
+                check_and_release_memory(process)
+                return rc
+            except Exception as e:
+                logging.exception(f"Error encountered when processing {self.dataset}: {e}")
+            
+
     def runfiles_sequential(self, write_npz=False, **kwargs) -> int:
         """Process files sequentially."""
         print(f"Expected to see {len(self.dsdict['files'])} outputs")
