@@ -9,6 +9,40 @@ from operator import attrgetter, itemgetter
 SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
 MAX_OBJECTS = 10  # Maximum number of objects to log
 
+def check_and_release_memory(process: psutil.Process, 
+                           rss_threshold_gb: float = 4.0,
+                           vms_rss_diff_threshold_mb: float = 400.0) -> None:
+    """Check memory usage and force release if exceeding thresholds.
+    
+    Args:
+        process: psutil.Process object to monitor
+        rss_threshold_gb: Threshold for RSS memory in GB
+        vms_rss_diff_threshold_mb: Threshold for VMS-RSS difference in MB
+    """
+    mem_info = process.memory_info()
+    rss_gb = mem_info.rss / (1024 ** 3)  # Convert to GB
+    vms_mb = mem_info.vms / (1024 ** 2)  # Convert to MB
+    rss_mb = mem_info.rss / (1024 ** 2)  # Convert to MB
+    vms_rss_diff = vms_mb - rss_mb
+    
+    if rss_gb > rss_threshold_gb and vms_rss_diff > vms_rss_diff_threshold_mb:
+        logging.warning(
+            f"High memory usage detected:\n"
+            f"RSS: {rss_gb:.2f}GB (threshold: {rss_threshold_gb}GB)\n"
+            f"VMS-RSS diff: {vms_rss_diff:.2f}MB (threshold: {vms_rss_diff_threshold_mb}MB)"
+        )
+        logging.info("Forcing memory release...")
+        force_release_memory()
+        
+        # Log memory after release
+        new_mem = process.memory_info()
+        logging.info(
+            f"Memory after forced release:\n"
+            f"RSS: {new_mem.rss/(1024**3):.2f}GB\n"
+            f"VMS: {new_mem.vms/(1024**3):.2f}GB\n"
+            f"VMS-RSS diff: {(new_mem.vms - new_mem.rss)/(1024**2):.2f}MB"
+        )
+
 def force_release_memory():
     try:
         ctypes.CDLL('libc.so.6').malloc_trim(0)
