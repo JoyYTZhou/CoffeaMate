@@ -10,7 +10,7 @@ import concurrent.futures
 
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper, release_mapped_memory
 from src.analysis.evtselutil import BaseEventSelections
-from src.utils.testutils import log_memory, check_and_release_memory
+from src.utils.testutils import log_memory, check_and_release_memory, check_open_files
 from src.utils.ioutil import ak_to_root, parallel_copy_and_load, compute_and_write_skimmed
 
 def fragment_files(dsdict, fragment_size: int) -> list[dict]:
@@ -186,10 +186,11 @@ class Processor:
                         self.filehelper.close_open_files_delete(self.copydir, "*.root")
                 
                 release_mapped_memory()
+                check_open_files()
                 check_and_release_memory(process)
-                return rc
             except Exception as e:
                 logging.exception(f"Error encountered when processing {self.dataset}: {e}")
+        return rc
             
 
     def runfiles_sequential(self, write_npz=False, **kwargs) -> int:
