@@ -58,7 +58,7 @@ def parallel_copy_and_load(fileargs, copydir, executor, rtcfg, read_args) -> dic
     future_to_file = {filename: executor.submit(process_file, filename, fileinfo, copydir, rtcfg, read_args) for filename, fileinfo in fileargs['files'].items()}
     return future_to_file
 
-def compute_dask_array(passed) -> ak.Array:
+def compute_dask_array(passed, force_compute=True) -> ak.Array:
     """Compute the dask array and handle zero-length partitions."""
     if hasattr(passed, 'npartitions'):
         passed = passed.persist()
@@ -70,7 +70,10 @@ def compute_dask_array(passed) -> ak.Array:
 
         if not has_zero_lengths:
             logging.debug("No zero-arrays found, using uproot.dask_write directly")
-            return passed
+            if force_compute:
+                return dask.compute(passed)[0]
+            else:
+                return passed
         else:
             logging.debug("Found zero-length partitions, filtering them out")
             valid_indices = [i for i, l in enumerate(lengths) if l > 0]
