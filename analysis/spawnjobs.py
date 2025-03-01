@@ -17,43 +17,51 @@ def div_dict(original_dict, chunk_size):
     for _ in range(0, len(original_dict), chunk_size):
         yield dict(islice(it, chunk_size))
 
-def filterExisting(ds: 'str', dsdata: 'dict', tsferP, out_endpattern=[".root", "cutflow.csv"], prefix=None) -> bool:
-    """Update dsdata on files that need to be processed for a MC dataset based on the existing output files and cutflow tables.
+def filterExisting(ds: str, dsdata: dict, tsferP, out_endpattern=[".root", "cutflow.csv"], prefix=None) -> bool:
+    """Update dsdata on files that need to be processed for a MC dataset 
+    based on the existing output files and cutflow tables.
     
-    Parameters
+    Parameters:
     - `ds`: Dataset name
     - `dsdata`: A dictionary of dataset information with keys 'files', 'metadata', 'filelist'
-    - `out_endpattern`: A string or a list of strings representing output ending file pattern to check for. No wildcards needed.
+    - `tsferP`: Path where processed files are stored.
+    - `out_endpattern`: A string or a list of strings representing output ending file pattern to check for.
     - `prefix`: Prefix to be used in case of xrootd system for tsferP. Treat tsferP as a local path if None.
 
-    Return
+    Returns:
     - bool: True if some files need to be processed, False otherwise. 
     """
+    
     helper = FileSysHelper()
     dir_exist = helper.checkpath(tsferP, createdir=False)
+    
     if not tsferP or not dir_exist:
         return True
     
     if isinstance(out_endpattern, str):
-        outputpattern = [outputpattern]
-    
+        out_endpattern = [out_endpattern]  # Convert to list if single string
+
     files_to_remove = [] 
 
+    existing_outfiles = helper.glob_files(tsferP, "*")  # Get all files in tsferP once
+
+    file_match_counts = {filename: 0 for filename in dsdata['files']}
+
     for filename, fileinfo in dsdata['files'].items():
-        prefix = f"{ds}_{fileinfo['uuid']}"
-        matched = 0
+        expected_prefix = f"{ds}_{fileinfo['uuid']}"
+
         for pattern in out_endpattern:
-            outfiles = helper.glob_files(tsferP, f"*{pattern}")
-            expected = f"{prefix}*{pattern}"
-            matched += helper.cross_check(expected, outfiles)
-        
-        if matched == len(out_endpattern):
+            expected_file = f"{expected_prefix}*{pattern}"  # Expected file pattern
+            if helper.cross_check(expected_file, existing_outfiles):  
+                file_match_counts[filename] += 1  # Increase match count
+
+        if file_match_counts[filename] == len(out_endpattern):
             files_to_remove.append(filename)
-        
+
     for file in files_to_remove:
         dsdata['files'].pop(file)
-    
-    return len(dsdata['files']) > 0
+
+    return len(dsdata['files']) > 0  # Return True if files remain, False if all processed
     
 class JobRunner:
     """
