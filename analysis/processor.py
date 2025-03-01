@@ -13,6 +13,14 @@ from src.analysis.evtselutil import BaseEventSelections
 from src.utils.testutils import log_memory, check_and_release_memory
 from src.utils.ioutil import ak_to_root, parallel_copy_and_load, compute_and_write_skimmed
 
+def calc_skim_params(filesize, avail_memory) -> tuple:
+    """Calculate the number of workers and fragment size based on the filesize and available memory."""
+    n_workers = avail_memory // (filesize*3)
+    n_workers = max(1, n_workers)
+    fragment_size = n_workers + 2
+
+    return (n_workers, fragment_size)
+
 def fragment_files(dsdict, fragment_size: int) -> list[dict]:
     """Split files into smaller fragments if needed.
     
@@ -119,7 +127,7 @@ class Processor:
     def load_for_skims(self, fileargs, executor, readkwargs) -> ak.Array:
         with self.load_skim_semaphore:
             return parallel_copy_and_load(fileargs, self.copydir, executor, self.rtcfg, readkwargs)
-
+    
     def run_skims(self, write_npz=False, max_workers=2, frag_threshold=4, readkwargs={}, writekwargs={}, **kwargs) -> int:
         """Process files in parallel. Recommended for skimming."""
         total_files = len(self.dsdict['files'])
