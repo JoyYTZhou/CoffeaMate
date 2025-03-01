@@ -4,7 +4,6 @@ import awkward as ak
 import dask_awkward as dak
 from uproot.writing._dask_write import ak_to_root
 
-
 from src.utils.filesysutil import XRootDHelper, pjoin
 
 def write_empty_root(filename):

@@ -1,5 +1,5 @@
 from dask.distributed import get_client
-import psutil, sys, logging, gc, dask, os, ctypes
+import psutil, sys, logging, gc, dask, os, ctypes, platform
 from pympler import muppy, summary
 from datetime import datetime
 from typing import Any
@@ -8,6 +8,31 @@ from operator import attrgetter, itemgetter
 
 SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
 MAX_OBJECTS = 10  # Maximum number of objects to log
+
+def is_jemalloc_used():
+    """Check if jemalloc is being used as the memory allocator."""
+    try:
+        with open("/proc/self/maps", "r") as f:
+            for line in f:
+                if "jemalloc" in line:
+                    return True
+    except Exception:
+        logging.exception("Error checking memory allocator")
+    return False
+
+def force_release_memory():
+    """Forces memory release by running garbage collection and `malloc_trim(0)` (if supported)."""
+    try:
+        gc.collect()
+        if "glibc" in platform.libc_ver()[0] and not is_jemalloc_used():
+            libc = ctypes.CDLL("libc.so.6")
+            libc.malloc_trim(0)
+            logging.info("Successfully released memory using malloc_trim(0).")
+        else:
+            logging.warning("Skipping malloc_trim(0): System is not using glibc or is using jemalloc.")
+    except Exception as e:
+        logging.exception(f"Error releasing memory: {e}")
+
 
 def check_and_release_memory(process: psutil.Process, 
                            rss_threshold_gb: float = 4.0,
@@ -49,24 +74,26 @@ def force_release_memory():
     except Exception as e:
         logging.exception(f"Error releasing memory: {e}")
 
-def check_open_files(auto_close_threshold: float = 100) -> tuple[int, list[str]]:
+def check_open_files(auto_close_threshold: float = 100, max_objects: int = MAX_OBJECTS) -> tuple[int, list[str]]:
     """Check and log details about currently open files with error handling.
-    Optionally close files exceeding size threshold.
     
+    Optionally close files exceeding a size threshold.
+
     Args:
         auto_close_threshold (float): Size threshold in MB to automatically close files.
-                                    Set to None to disable auto-closing.
-    
+                                      Set to None to disable auto-closing.
+        max_objects (int): Number of largest open files to log.
+
     Returns:
-        tuple: (number of open files, list of file paths)
+        tuple: (number of remaining open files, list of file paths)
     """
     try:
         process = psutil.Process()
         open_files = process.open_files()
-        
-        # Filter and sort by size if possible
+
         file_info = []
         closed_files = []
+        nfs_files = []  # Track .nfsXXXX files
         
         for file in open_files:
             try:
@@ -74,59 +101,59 @@ def check_open_files(auto_close_threshold: float = 100) -> tuple[int, list[str]]
                     size = os.path.getsize(file.path)
                     file_info.append((file, size))
                     
-                    # Check if file should be closed
-                    if (auto_close_threshold is not None and 
-                        size > auto_close_threshold * 1024 * 1024):  # Convert MB to bytes
+                    # Auto-close files if they exceed threshold
+                    if auto_close_threshold is not None and size > auto_close_threshold * 1024 * 1024:
                         try:
-                            # Try to close the file using its file descriptor
-                            os.close(file.fd)
+                            os.close(file.fd)  # Close file descriptor
                             closed_files.append((file.path, size))
                             logging.warning(
                                 f"Closed large file: {file.path} "
                                 f"(size: {size/1024/1024:.2f}MB, fd: {file.fd})"
                             )
                         except Exception as close_error:
-                            logging.error(
-                                f"Failed to close file {file.path}: {close_error}"
-                            )
-                            
+                            logging.error(f"Failed to close file {file.path}: {close_error}")
+                
+                # Check if file is a .nfsXXXX file
+                if "/.nfs" in file.path:
+                    nfs_files.append(file.path)
+
             except (OSError, IOError) as e:
                 logging.warning(f"Could not get size for {file.path}: {e}")
-        
-        # Sort by size if we have size info
-        if file_info:
-            file_info.sort(key=lambda x: x[1], reverse=True)
-            largest_files = file_info[:MAX_OBJECTS]
-        else:
-            largest_files = [(f, 0) for f in open_files[:MAX_OBJECTS]]
 
-        # Log summary
+        # Sort files by size (descending)
+        file_info.sort(key=lambda x: x[1], reverse=True)
+        largest_files = file_info[:max_objects]
+
+        # Log overall summary
         logging.info(f"Total open files: {len(open_files)}")
         if closed_files:
             logging.info(f"Automatically closed {len(closed_files)} files exceeding {auto_close_threshold}MB:")
             for path, size in closed_files:
                 logging.info(f"  - {path} ({size/1024/1024:.2f}MB)")
-        
-        # Log details of largest/first 10 files
+
+        if nfs_files:
+            logging.warning(f"Detected {len(nfs_files)} lingering .nfsXXXX files:")
+            for path in nfs_files:
+                logging.warning(f"  - {path}")
+
+        # Log details of largest open files
         for file, size in largest_files:
             try:
                 file_details = {
-                    'path': file.path,
-                    'fd': file.fd,
-                    'mode': file.mode if hasattr(file, 'mode') else 'unknown',
-                    'size': f"{size/1024/1024:.2f}MB" if size > 0 else 'unknown',
-                    'position': file.position if hasattr(file, 'position') else 'unknown',
-                    'status': 'closed' if file.path in [f[0] for f in closed_files] else 'open'
+                    "path": file.path,
+                    "fd": file.fd,
+                    "mode": getattr(file, "mode", "unknown"),
+                    "size": f"{size/1024/1024:.2f}MB" if size > 0 else "unknown",
+                    "position": getattr(file, "position", "unknown"),
+                    "status": "closed" if file.path in [f[0] for f in closed_files] else "open"
                 }
                 logging.info(f"File Details: {file_details}")
             except Exception as e:
                 logging.warning(f"Error getting details for file {file.path}: {e}")
 
-        # Return updated count (excluding closed files) and paths
         remaining_files = len(open_files) - len(closed_files)
-        active_paths = [f[0].path for f in largest_files 
-                       if f[0].path not in [cf[0] for cf in closed_files]]
-        
+        active_paths = [f[0].path for f in largest_files if f[0].path not in [cf[0] for cf in closed_files]]
+
         return remaining_files, active_paths
 
     except psutil.AccessDenied:
