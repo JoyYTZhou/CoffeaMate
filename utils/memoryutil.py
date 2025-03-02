@@ -18,10 +18,10 @@ def restart_if_vms_high(threshold_gb=6):
         logging.warning(f"🔴 High VMS detected ({vms:.2f} GB). Restarting Python...")
         os.execv(sys.executable, [sys.executable] + sys.argv)  # Restart process
 
-def analyze_memory_status(use_pympler=False):
+def analyze_memory_status(process=None, use_pympler=False):
     """Comprehensive memory analysis with optional Pympler details."""
-    # Basic RSS memory report
-    process = psutil.Process(os.getpid())
+    if process is None:
+        process = psutil.Process(os.getpid())
     memory_usage = process.memory_info().rss / (1024 ** 3)
     logging.info(f"Current RSS memory usage: {memory_usage:.2f} GB")
     vms_usage = process.memory_info().vms / (1024 ** 3)
@@ -111,7 +111,9 @@ def check_and_release_memory(process: psutil.Process,
                       f"VMS-RSS diff: {new_vms_rss_diff:.2f}MB")
         if new_rss_gb > rss_threshold_gb and new_vms_rss_diff > vms_rss_diff_threshold_mb:
             logging.warning("Memory release did not reduce memory usage sufficiently.")
+            logging.warning("Force mallopt trim to reduce memory fragmentation.")
             force_mallopt_trim()
+            analyze_memory_status(process, use_pympler=False)
 
 def monitor_dask(track_growth=True):
     """Monitor Dask workers' memory usage and optionally track growth."""
@@ -173,13 +175,14 @@ def track_memory_all(track_objects=True, track_dask=True, interval=60, duration=
     import time
     start_time = time.time()
     end_time = start_time + duration
+    process = psutil.Process(os.getpid())
     
     while time.time() < end_time:
         if track_objects:
             # Use the new consolidated function instead of analyze_memory
             analyze_memory_usage(include_types=True, include_collections=True)
             # Also get basic memory status
-            analyze_memory_status(use_pympler=False)
+            analyze_memory_status(process, use_pympler=False)
         
         if track_dask:
             try:
