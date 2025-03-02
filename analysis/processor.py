@@ -10,8 +10,8 @@ import concurrent.futures
 
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper, release_mapped_memory
 from src.analysis.evtselutil import BaseEventSelections
-from src.utils.testutils import log_memory, check_and_release_memory, check_open_files
-from src.utils.ioutil import ak_to_root, parallel_copy_and_load, compute_and_write_skimmed
+from src.utils.memoryutil import check_and_release_memory, log_memory
+from src.utils.ioutil import ak_to_root, parallel_copy_and_load, compute_and_write_skimmed, check_open_files
 
 def calc_skim_params(filesize, avail_memory) -> tuple:
     """Calculate the number of workers and fragment size based on the filesize and available memory."""
