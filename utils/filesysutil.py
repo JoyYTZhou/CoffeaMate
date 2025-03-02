@@ -206,7 +206,7 @@ class FileSysHelper:
                     if remove:
                         os.remove(file)
                 else:
-                    print(f"File {dest_file} exists. Skipping.")
+                    logging.debug(f"File {dest_file} exists. Skipping.")
     
 class XRootDHelper:
     def __init__(self, prefix=PREFIX) -> None:
@@ -239,12 +239,11 @@ class XRootDHelper:
             if raiseError:
                 raise FileNotFoundError(f"this path {dirname} does not exist.")
             else:
+                logging.warning(f"Path {dirname} does not exist.")
                 if createdir:
                     status, _ = self.xrdfs_client.mkdir(dirname)
                     if not status.ok:
                         raise Exception(f"Failed to create directory {dirname}: {status.message}")
-                else:
-                    print(f"Path {dirname} does not exist.")
                 return False
         return True
     
@@ -312,7 +311,7 @@ def checkx509():
     proxy_position = os.environ.get("X509_USER_PROXY", default=None)
     if proxy_position is None:
         raise SystemError("Proxy not found. Immediately check proxy!")
-    print(f"Proxy at: {proxy_position}.")
+    logging.info(f"Proxy at: {proxy_position}.")
     proxy_directory = os.environ.get("X509_CERT_DIR", default=None)
     if proxy_directory is None:
         print(f"Certificate directory not set!")
