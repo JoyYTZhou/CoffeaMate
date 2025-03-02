@@ -189,8 +189,9 @@ def compute_dask_array(passed, force_compute=True) -> ak.Array:
         has_zero_lengths = any(l == 0 for l in lengths)
 
         if not has_zero_lengths:
-            logging.debug("No zero-arrays found, using uproot.dask_write directly")
+            logging.debug("No zero-arrays found")
             if force_compute:
+                logging.debug("Computing dask arrays...")
                 return dask.compute(passed)[0]
             else:
                 return passed
