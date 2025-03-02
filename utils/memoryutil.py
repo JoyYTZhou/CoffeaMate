@@ -18,16 +18,20 @@ def restart_if_vms_high(threshold_gb=6):
         logging.warning(f"🔴 High VMS detected ({vms:.2f} GB). Restarting Python...")
         os.execv(sys.executable, [sys.executable] + sys.argv)  # Restart process
 
-def analyze_memory_status(process=None, use_pympler=False):
-    """Comprehensive memory analysis with optional Pympler details."""
+def analyze_memory_status(process=None, use_pympler=False) -> tuple[int, int]:
+    """Comprehensive memory analysis with optional Pympler details.
+    
+    Return 
+    - RSS memory usage in GB
+    - VMS memory usage in GB"""
     if process is None:
         process = psutil.Process(os.getpid())
-    memory_usage = process.memory_info().rss / (1024 ** 3)
+    memory_info = process.memory_info()
+    memory_usage = memory_info.rss / (1024 ** 3)
     logging.info(f"Current RSS memory usage: {memory_usage:.2f} GB")
-    vms_usage = process.memory_info().vms / (1024 ** 3)
+    vms_usage = memory_info.vms / (1024 ** 3)
     logging.info(f"Current VMS memory usage: {vms_usage:.2f} GB")
 
-    # System memory status
     system_memory = psutil.virtual_memory()
     if system_memory.used > SIZE_THRESHOLD:
         logging.warning(f"System memory usage: {system_memory.percent}% ({system_memory.used / 1e6:.2f} MB)")
@@ -38,6 +42,8 @@ def analyze_memory_status(process=None, use_pympler=False):
         sum_obj = summary.summarize(all_objects)
         summary_str = "\n".join(summary.format_(sum_obj))
         logging.info(f"Pympler Memory Summary:\n{summary_str}")
+    
+    return memory_usage, vms_usage
 
 def force_mallopt_trim():
     """Use mallopt() to force aggressive memory release in glibc."""
@@ -85,10 +91,9 @@ def check_and_release_memory(process: psutil.Process,
         rss_threshold_gb: Threshold for RSS memory in GB
         vms_rss_diff_threshold_mb: Threshold for VMS-RSS difference in MB
     """
-    mem_info = process.memory_info()
-    rss_gb = mem_info.rss / (1024 ** 3)  # Convert to GB
-    vms_mb = mem_info.vms / (1024 ** 2)  # Convert to MB
-    rss_mb = mem_info.rss / (1024 ** 2)  # Convert to MB
+    rss_gb, vms_gb = analyze_memory_status(process, use_pympler=False)
+    vms_mb = vms_gb * 1024  # Convert to MB
+    rss_mb = rss_gb * 1024  # Convert to MB
     vms_rss_diff = vms_mb - rss_mb
     
     if rss_gb > rss_threshold_gb and vms_rss_diff > vms_rss_diff_threshold_mb:
@@ -101,13 +106,11 @@ def check_and_release_memory(process: psutil.Process,
         force_release_memory()
         
         # Log memory after release
-        new_mem = process.memory_info()
-        new_rss_gb = new_mem.rss / (1024 ** 3)
-        new_vms_mb = new_mem.vms / (1024 ** 2)
-        new_vms_rss_diff = new_vms_mb - (new_mem.rss / (1024 ** 2))
+        new_rss_gb, new_vms_gb = analyze_memory_status(process, use_pympler=False)
+        new_vms_rss_diff = (new_vms_gb * 1024) - (new_rss_gb * 1024)
         logging.info(f"Memory after forced release:\n"
                       f"RSS: {new_rss_gb:.2f}GB\n"
-                      f"VMS: {new_vms_mb:.2f}GB\n"
+                      f"VMS: {new_vms_gb:.2f}GB\n"
                       f"VMS-RSS diff: {new_vms_rss_diff:.2f}MB")
         if new_rss_gb > rss_threshold_gb and new_vms_rss_diff > vms_rss_diff_threshold_mb:
             logging.warning("Memory release did not reduce memory usage sufficiently.")
