@@ -9,6 +9,15 @@ from operator import attrgetter, itemgetter
 SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
 MAX_OBJECTS = 10  # Maximum number of objects to log
 
+def restart_if_vms_high(threshold_gb=6):
+    """Restart Python if VMS memory usage is too high."""
+    process = psutil.Process(os.getpid())
+    vms = process.memory_info().vms / (1024**3)  # Convert to GB
+
+    if vms > threshold_gb:
+        logging.warning(f"🔴 High VMS detected ({vms:.2f} GB). Restarting Python...")
+        os.execv(sys.executable, [sys.executable] + sys.argv)  # Restart process
+
 def analyze_memory_status(use_pympler=False):
     """Comprehensive memory analysis with optional Pympler details."""
     # Basic RSS memory report
@@ -30,17 +39,17 @@ def analyze_memory_status(use_pympler=False):
         summary_str = "\n".join(summary.format_(sum_obj))
         logging.info(f"Pympler Memory Summary:\n{summary_str}")
 
-def force_malloc_release():
-    """Force glibc to return all unused memory to the OS."""
+def force_mallopt_trim():
+    """Use mallopt() to force aggressive memory release in glibc."""
     try:
         libc = ctypes.CDLL("libc.so.6")
-        if hasattr(libc, "malloc_release"):
-            libc.malloc_release()
-            logging.info("Successfully released memory using malloc_release().")
-        else:
-            logging.warning("malloc_release() not available on this system.")
+        M_MMAP_THRESHOLD = 16  # Reduce mmap threshold
+        M_TRIM_THRESHOLD = -1  # Force trimming
+        libc.mallopt(0, M_MMAP_THRESHOLD)
+        libc.mallopt(1, M_TRIM_THRESHOLD)
+        logging.info("✅ Successfully called mallopt() to reduce memory fragmentation.")
     except Exception as e:
-        logging.exception(f"Error calling malloc_release(): {e}")
+        logging.exception(f"⚠️ Error calling mallopt(): {e}")
 
 def is_jemalloc_used():
     """Check if jemalloc is being used as the memory allocator."""
@@ -102,8 +111,7 @@ def check_and_release_memory(process: psutil.Process,
                       f"VMS-RSS diff: {new_vms_rss_diff:.2f}MB")
         if new_rss_gb > rss_threshold_gb and new_vms_rss_diff > vms_rss_diff_threshold_mb:
             logging.warning("Memory release did not reduce memory usage sufficiently.")
-            logging.warning("Trying malloc_release()...")
-            force_malloc_release()
+            force_mallopt_trim()
 
 def monitor_dask(track_growth=True):
     """Monitor Dask workers' memory usage and optionally track growth."""
