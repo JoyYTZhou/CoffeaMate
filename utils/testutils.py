@@ -9,6 +9,18 @@ from operator import attrgetter, itemgetter
 SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
 MAX_OBJECTS = 10  # Maximum number of objects to log
 
+def force_malloc_release():
+    """Force glibc to return all unused memory to the OS."""
+    try:
+        libc = ctypes.CDLL("libc.so.6")
+        if hasattr(libc, "malloc_release"):
+            libc.malloc_release()
+            logging.info("Successfully released memory using malloc_release().")
+        else:
+            logging.warning("malloc_release() not available on this system.")
+    except Exception as e:
+        logging.exception(f"Error calling malloc_release(): {e}")
+
 def is_jemalloc_used():
     """Check if jemalloc is being used as the memory allocator."""
     try:
@@ -61,18 +73,17 @@ def check_and_release_memory(process: psutil.Process,
         
         # Log memory after release
         new_mem = process.memory_info()
-        logging.info(
-            f"Memory after forced release:\n"
-            f"RSS: {new_mem.rss/(1024**3):.2f}GB\n"
-            f"VMS: {new_mem.vms/(1024**3):.2f}GB\n"
-            f"VMS-RSS diff: {(new_mem.vms - new_mem.rss)/(1024**2):.2f}MB"
-        )
-
-def force_release_memory():
-    try:
-        ctypes.CDLL('libc.so.6').malloc_trim(0)
-    except Exception as e:
-        logging.exception(f"Error releasing memory: {e}")
+        new_rss_gb = new_mem.rss / (1024 ** 3)
+        new_vms_mb = new_mem.vms / (1024 ** 2)
+        new_vms_rss_diff = new_vms_mb - (new_mem.rss / (1024 ** 2))
+        logging.info(f"Memory after forced release:\n"
+                      f"RSS: {new_rss_gb:.2f}GB\n"
+                      f"VMS: {new_vms_mb:.2f}GB\n"
+                      f"VMS-RSS diff: {new_vms_rss_diff:.2f}MB")
+        if new_rss_gb > rss_threshold_gb and new_vms_rss_diff > vms_rss_diff_threshold_mb:
+            logging.warning("Memory release did not reduce memory usage sufficiently.")
+            logging.warning("Trying malloc_release()...")
+            force_malloc_release()
 
 def check_open_files(auto_close_threshold: float = 100, max_objects: int = MAX_OBJECTS) -> tuple[int, list[str]]:
     """Check and log details about currently open files with error handling.
@@ -418,21 +429,31 @@ def log_memory(process, stage):
         logging.warning(f"Memory usage at {stage}: {mem_usage / 1e6:.2f} MB")
     return mem_usage
 
-def setup_logging(console_level=logging.WARNING, file_level=logging.DEBUG):
-    """Setup logging with consistent format and levels"""
-    logging.getLogger().handlers.clear()
-    debug_filename = f'debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
-    logging.basicConfig(
-        filename=debug_filename,
-        level=file_level,
-        format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
-    )
+def setup_logging(console_level=logging.WARNING, file_level=logging.DEBUG, log_to_file=True):
+    """Setup logging with an option to log to a file or only to the console."""
+    
+    logging.getLogger().handlers.clear()  # Clear existing handlers
+
+    if log_to_file:
+        debug_filename = f'debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+        logging.basicConfig(
+            filename=debug_filename,
+            level=file_level,
+            format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
+        )
+
     console_handler = logging.StreamHandler()
     console_handler.setLevel(console_level)
+    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
     logging.getLogger().addHandler(console_handler)
-    
-    # Set specific logger levels
+
     logging.getLogger("uproot").setLevel(logging.WARNING)
     logging.getLogger("dask").setLevel(logging.DEBUG)
     logging.getLogger("distributed").setLevel(logging.DEBUG)
     logging.getLogger("fsspec").setLevel(logging.WARNING)
+
+    if log_to_file:
+        logging.info(f"Logging setup: Console Level = {console_level}, File Level = {file_level}, Log File = {debug_filename}")
+    else:
+        logging.info(f"Logging setup: Console Level = {console_level}, File logging is disabled.")
+
