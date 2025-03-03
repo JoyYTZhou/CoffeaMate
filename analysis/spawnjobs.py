@@ -89,7 +89,7 @@ class JobRunner:
             helper.checkpath(self.transferPBase, createdir=True)
     
     def submitskims(self, client, proc_kwargs={}) -> int:
-        proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, **proc_kwargs)
+        proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, proc_kwargs=proc_kwargs)
         read_kwargs = {}
         filter_name = self.rs.get("FILTER_NAME", None)
         if filter_name:

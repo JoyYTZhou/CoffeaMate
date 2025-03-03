@@ -65,7 +65,7 @@ def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
 
 class Processor:
     """Process individual file or filesets given strings/dicts belonging to one dataset."""
-    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, **kwargs):
         """
         Parameters
         - `ds_dict`: Example dictionary should look like this,
@@ -79,8 +79,8 @@ class Processor:
         self.transfer = transferP
         self.filehelper = FileSysHelper()
         self.initdir()
-        self.write_skim_semaphore = threading.Semaphore(kwargs.get("n_write", 3))
-        self.load_skim_semaphore = threading.Semaphore(kwargs.get("n_load", 3))
+        self.write_skim_semaphore = threading.Semaphore(proc_kwargs.get("n_write", 3))
+        self.load_skim_semaphore = threading.Semaphore(proc_kwargs.get("n_load", 3))
     
     def initdir(self) -> None:
         """Initialize the output directory and copy directory if necessary.
