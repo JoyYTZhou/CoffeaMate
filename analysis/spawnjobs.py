@@ -88,8 +88,8 @@ class JobRunner:
             self.transferPBase = f'{self.transferPBase}/{year}'
             helper.checkpath(self.transferPBase, createdir=True)
     
-    def submitskims(self, client, **kwargs) -> int:
-        proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass)
+    def submitskims(self, client, proc_kwargs={}) -> int:
+        proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, **proc_kwargs)
         read_kwargs = {}
         filter_name = self.rs.get("FILTER_NAME", None)
         if filter_name:

@@ -64,8 +64,6 @@ def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
     return cutflow_name
 
 class Processor:
-    write_skim_semaphore = threading.Semaphore(3)
-    load_skim_semaphore = threading.Semaphore(3)
     """Process individual file or filesets given strings/dicts belonging to one dataset."""
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, **kwargs):
         """
@@ -81,6 +79,8 @@ class Processor:
         self.transfer = transferP
         self.filehelper = FileSysHelper()
         self.initdir()
+        self.write_skim_semaphore = threading.Semaphore(kwargs.get("n_write", 3))
+        self.load_skim_semaphore = threading.Semaphore(kwargs.get("n_load", 3))
     
     def initdir(self) -> None:
         """Initialize the output directory and copy directory if necessary.
