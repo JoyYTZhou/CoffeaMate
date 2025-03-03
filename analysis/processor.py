@@ -128,7 +128,7 @@ class Processor:
         with self.load_skim_semaphore:
             return parallel_copy_and_load(fileargs, self.copydir, executor, self.rtcfg, readkwargs)
     
-    def run_skims(self, write_npz=False, max_workers=2, frag_threshold=4, readkwargs={}, writekwargs={}, **kwargs) -> int:
+    def run_skims(self, write_npz=False, max_workers=2, frag_threshold=3, readkwargs={}, writekwargs={}, **kwargs) -> int:
         """Process files in parallel. Recommended for skimming."""
         total_files = len(self.dsdict['files'])
         logging.debug(f"Expected to see {total_files} outputs")

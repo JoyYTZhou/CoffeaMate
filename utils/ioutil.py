@@ -6,11 +6,16 @@ from datetime import datetime
 from uproot.writing._dask_write import ak_to_root
 
 from src.utils.filesysutil import XRootDHelper, pjoin
+import logging
+from datetime import datetime
 
 def setup_logging(console_level=logging.WARNING, file_level=logging.DEBUG, log_to_file=True):
     """Setup logging with an option to log to a file or only to the console."""
-    
+
     logging.getLogger().handlers.clear()  # Clear existing handlers
+
+    # Ensure the root logger level is set based on the lowest level requested
+    logging.getLogger().setLevel(min(console_level, file_level))  # Set root logger level
 
     if log_to_file:
         debug_filename = f'debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
@@ -20,20 +25,19 @@ def setup_logging(console_level=logging.WARNING, file_level=logging.DEBUG, log_t
             format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
         )
 
+    # Always add a console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(console_level)
     console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
     logging.getLogger().addHandler(console_handler)
 
+    # Set specific library log levels
     logging.getLogger("uproot").setLevel(logging.WARNING)
     logging.getLogger("dask").setLevel(logging.DEBUG)
     logging.getLogger("distributed").setLevel(logging.DEBUG)
     logging.getLogger("fsspec").setLevel(logging.WARNING)
 
-    if log_to_file:
-        logging.info(f"Logging setup: Console Level = {console_level}, File Level = {file_level}, Log File = {debug_filename}")
-    else:
-        logging.info(f"Logging setup: Console Level = {console_level}, File logging is disabled.")
+    logging.info(f"Logging setup: Console Level = {console_level}, File logging is {'enabled' if log_to_file else 'disabled'}.")
 
 def check_open_files(auto_close_threshold: float = 100, max_objects: int = 10) -> tuple[int, list[str]]:
     """Check and log details about currently open files with error handling.
