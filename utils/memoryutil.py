@@ -97,22 +97,13 @@ def check_and_release_memory(process: psutil.Process,
     vms_rss_diff = vms_mb - rss_mb
     
     if rss_gb > rss_threshold_gb and vms_rss_diff > vms_rss_diff_threshold_mb:
-        logging.warning(
-            f"High memory usage detected:\n"
-            f"RSS: {rss_gb:.2f}GB (threshold: {rss_threshold_gb}GB)\n"
-            f"VMS-RSS diff: {vms_rss_diff:.2f}MB (threshold: {vms_rss_diff_threshold_mb}MB)"
-        )
-        logging.info("Forcing memory release...")
+        logging.warning("High memory usage detected, forcing memory release ...")
         force_release_memory()
         
-        # Log memory after release
+        logging.info("Memory after forced release")
         new_rss_gb, new_vms_gb = analyze_memory_status(process, use_pympler=False)
         new_vms_rss_diff = (new_vms_gb * 1024) - (new_rss_gb * 1024)
-        logging.info(f"Memory after forced release:\n"
-                      f"RSS: {new_rss_gb:.2f}GB\n"
-                      f"VMS: {new_vms_gb:.2f}GB\n"
-                      f"VMS-RSS diff: {new_vms_rss_diff:.2f}MB")
-        if new_rss_gb > rss_threshold_gb and new_vms_rss_diff > vms_rss_diff_threshold_mb:
+        if new_rss_gb > rss_threshold_gb or new_vms_rss_diff > vms_rss_diff_threshold_mb:
             logging.warning("Memory release did not reduce memory usage sufficiently.")
             logging.warning("Force mallopt trim to reduce memory fragmentation.")
             force_mallopt_trim()
@@ -261,7 +252,6 @@ def analyze_memory_usage(include_types=True, include_collections=True):
                 logging.debug(f"First {ele_print} values: {list(obj.values())[:ele_print]}")
             elif isinstance(obj, tuple):
                 logging.debug(f"First {ele_print} elements: {obj[:ele_print]}")
-
 
 def analyze_references(track_cycles=True, min_refs=10):
     """Combined reference analysis function."""
