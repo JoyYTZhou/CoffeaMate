@@ -90,7 +90,7 @@ class JobRunner:
             helper.checkpath(self.transferPBase, createdir=True)
     
     def submitskims(self, client, proc_kwargs={}) -> int:
-        limit_memory_usage(20)
+        limit_memory_usage(24)
         proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, proc_kwargs=proc_kwargs)
         read_kwargs = {}
         filter_name = self.rs.get("FILTER_NAME", None)
