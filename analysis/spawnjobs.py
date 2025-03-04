@@ -5,6 +5,7 @@ from itertools import islice
 
 from src.analysis.processor import Processor
 from src.utils.filesysutil import FileSysHelper, pjoin
+from src.utils.memoryutil import limit_memory_usage
 
 def read_pattern(filepath):
     basename = os.path.basename(filepath).split('.')[0]
@@ -89,6 +90,7 @@ class JobRunner:
             helper.checkpath(self.transferPBase, createdir=True)
     
     def submitskims(self, client, proc_kwargs={}) -> int:
+        limit_memory_usage(20)
         proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, proc_kwargs=proc_kwargs)
         read_kwargs = {}
         filter_name = self.rs.get("FILTER_NAME", None)

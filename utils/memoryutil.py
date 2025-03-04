@@ -1,5 +1,5 @@
 from dask.distributed import get_client
-import psutil, sys, logging, gc, dask, os, ctypes, platform
+import psutil, sys, logging, gc, dask, os, ctypes, platform, resource
 from pympler import muppy, summary
 from datetime import datetime
 from typing import Any
@@ -17,6 +17,12 @@ def restart_if_vms_high(threshold_gb=6):
     if vms > threshold_gb:
         logging.warning(f"🔴 High VMS detected ({vms:.2f} GB). Restarting Python...")
         os.execv(sys.executable, [sys.executable] + sys.argv)  # Restart process
+
+def limit_memory_usage(max_gb=8):
+    """Limit Python's memory usage to force reuse of allocated memory."""
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    resource.setrlimit(resource.RLIMIT_AS, (max_gb * 1024**3, hard))
+    print(f"✅ Memory usage limited to {max_gb} GB.")
 
 def analyze_memory_status(process=None, use_pympler=False) -> tuple[int, int]:
     """Comprehensive memory analysis with optional Pympler details.
