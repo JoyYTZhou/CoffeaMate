@@ -4,8 +4,23 @@ import pandas as pd
 import operator as opr
 import dask_awkward as dak
 import awkward as ak
+from typing import Optional, Union, List, Tuple, Callable
 
 from src.utils.datautil import arr_handler
+
+def _create_proxy_property(name):
+    def getter(self):
+        return getattr(self, f"_{name}")
+    def setter(self, value):
+        setattr(self, f"_{name}", weakref.proxy(value) if self.__weakref else value)
+    return property(getter, setter)
+
+MASK_CONFIGS = {
+    'pt': {'func': None},
+    'eta': {'func': abs},
+    'dxy': {'func': abs},
+    'dz': {'func': abs}
+}
 
 class Object:
     """Object class for handling object selections, meant as an observer of the events.
@@ -17,6 +32,8 @@ class Object:
     - `mapcfg`: mapping configuration for the object
     - `fields`: list of fields in the object
     """
+    events = _create_proxy_property('events')
+    selcfg = _create_proxy_property('selcfg')
 
     def __init__(self, events, name, selcfg, mapcfg, weakrefEvt=True):
         """Construct an object from provided events with given selection configuration.
@@ -30,40 +47,23 @@ class Object:
         """
         self._name = name
         self.__weakref = weakrefEvt
-        self.events = events
-        self._selcfg = selcfg
+        self._events = None
+        self._selcfg = None
         self._mapcfg = mapcfg
+
+        self._events = events
+        self._selcfg = selcfg
         self.fields = list(self.mapcfg.keys())
-    
-    @property
-    def events(self):
-        return self._events
-
-    @events.setter
-    def events(self, value):
-        self._events = weakref.proxy(value) if self.__weakref else value
-    
-    @property
-    def selcfg(self):
-        return self._selcfg
-
-    @selcfg.setter
-    def selcfg(self, value):
-        self._selcfg = weakref.proxy(value)
 
     @property
     def name(self):
         return self._name
-
-    @property
-    def selcfg(self):
-        return self._selcfg
     
     @property
     def mapcfg(self):
         return self._mapcfg
         
-    def custommask(self, propname: 'str', op, func=None):
+    def custommask(self, propname: str, op: Callable, func: Optional[Callable]=None) -> ak.Array:
         """Create custom mask based on input.
         
         Parameters
@@ -93,22 +93,13 @@ class Object:
             return op(func(aodarr), selval)
         else:
             return op(aodarr, selval)
-
-    def ptmask(self, op):
-        """Object Level mask for pt."""
-        return self.custommask('pt', op)
-
-    def absetamask(self, op):
-        """Object Level mask for |eta|."""
-        return self.custommask('eta', op, abs)
-
-    def absdxymask(self, op):
-        """Object Level mask for |dxy|."""
-        return self.custommask('dxy', op, abs)
-
-    def absdzmask(self, op):
-        """Object Level mask for |dz|."""
-        return self.custommask('dz', op, abs)
+    
+    def common_mask(self, prop_name, op):
+        """Create object level mask with predefined configurations."""
+        config = MASK_CONFIGS.get(prop_name)
+        if not config:
+            raise ValueError(f"Property {prop_name} is not a predefined mask configuration (e.g., pt, eta, dxy, etc.).")
+        return self.custommask(prop_name, op, config['func'])
     
     def numselmask(self, mask, op):
         """Returns event-level boolean mask."""
@@ -179,6 +170,9 @@ class Object:
     def getld(self, **kwargs) -> ak.Array:
         objs = self.getzipped(**kwargs) 
         return objs[:,0]
+    
+    def get_matched_jet(self):
+        pass
 
     @staticmethod
     def sortmask(dfarr, **kwargs) -> ak.Array:
@@ -220,15 +214,14 @@ class Object:
 
     @staticmethod
     def set_zipped(events, objname, namemap) -> ak.Array:
-        """Given events, read only object-related observables and zip them into ak. 
-        Then zip the dict into an object.
+        """Given events, read only object-related observables and zip them into awkward/dask array.
         
         Parameters
         - `events`: events to extract the object from
         - `namemap`: mapping configuration for the object
         """
-        zipped_dict = Object.get_namemap(events, objname, namemap)
-        zipped_object = dak.zip(zipped_dict) if isinstance(events, dak.lib.core.Array) else ak.zip(zipped_dict) 
+        dict_to_zip = Object.get_namemap(events, objname, namemap)
+        zipped_object = dak.zip(dict_to_zip) if isinstance(events, dak.lib.core.Array) else ak.zip(dict_to_zip) 
         return zipped_object
 
     @staticmethod
@@ -264,13 +257,31 @@ class Object:
         return op(abs(vec.deltaR(veclist)), threshold)
 
     @staticmethod
-    def get_namemap(events: 'ak.Array', col_name: 'str', namemap: 'dict' = {}):
-        vec_type = ['pt', 'eta', 'phi', 'mass']
-        to_be_zipped = {cop: events[col_name+"_"+cop] 
-                        for cop in vec_type} if col_name is not None else {cop: events[cop] for cop in vec_type}
-        if namemap: to_be_zipped.update({name: events[nanoaodname] 
-                       for name, nanoaodname in namemap.items()})
-        return to_be_zipped
+    def get_namemap(events: 'ak.Array', col_name: Optional[str], namemap: dict = {}) -> dict:
+        """Get mapping between names and event arrays.
+        
+        Args:
+            events: Event array
+            col_name: Column prefix for vector components, e.g. 'Electron'
+            namemap: Additional name mappings
+            
+        Returns:
+            Dictionary mapping names to event arrays
+        """
+        VECTOR_COMPONENTS = ['pt', 'eta', 'phi', 'mass']
+        
+        result = {}
+        for component in VECTOR_COMPONENTS:
+            field = f"{col_name}_{component}" if col_name else component
+            result[component] = events[field]
+        
+        result.update({
+            name: events[aod_name] 
+            for name, aod_name in namemap.items()
+        })
+        
+        return result
+
 
 # For NANOAOD V12
 trigger_obj_map = {"id": "TrigObj_id", "eta": "TrigObj_eta", "phi": "TrigObj_phi", "pt": "TrigObj_pt",
