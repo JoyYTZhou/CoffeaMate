@@ -9,6 +9,22 @@ from operator import attrgetter, itemgetter
 SIZE_THRESHOLD = 10 * 1024 * 1024  # 10MB in bytes
 MAX_OBJECTS = 10  # Maximum number of objects to log
 
+import numpy as np
+
+def prevent_numpy_memory_leak():
+    """Force NumPy to release memory after processing large arrays."""
+    arr = np.zeros((100000000,), dtype=np.float64)  # Large allocation
+    arr_copy = arr.copy()  # Ensure memory is not locked
+    del arr
+    force_release_memory()
+
+def force_memory_reuse():
+    """Use madvise() to tell the OS to reuse freed memory immediately."""
+    libc = ctypes.CDLL("libc.so.6")
+    MADV_DONTNEED = 4  # Advise OS to discard memory immediately
+    libc.madvise(0, 0, MADV_DONTNEED)
+    print("✅ Forced OS to discard unused memory immediately.")
+
 def restart_if_vms_high(threshold_gb=6):
     """Restart Python if VMS memory usage is too high."""
     process = psutil.Process(os.getpid())
@@ -113,6 +129,7 @@ def check_and_release_memory(process: psutil.Process,
             logging.warning("Memory release did not reduce memory usage sufficiently.")
             logging.warning("Force mallopt trim to reduce memory fragmentation.")
             force_mallopt_trim()
+            force_memory_reuse()
             analyze_memory_status(process, use_pympler=False)
 
 def monitor_dask(track_growth=True):
