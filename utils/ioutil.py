@@ -251,6 +251,7 @@ def write_computed_array(computed_array, outdir, dataset, suffix, write_args={})
                 storage_options=None,
                 **write_options
             )
+            logging.debug(f"Writing selected events from {suffix} to output ...")
         except MemoryError:
             logging.exception(f"MemoryError encountered in writing outputs with ak_to_root() for file index {suffix}.")
             return 1
