@@ -111,8 +111,9 @@ class Processor:
         self.transfer = transferP
         self.filehelper = FileSysHelper()
         self.initdir()
-        self.write_skim_semaphore = threading.Semaphore(proc_kwargs.get("n_write", 3))
-        self.load_skim_semaphore = threading.Semaphore(proc_kwargs.get("n_load", 3))
+        self.write_skim_semaphore = threading.Semaphore()
+        self.proc_kwargs = proc_kwargs
+        self.load_skim_semaphore = threading.Semaphore()
     
     def initdir(self) -> None:
         """Initialize the output directory and copy directory if necessary.
@@ -168,6 +169,9 @@ class Processor:
         process = psutil.Process()
 
         batch_dicts = fragment_files(self.dsdict, frag_threshold)
+        frag_size = len(batch_dicts)
+        self.load_skim_semaphore = threading.Semaphore(min(frag_size, 4))
+        self.write_skim_semaphore = threading.Semaphore(min(frag_size, 4))
             
         for batch_dict in batch_dicts:
             try: 
