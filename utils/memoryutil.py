@@ -98,6 +98,8 @@ def force_release_memory():
             libc = ctypes.CDLL("libc.so.6")
             libc.malloc_trim(0)
             logging.info("Successfully released memory using malloc_trim(0).")
+            libc = ctypes.CDLL(None)  # Close the library
+            libc.malloc_trim(0)  # Attempt to release memory again
         else:
             logging.warning("Skipping malloc_trim(0): System is not using glibc or is using jemalloc.")
     except Exception as e:
