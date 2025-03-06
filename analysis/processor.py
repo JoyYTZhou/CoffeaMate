@@ -1,17 +1,44 @@
 # This file contains the Processor class, which is used to process individual files or filesets.
 # The behavior of the Processor class is highly dependent on run time configurations and the event selection class used.
 import uproot._util
-import uproot, pickle, gc, logging, threading
+import uproot, pickle, gc, logging, threading, statistics
 import pandas as pd
 import dask_awkward as dak
 import psutil
 import awkward as ak
 import concurrent.futures
+from itertools import islice
 
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper, release_mapped_memory
 from src.analysis.evtselutil import BaseEventSelections
 from src.utils.memoryutil import check_and_release_memory, log_memory
 from src.utils.ioutil import ak_to_root, parallel_copy_and_load, compute_and_write_skimmed, check_open_files
+
+def infer_fragment_size(files_dict, available_memory) -> int:
+    """Infer the fragment size based on the filesize and available memory.
+    
+    Args:
+        available_memory: Available memory in GB (minus overhead)
+        mem_per_part: Memory estimated taken by one fragment in GB"""
+    logging.debug("Inferring fragment size based on filesize and available memory")
+    sample_files = dict(islice(files_dict.items(), 5)) if len(files_dict) > 5 else files_dict
+    list_len_steps = []
+    list_part_size = []
+    for _, fileinfo in sample_files.items():
+        list_len_steps.append(len(fileinfo['steps']))
+        list_part_size.append(fileinfo['steps'][0][1])
+
+    med_num_part = statistics.median(list_len_steps)
+    med_part_size = statistics.median(list_part_size)/1000 # k Events
+    logging.debug("Median number of steps: %s", med_num_part)
+    logging.debug("Median part size: %s", med_part_size)
+
+    mem_per_kevts = 8 # MB
+    mem_per_part = mem_per_kevts * med_part_size / 1024 # GB
+    allowed_parts = available_memory/mem_per_part
+    
+    frag_size = int(allowed_parts/med_num_part)
+    logging.debug("Inferred fragment size: %s", frag_size)
 
 def calc_skim_params(filesize, avail_memory) -> tuple:
     """Calculate the number of workers and fragment size based on the filesize and available memory."""
@@ -21,15 +48,18 @@ def calc_skim_params(filesize, avail_memory) -> tuple:
 
     return (n_workers, fragment_size)
 
-def fragment_files(dsdict, fragment_size: int) -> list[dict]:
+def fragment_files(dsdict, fragment_size: int = 2) -> list[dict]:
     """Split files into smaller fragments if needed.
     
     Args:
-        fragment_size: Maximum number of files per fragment
+        fragment_size: Maximum number of files per fragment; If None, will infer from memory size + step size if available
         
     Returns:
         List of dictionaries, each containing a subset of files
     """
+    if fragment_size is None:
+        fragment_size = infer_fragment_size(dsdict['files'], available_memory=psutil.virtual_memory().available/1024**3)
+    
     files = dsdict['files']
     if len(files) <= fragment_size:
         return [dsdict]
@@ -128,7 +158,7 @@ class Processor:
         with self.load_skim_semaphore:
             return parallel_copy_and_load(fileargs, self.copydir, executor, self.rtcfg, readkwargs)
     
-    def run_skims(self, write_npz=False, max_workers=2, frag_threshold=3, readkwargs={}, writekwargs={}, **kwargs) -> int:
+    def run_skims(self, write_npz=False, max_workers=2, frag_threshold=None, readkwargs={}, writekwargs={}, **kwargs) -> int:
         """Process files in parallel. Recommended for skimming."""
         total_files = len(self.dsdict['files'])
         logging.debug(f"Expected to see {total_files} outputs")
@@ -154,7 +184,6 @@ class Processor:
                             future_passed[suffix] = executor.submit(self.evtselclass(**self.evtsel_kwargs).callevtsel, events)
                         except Exception as e:
                             logging.exception(f"Error copying and loading {filename}: {e}")
-                    log_memory(process, "after loading")
                     for future in concurrent.futures.as_completed(future_passed.values()):
                         suffix = next(s for s, f in future_passed.items() if f == future)
                         try:
