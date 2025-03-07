@@ -31,10 +31,12 @@ def infer_fragment_size(files_dict, available_memory) -> int:
     med_num_part = statistics.median(list_len_steps)
     med_part_size = statistics.median(list_part_size)/1000 # k Events
     logging.debug("Median number of steps: %s", med_num_part)
-    logging.debug("Median part size: %s", med_part_size)
+    logging.debug(f"Median partition size: {med_part_size} k Events")
 
     mem_per_kevts = 8 # MB
     mem_per_part = mem_per_kevts * med_part_size / 1024 # GB
+    logging.debug("Estimating memory per partition: %s GB", mem_per_part)
+    logging.debug("Available memory: %s GB", available_memory)
     allowed_parts = available_memory/mem_per_part
     
     frag_size = int(allowed_parts/med_num_part)
@@ -58,7 +60,7 @@ def fragment_files(dsdict, fragment_size: int = 2) -> list[dict]:
         List of dictionaries, each containing a subset of files
     """
     if fragment_size is None:
-        fragment_size = infer_fragment_size(dsdict['files'], available_memory=psutil.virtual_memory().available/1024**3)
+        fragment_size = infer_fragment_size(dsdict['files'], available_memory=psutil.virtual_memory().available/(1024**3))
     
     files = dsdict['files']
     if len(files) <= fragment_size:
