@@ -42,6 +42,8 @@ def infer_fragment_size(files_dict, available_memory) -> int:
     frag_size = int(allowed_parts/med_num_part)
     logging.debug("Inferred fragment size: %s", frag_size)
 
+    return frag_size
+
 def calc_skim_params(filesize, avail_memory) -> tuple:
     """Calculate the number of workers and fragment size based on the filesize and available memory."""
     n_workers = avail_memory // (filesize*3)
