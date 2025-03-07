@@ -101,11 +101,15 @@ def dynamic_worker_number(peak_mem_usage, current_mem, current_worker=3, min_wor
     curr_mem_percent = current_mem / avail_mem
 
     if curr_mem_percent < 0.2 and peak_mem_usage_percent < 0.7:
-        return min(current_worker + 1, max_workers)
+        n_worker = min(current_worker + 1, max_workers)
+        logging.debug(f"Increasing workers to {n_worker}")
     elif curr_mem_percent > 0.8 or peak_mem_usage_percent > 0.9:
-        return max(current_worker - 1, min_workers)
+        n_worker = max(current_worker - 1, min_workers)
+        logging.debug(f"Decreasing workers to {n_worker}")
+    else:
+        n_worker = current_worker
     
-    return current_worker
+    return n_worker
     
 def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
     """Write the cutflow to a file. 

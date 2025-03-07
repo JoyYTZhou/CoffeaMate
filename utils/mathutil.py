@@ -22,6 +22,19 @@ class MathUtil:
         return low, high
     
     @staticmethod
+    def add_f_momentum(df, obj_name:'str'):
+        """Convert the four-momentum of the object to the dataframe.
+        
+        Parameters
+        - df: DataFrame
+        - obj_name: Object name
+        """
+        fv = Object.fourvector(df, obj_name, sort=False)
+        df[f'{obj_name}_px'] = fv.px
+        df[f'{obj_name}_py'] = fv.py
+        df[f'{obj_name}_pz'] = fv.pz
+    
+    @staticmethod
     def add_inv_M(df, objx:'str', objy:'str', inv_m_name:'str') -> None:
         """Add invariant mass column to the dataframe.
         
