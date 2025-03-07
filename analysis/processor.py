@@ -62,7 +62,8 @@ def fragment_files(dsdict, fragment_size: int = 2) -> list[dict]:
         List of dictionaries, each containing a subset of files
     """
     if fragment_size is None:
-        fragment_size = infer_fragment_size(dsdict['files'], available_memory=psutil.virtual_memory().available/(1024**3))
+        available_mem = int(os.environ.get("REQUEST_MEMORY", 22000)) / 1024
+        fragment_size = infer_fragment_size(dsdict['files'], available_memory=available_mem)
     
     files = dsdict['files']
     if len(files) <= fragment_size:
