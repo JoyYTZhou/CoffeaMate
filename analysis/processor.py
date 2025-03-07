@@ -1,7 +1,7 @@
 # This file contains the Processor class, which is used to process individual files or filesets.
 # The behavior of the Processor class is highly dependent on run time configurations and the event selection class used.
 import uproot._util
-import uproot, pickle, gc, logging, threading, statistics
+import uproot, pickle, gc, logging, threading, statistics, resource
 import pandas as pd
 import dask_awkward as dak
 import psutil
@@ -82,6 +82,31 @@ def fragment_files(dsdict, fragment_size: int = 2) -> list[dict]:
                 f"of size {fragment_size}")
     return fragments
 
+
+def dynamic_worker_number(peak_mem_usage, current_mem, current_worker=3, min_workers=1, max_workers=8) -> int:
+    """Dynamically adjust the number of workers based on peak memory usage.
+
+    Args:
+    - peak_mem_usage (float): Peak memory usage in GB.
+    - current_mem (float): Current memory usage in GB.
+    - current_worker (int): Current number of workers.
+    - min_workers (int): Minimum number of workers.
+    - max_workers (int): Maximum number of workers.
+
+    Returns:
+    - int: Adjusted number of workers.
+    """
+    avail_mem = psutil.virtual_memory().available / (1024**3)
+    peak_mem_usage_percent = peak_mem_usage / avail_mem
+    curr_mem_percent = current_mem / avail_mem
+
+    if curr_mem_percent < 0.2 and peak_mem_usage_percent < 0.7:
+        return min(current_worker + 1, max_workers)
+    elif curr_mem_percent > 0.8 or peak_mem_usage_percent > 0.9:
+        return max(current_worker - 1, min_workers)
+    
+    return current_worker
+    
 def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
     """Write the cutflow to a file. 
     
@@ -163,7 +188,7 @@ class Processor:
         with self.load_skim_semaphore:
             return parallel_copy_and_load(fileargs, self.copydir, executor, self.rtcfg, readkwargs)
     
-    def run_skims(self, write_npz=False, max_workers=2, frag_threshold=None, readkwargs={}, writekwargs={}, **kwargs) -> int:
+    def run_skims(self, write_npz=False, frag_threshold=None, readkwargs={}, writekwargs={}, **kwargs) -> int:
         """Process files in parallel. Recommended for skimming."""
         total_files = len(self.dsdict['files'])
         logging.debug(f"Expected to see {total_files} outputs")
@@ -174,10 +199,12 @@ class Processor:
         frag_size = len(batch_dicts)
         self.load_skim_semaphore = threading.Semaphore(min(frag_size, 4))
         self.write_skim_semaphore = threading.Semaphore(min(frag_size, 4))
+
+        worker_no = 2
             
         for batch_dict in batch_dicts:
             try: 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=worker_no) as executor:
                     future_loaded = self.load_for_skims(
                         fileargs=batch_dict,
                         executor=executor,
@@ -221,8 +248,10 @@ class Processor:
                 check_and_release_memory(process)
             except Exception as e:
                 logging.exception(f"Error encountered when processing {self.dataset}: {e}")
+            peak_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024**2)
+            curr_mem = process.memory_info().rss / (1024**3)
+            worker_no = dynamic_worker_number(peak_mem, curr_mem, current_worker=worker_no)
         return rc
-            
 
     def runfiles_sequential(self, write_npz=False, **kwargs) -> int:
         """Process files sequentially."""
