@@ -33,7 +33,7 @@ def infer_fragment_size(files_dict, available_memory) -> int:
     logging.debug("Median number of steps: %s", med_num_part)
     logging.debug(f"Median partition size: {med_part_size} k Events")
 
-    mem_per_kevts = 8 # MB
+    mem_per_kevts = 6 # MB
     mem_per_part = mem_per_kevts * med_part_size / 1024 # GB
     logging.debug("Estimating memory per partition: %s GB", mem_per_part)
     logging.debug("Available memory: %s GB", available_memory)
