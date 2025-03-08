@@ -365,3 +365,31 @@ def log_memory(process, stage):
     if mem_usage > SIZE_THRESHOLD:
         logging.warning(f"Memory usage at {stage}: {mem_usage / 1e6:.2f} MB")
     return mem_usage
+
+def dynamic_worker_number(peak_mem_usage, current_mem, current_worker=3, min_workers=1, max_workers=8) -> int:
+    """Dynamically adjust the number of workers based on peak memory usage.
+
+    Args:
+    - peak_mem_usage (float): Peak memory usage in GB.
+    - current_mem (float): Current memory usage in GB.
+    - current_worker (int): Current number of workers.
+    - min_workers (int): Minimum number of workers.
+    - max_workers (int): Maximum number of workers.
+
+    Returns:
+    - int: Adjusted number of workers.
+    """
+    avail_mem = psutil.virtual_memory().available / (1024**3)
+    peak_mem_usage_percent = peak_mem_usage / avail_mem
+    curr_mem_percent = current_mem / avail_mem
+
+    if curr_mem_percent < 0.2 and peak_mem_usage_percent < 0.7:
+        n_worker = min(current_worker + 1, max_workers)
+        logging.debug(f"Increasing workers to {n_worker}")
+    elif curr_mem_percent > 0.8 or peak_mem_usage_percent > 0.9:
+        n_worker = max(current_worker - 1, min_workers)
+        logging.debug(f"Decreasing workers to {n_worker}")
+    else:
+        n_worker = current_worker
+    
+    return n_worker

@@ -136,7 +136,7 @@ def write_empty_root(filename):
     with uproot.recreate(filename):
         pass
         
-def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
+def process_file(filename, fileinfo, copydir, delayed_open=True, uproot_args={}) -> tuple:
     """Handles file copying and loading"""
     suffix = fileinfo['uuid']
     dest_file = pjoin(copydir, f"{suffix}.root")
@@ -144,9 +144,8 @@ def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
     logging.debug(f"Copying and loading {filename} to {dest_file}")
     XRootDHelper.copy_local(filename, dest_file)
     
-    delayed_open = rtcfg.get("DELAYED_OPEN", True)
     if delayed_open:
-        events = uproot.dask(files={dest_file: fileinfo}, **read_args)
+        events = uproot.dask(files={dest_file: fileinfo}, **uproot_args)
         
         if hasattr(events, 'npartitions'):
             nparts = events.npartitions
@@ -161,7 +160,7 @@ def process_file(filename, fileinfo, copydir, rtcfg, read_args) -> tuple:
         
         return (events, suffix)
     else:
-        return (uproot.open(dest_file + ":Events").arrays(**read_args), suffix)
+        return (uproot.open(dest_file + ":Events").arrays(**uproot_args), suffix)
 
 def submit_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3) -> list:
     """Runs file copying and loading in parallel"""
@@ -177,9 +176,9 @@ def submit_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3) -> 
                 logging.exception(f"Error copying and loading {future_to_file[future]}: {e}")
     return results
 
-def parallel_copy_and_load(fileargs, copydir, executor, rtcfg, read_args) -> dict:
+def parallel_copy_and_load(fileargs, copydir, executor, delayed_open=True, uproot_args={}) -> dict:
     """Runs file copying and loading in parallel"""
-    future_to_file = {filename: executor.submit(process_file, filename, fileinfo, copydir, rtcfg, read_args) for filename, fileinfo in fileargs['files'].items()}
+    future_to_file = {filename: executor.submit(process_file, filename, fileinfo, copydir, delayed_open, uproot_args) for filename, fileinfo in fileargs['files'].items()}
     return future_to_file
 
 def compute_dask_array(passed, force_compute=True) -> ak.Array:

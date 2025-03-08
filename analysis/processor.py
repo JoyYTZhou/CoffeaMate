@@ -11,7 +11,7 @@ from itertools import islice
 
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper, release_mapped_memory
 from src.analysis.evtselutil import BaseEventSelections
-from src.utils.memoryutil import check_and_release_memory, log_memory
+from src.utils.memoryutil import check_and_release_memory, log_memory, dynamic_worker_number
 from src.utils.ioutil import ak_to_root, parallel_copy_and_load, compute_and_write_skimmed, check_open_files
 
 def infer_fragment_size(files_dict, available_memory) -> int:
@@ -82,36 +82,7 @@ def fragment_files(dsdict, fragment_size: int = 2) -> list[dict]:
     logging.info(f"Split {len(files)} files into {len(fragments)} fragments "
                 f"of size {fragment_size}")
     return fragments
-
-
-def dynamic_worker_number(peak_mem_usage, current_mem, current_worker=3, min_workers=1, max_workers=8) -> int:
-    """Dynamically adjust the number of workers based on peak memory usage.
-
-    Args:
-    - peak_mem_usage (float): Peak memory usage in GB.
-    - current_mem (float): Current memory usage in GB.
-    - current_worker (int): Current number of workers.
-    - min_workers (int): Minimum number of workers.
-    - max_workers (int): Maximum number of workers.
-
-    Returns:
-    - int: Adjusted number of workers.
-    """
-    avail_mem = psutil.virtual_memory().available / (1024**3)
-    peak_mem_usage_percent = peak_mem_usage / avail_mem
-    curr_mem_percent = current_mem / avail_mem
-
-    if curr_mem_percent < 0.2 and peak_mem_usage_percent < 0.7:
-        n_worker = min(current_worker + 1, max_workers)
-        logging.debug(f"Increasing workers to {n_worker}")
-    elif curr_mem_percent > 0.8 or peak_mem_usage_percent > 0.9:
-        n_worker = max(current_worker - 1, min_workers)
-        logging.debug(f"Decreasing workers to {n_worker}")
-    else:
-        n_worker = current_worker
-    
-    return n_worker
-    
+ 
 def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
     """Write the cutflow to a file. 
     
@@ -126,7 +97,7 @@ def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
     cutflow_df.to_csv(output_name)
     logging.debug("Cutflow written to %s", output_name)
     return cutflow_name
-
+    
 class Processor:
     """Process individual file or filesets given strings/dicts belonging to one dataset."""
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, **kwargs):
@@ -143,9 +114,7 @@ class Processor:
         self.transfer = transferP
         self.filehelper = FileSysHelper()
         self.initdir()
-        self.write_skim_semaphore = threading.Semaphore()
         self.proc_kwargs = proc_kwargs
-        self.load_skim_semaphore = threading.Semaphore()
     
     def initdir(self) -> None:
         """Initialize the output directory and copy directory if necessary.
@@ -189,74 +158,8 @@ class Processor:
             )
         return events
 
-    def load_for_skims(self, fileargs, executor, readkwargs) -> ak.Array:
-        with self.load_skim_semaphore:
-            return parallel_copy_and_load(fileargs, self.copydir, executor, self.rtcfg, readkwargs)
-    
-    def run_skims(self, write_npz=False, frag_threshold=None, readkwargs={}, writekwargs={}, **kwargs) -> int:
-        """Process files in parallel. Recommended for skimming."""
-        total_files = len(self.dsdict['files'])
-        logging.debug(f"Expected to see {total_files} outputs")
-        rc = 0
-        process = psutil.Process()
-
-        batch_dicts = fragment_files(self.dsdict, frag_threshold)
-        frag_size = len(batch_dicts)
-        self.load_skim_semaphore = threading.Semaphore(min(frag_size, 2))
-        self.write_skim_semaphore = threading.Semaphore(min(frag_size, 2))
-
-        worker_no = 2
-            
-        for batch_dict in batch_dicts:
-            try: 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=worker_no) as executor:
-                    future_loaded = self.load_for_skims(
-                        fileargs=batch_dict,
-                        executor=executor,
-                        readkwargs=readkwargs)
-                    
-                    future_cf, future_writes, future_passed = [], [], {}
-                    log_memory(process, "before processing")
-                    for future in concurrent.futures.as_completed(future_loaded.values()):
-                        filename = next(f for f, future in future_loaded.items() if future == future)
-                        try: 
-                            events, suffix = future.result()
-                            future_passed[suffix] = executor.submit(self.evtselclass(**self.evtsel_kwargs).callevtsel, events)
-                        except Exception as e:
-                            logging.exception(f"Error copying and loading {filename}: {e}")
-                    for future in concurrent.futures.as_completed(future_passed.values()):
-                        suffix = next(s for s, f in future_passed.items() if f == future)
-                        try:
-                            log_memory(process, f"before computing/writing {suffix}")
-                            passed, evtsel_state = future.result()
-                            future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
-                            future_writes.append(executor.submit(self.writeskimmed, passed, suffix, **writekwargs))
-                        except Exception as e:
-                            logging.exception(f"Error processing {suffix}: {e}")
-                    cutflow_files = []
-                    for future in concurrent.futures.as_completed(future_cf + future_writes):
-                        if future in future_cf:
-                            cutflow_files.append(future.result())
-                        else:
-                            rc += future.result()
-                        del future
-                    del future_cf, future_writes, future_passed, future_loaded
-                    log_memory(process, "after computing + writing + garbage collection")
-                    if self.transfer:
-                        for cutflow_file in cutflow_files:
-                            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True)
-                        self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True)
-                    if not self.rtcfg.get("REMOTE_LOAD", True):
-                        self.filehelper.close_open_files_delete(self.copydir, "*.root")
-                release_mapped_memory()
-                check_open_files()
-                check_and_release_memory(process)
-            except Exception as e:
-                logging.exception(f"Error encountered when processing {self.dataset}: {e}")
-            peak_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024**2)
-            curr_mem = process.memory_info().rss / (1024**3)
-            worker_no = dynamic_worker_number(peak_mem, curr_mem, current_worker=worker_no)
-        return rc
+    def run(self, *args, **kwargs) -> int:
+        raise NotImplementedError("Processor.run() must be implemented in a subclass.")
 
     def runfiles_sequential(self, write_npz=False, **kwargs) -> int:
         """Process files sequentially."""
@@ -301,11 +204,7 @@ class Processor:
             self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True)
             print(f"Files transferred to: {self.transfer}" )
         return rc
-    
-    def writeskimmed(self, passed, suffix, **kwargs) -> int:
-        with self.write_skim_semaphore:
-            return compute_and_write_skimmed(passed, self.outdir, self.dataset, suffix, **kwargs)
-    
+
     def writedask(self, passed: dak.lib.core.Array, suffix, parquet=False) -> int:
         pass
     
@@ -337,4 +236,85 @@ class Processor:
         finame = pjoin(self.outdir, f"{self.dataset}_{suffix}.pkl")
         with open(finame, 'wb') as f:
             pickle.dump(passed, f)
-        return 0
+        return 0 
+
+class SkimProcessor(Processor):
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, **kwargs):
+        super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs, **kwargs)
+        self._write_semaphore = threading.Semaphore()
+        self._load_semaphore = threading.Semaphore()
+    
+    def __load_for_skims(self, fileargs, executor, uproot_args={}) -> ak.Array:
+        with self._load_semaphore:
+            return parallel_copy_and_load(fileargs, self.copydir, executor, True, uproot_args)
+    
+    def run(self, write_npz=False, frag_threshold=None, readkwargs={}, writekwargs={}, **kwargs) -> int:
+        """Process files in parallel. Recommended for skimming."""
+        total_files = len(self.dsdict['files'])
+        logging.debug(f"Expected to see {total_files} outputs")
+        rc = 0
+        process = psutil.Process()
+
+        batch_dicts = fragment_files(self.dsdict, frag_threshold)
+        frag_size = len(batch_dicts)
+        self._load_semaphore = threading.Semaphore(min(frag_size, 2))
+        self._write_semaphore = threading.Semaphore(min(frag_size, 2))
+
+        worker_no = 2
+            
+        for batch_dict in batch_dicts:
+            try: 
+                with concurrent.futures.ThreadPoolExecutor(max_workers=worker_no) as executor:
+                    future_loaded = self.__load_for_skims(
+                        fileargs=batch_dict,
+                        executor=executor,
+                        readkwargs=readkwargs)
+                    
+                    future_cf, future_writes, future_passed = [], [], {}
+                    log_memory(process, "before processing")
+                    for future in concurrent.futures.as_completed(future_loaded.values()):
+                        filename = next(f for f, future in future_loaded.items() if future == future)
+                        try: 
+                            events, suffix = future.result()
+                            future_passed[suffix] = executor.submit(self.evtselclass(**self.evtsel_kwargs).callevtsel, events)
+                        except Exception as e:
+                            logging.exception(f"Error copying and loading {filename}: {e}")
+                    for future in concurrent.futures.as_completed(future_passed.values()):
+                        suffix = next(s for s, f in future_passed.items() if f == future)
+                        try:
+                            log_memory(process, f"before computing/writing {suffix}")
+                            passed, evtsel_state = future.result()
+                            future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
+                            future_writes.append(executor.submit(self.__writeskimmed, passed, suffix, **writekwargs))
+                        except Exception as e:
+                            logging.exception(f"Error processing {suffix}: {e}")
+                    cutflow_files = []
+                    for future in concurrent.futures.as_completed(future_cf + future_writes):
+                        if future in future_cf:
+                            cutflow_files.append(future.result())
+                        else:
+                            rc += future.result()
+                        del future
+                    del future_cf, future_writes, future_passed, future_loaded
+                    log_memory(process, "after computing + writing + garbage collection")
+                    if self.transfer:
+                        for cutflow_file in cutflow_files:
+                            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True)
+                        self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True)
+                    if not self.rtcfg.get("REMOTE_LOAD", True):
+                        self.filehelper.close_open_files_delete(self.copydir, "*.root")
+                release_mapped_memory()
+                check_open_files()
+                check_and_release_memory(process)
+            except Exception as e:
+                logging.exception(f"Error encountered when processing {self.dataset}: {e}")
+            peak_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024**2)
+            curr_mem = process.memory_info().rss / (1024**3)
+            worker_no = dynamic_worker_number(peak_mem, curr_mem, current_worker=worker_no)
+        return rc
+
+    def __writeskimmed(self, passed, suffix, **kwargs) -> int:
+        with self._write_semaphore:
+            return compute_and_write_skimmed(passed, self.outdir, self.dataset, suffix, **kwargs)
+    
+    

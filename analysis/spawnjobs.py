@@ -89,17 +89,7 @@ class JobRunner:
             self.transferPBase = f'{self.transferPBase}/{year}'
             helper.checkpath(self.transferPBase, createdir=True)
     
-    def submitskims(self, client, proc_kwargs={}) -> int:
-        # limit_memory_usage(24)
-        proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, proc_kwargs=proc_kwargs)
-        read_kwargs = {}
-        filter_name = self.rs.get("FILTER_NAME", None)
-        if filter_name:
-            read_kwargs = {"filter_name": filter_name}
-        rc = proc.run_skims(readkwargs=read_kwargs)
-        return rc
-        
-    def submitjobs(self, client, **kwargs) -> int:
+    def submitjobs(self, client, proc_kwargs={}, **kwargs) -> int:
         """Run jobs based on client settings.
         If a valid client is found and future mode is true, submit simultaneously run jobs.
         If not, fall back into a loop mode. Note that even in this mode, any dask computations will be managed by client explicitly or implicitly.
@@ -107,9 +97,14 @@ class JobRunner:
         Parameters
         - `kwargs`: Additional keyword arguments to be passed to the processor.writeevts() method.
         """
-        proc = Processor(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass)
-        rc = proc.runfiles(**kwargs)
-        return 0
+        proc_class = self.rs.get("PROC_NAME", "Processor")
+        proc = proc_class(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, proc_kwargs=proc_kwargs)
+        read_kwargs = {}
+        filter_name = self.rs.get("FILTER_NAME", None)
+        if filter_name:
+            read_kwargs = {"filter_name": filter_name}
+        rc = proc.run(readkwargs=read_kwargs)
+        return rc
     
     def submitfutures(self, client, filelist, indx) -> list:
         """Submit jobs as futures to client.
