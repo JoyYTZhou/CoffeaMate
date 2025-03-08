@@ -27,6 +27,8 @@ class PlotStyle:
         if title:
             ax.set_title(title, fontsize=fontsize)
         ax.tick_params(axis='both', which='major', labelsize=10, length=0)
+        ax.tick_params(axis='both', which='minor', length=3)
+        ax.minorticks_on()
         for spine in ax.spines.values():
             spine.set_linewidth(0.5)
 
@@ -159,7 +161,7 @@ class PlotUtil:
         err_total = np.sqrt(total)
         percentage, percentage_err = HistogramHelper.calc_ratio_and_errors(hist_true, total, err_true, err_total)
 
-        fig, (ax, ax2) = PlotStyle.create_figure(n_row=2, n_col=1, figsize=(12, 10))
+        fig, (ax, ax2) = PlotStyle.create_figure(n_row=2, n_col=1, figsize=(8, 8))
         PlotStyle.setup_cms_style(ax, lumi=None)
         PlotStyle.setup_cms_style(ax2, lumi=None)
         
@@ -171,7 +173,7 @@ class PlotUtil:
             label=Y_label_1,
             color=PlotStyle.COLORS[0],
             histtype='errorbar',
-            alpha=0.7
+            alpha=0.9
         )
         PlotStyle.setup_axis(ax, X_label, Y_label_1, f"{Y_label_1} along {X_label}")
 
