@@ -101,7 +101,7 @@ def dynamic_worker_number(peak_mem_usage, current_mem, current_worker=3, min_wor
     peak_mem_usage_percent = peak_mem_usage / avail_mem
     curr_mem_percent = current_mem / avail_mem
 
-    if curr_mem_percent < 0.2 and peak_mem_usage_percent < 0.7:
+    if curr_mem_percent < 0.2 and peak_mem_usage_percent < 0.6:
         n_worker = min(current_worker + 1, max_workers)
         logging.debug(f"Increasing workers to {n_worker}")
     elif curr_mem_percent > 0.8 or peak_mem_usage_percent > 0.9:
