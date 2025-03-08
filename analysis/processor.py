@@ -33,7 +33,7 @@ def infer_fragment_size(files_dict, available_memory) -> int:
     logging.debug("Median number of steps: %s", med_num_part)
     logging.debug(f"Median partition size: {med_part_size} k Events")
 
-    mem_per_kevts = 6 # MB
+    mem_per_kevts = 8 # MB
     mem_per_part = mem_per_kevts * med_part_size / 1024 # GB
     logging.debug("Estimating memory per partition: %s GB", mem_per_part)
     logging.debug("Available memory: %s GB", available_memory)
@@ -202,8 +202,8 @@ class Processor:
 
         batch_dicts = fragment_files(self.dsdict, frag_threshold)
         frag_size = len(batch_dicts)
-        self.load_skim_semaphore = threading.Semaphore(min(frag_size, 4))
-        self.write_skim_semaphore = threading.Semaphore(min(frag_size, 4))
+        self.load_skim_semaphore = threading.Semaphore(min(frag_size, 2))
+        self.write_skim_semaphore = threading.Semaphore(min(frag_size, 2))
 
         worker_no = 2
             
@@ -234,11 +234,11 @@ class Processor:
                         except Exception as e:
                             logging.exception(f"Error processing {suffix}: {e}")
                     cutflow_files = []
-                    for future in concurrent.futures.as_completed(future_cf):
-                        cutflow_files.append(future.result())
-                        del future
-                    for future in concurrent.futures.as_completed(future_writes):
-                        rc += future.result()
+                    for future in concurrent.futures.as_completed(future_cf + future_writes):
+                        if future in future_cf:
+                            cutflow_files.append(future.result())
+                        else:
+                            rc += future.result()
                         del future
                     del future_cf, future_writes, future_passed, future_loaded
                     log_memory(process, "after computing + writing + garbage collection")
