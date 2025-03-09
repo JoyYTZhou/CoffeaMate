@@ -205,51 +205,84 @@ class CSVPlotter:
         return [list_of_obj[i] for i in order]
 
     @staticmethod
-    def plot_shape(list_of_evts: list[pd.DataFrame], labels, attridict: dict, ratio_ylabel, outdir, hist_ylabel='Normalized', title='', save_suffix='') -> None:
-        """Compare the (normalized) shape of the object attribute for two different dataframes, with ratio panel attached.
+    def plot_shape(list_of_evts: list[pd.DataFrame], labels: list, attridict: dict, 
+                ratio_ylabel: str, outdir: str, hist_ylabel: str = 'Normalized', 
+                title: str = '', save_suffix: str = '') -> None:
+        """Compare normalized shapes of distributions with ratio panels.
         
         Parameters
-        - `list_of_evts`: the list of dataframes to be histogrammed and compared"""
-        assert len(list_of_evts) >= 2, "The number of dataframes must be at least 2."
-        assert 'weight' in list_of_evts[0].columns, "The weight column must be present in the dataframe."
+        ----------
+        list_of_evts : list[pd.DataFrame]
+            List of DataFrames to compare
+        labels : list
+            Labels for each DataFrame in the comparison
+        attridict : dict
+            Dictionary of attributes to plot with their options
+            Format: {
+                'attribute_name': {
+                    'hist': {'bins': int, 'range': tuple},
+                    'plot': {'xlabel': str, ...}
+                }
+            }
+        ratio_ylabel : str
+            Label for ratio panel y-axis
+        outdir : str
+            Directory to save plots
+        hist_ylabel : str, optional
+            Label for histogram y-axis
+        title : str, optional
+            Plot title
+        save_suffix : str, optional
+            Suffix for saved files
+        """
+        # Input validation
+        if len(list_of_evts) < 2:
+            raise ValueError("Need at least 2 DataFrames to compare")
+        if not all('weight' in df.columns for df in list_of_evts):
+            raise ValueError("All DataFrames must have 'weight' column")
 
-        for att, options in attridict.items():
-            pltopts = options['plot'].copy()
+        styles = [
+            {'histtype': 'fill', 'alpha': 0.4, 'linewidth': 1.5},
+            {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1},
+            {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1}
+        ]
+
+        for attr, options in attridict.items():
             fig, axs, ax2s = PlotStyle.create_ratio_figure(
                 title=title,
-                x_label=pltopts.pop('xlabel', ''),
+                x_label=options['plot'].get('xlabel', ''),
                 top_ylabel=hist_ylabel,
                 bottom_ylabel=ratio_ylabel
             )
             
             hist_list = []
             wgt_list = []
-            bins = options['hist']['bins']
-            bin_range = options['hist']['range']
-            
-            for evts in list_of_evts:
+            for df in list_of_evts:
                 counts, edges = HistogramHelper.make_histogram(
-                    data=evts[att],
-                    bins=bins,
-                    range=bin_range,
-                    weights=evts['weight'],
-                    density=False
+                    data=df[attr],
+                    bins=options['hist']['bins'],
+                    range=options['hist']['range'],
+                    weights=df['weight']
                 )
                 hist_list.append(counts)
-                wgt_list.append(evts['weight'])
-                bins = edges
+                wgt_list.append(df['weight'])
             
             ObjectPlotter.plot_var_with_err(
-                ax=axs[0], ax2=ax2s[0],
+                ax=axs[0],
+                ax2=ax2s[0],
                 hist_list=hist_list,
                 wgt_list=wgt_list,
-                bins=bins,
+                bins=edges,
                 label=labels,
-                xrange=bin_range,
-                **pltopts
+                xrange=options['hist']['range'],
+                styles=styles,
             )
 
-            fig.savefig(pjoin(outdir, f'{att}{save_suffix}.png'), dpi=400, bbox_inches='tight')
+            fig.savefig(
+                pjoin(outdir, f'{attr}{save_suffix}.png'),
+                dpi=400,
+                bbox_inches='tight'
+            )
 
     def plot_SvBHist(self, ax, evts, att, attoptions, **kwargs) -> list:
         """Plot the signal and background histograms."""
@@ -350,26 +383,55 @@ class ObjectPlotter():
         hep.histplot(hist, bins=bin_edges, label=label, ax=ax, linewidth=1.5, **kwargs)
         ax.legend(fontsize=12, loc='upper right')
         ax.set_xlim(*xrange)
-    
+
     @staticmethod
     def plot_var_with_err(ax, ax2, hist_list, wgt_list, bins, label, xrange, **kwargs):
-        """Plot histograms with error bars and ratio panel"""
+        """Plot multiple histograms with error bars and ratio panel.
+        
+        Parameters
+        ----------
+        ax : matplotlib.axes.Axes
+            Main plot axes
+        ax2 : matplotlib.axes.Axes
+            Ratio panel axes
+        hist_list : list
+            List of histograms to plot
+        wgt_list : list
+            List of weights for each histogram
+        bins : array-like
+            Bin edges
+        label : list
+            Labels for each histogram
+        xrange : tuple
+            (xmin, xmax) for plot range
+        **kwargs : dict
+            Additional plotting parameters including 'styles' for individual histogram styling
+        """
         bin_width = bins[1] - bins[0]
-        colors = PlotStyle.COLORS[:len(hist_list)]
-        
-        norm_hist_list = []
-        norm_err_list = []
-        for hist, wgt in zip(hist_list, wgt_list):
-            norm_hist, norm_err = HistogramHelper.normalize_histogram(hist, wgt, bin_width)
-            norm_hist_list.append(norm_hist)
-            norm_err_list.append(norm_err)
-        
-        ObjectPlotter.plot_var(ax, norm_hist_list, bins, label, xrange,
-            histtype='step', alpha=1.0, color=colors, **kwargs
-        )
-        
-        error_x = (bins[:-1] + bins[1:])/2
+        colors = kwargs.pop('colors', PlotStyle.COLORS[:len(hist_list)])
+        styles = kwargs.pop('styles', None) or [{'histtype': 'step', 'alpha': 1.0}] * len(hist_list)
 
+        normalized_data = [
+            HistogramHelper.normalize_histogram(hist, wgt, bin_width)
+            for hist, wgt in zip(hist_list, wgt_list)
+        ]
+        norm_hist_list, norm_err_list = zip(*normalized_data)
+
+        for hist, style, lbl, color in zip(norm_hist_list, styles, label, colors):
+            hep.histplot(
+                hist,
+                bins=bins,
+                label=lbl,
+                ax=ax,
+                color=color,
+                **style,
+                **kwargs
+            )
+
+        ax.legend(fontsize=12, loc='upper right')
+        ax.set_xlim(*xrange)
+
+        error_x = (bins[:-1] + bins[1:]) / 2
         ObjectPlotter._plot_ratio_panel(ax2, norm_hist_list, norm_err_list, error_x, colors)
 
     @staticmethod
@@ -380,14 +442,14 @@ class ObjectPlotter():
                 norm_hist_list[1], norm_hist_list[0],
                 norm_err_list[1], norm_err_list[0]
             )
-            ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color='black')
+            ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color='black', elinewidth=0.9)
         else:
             for i in range(1, len(norm_hist_list)):
                 ratio, ratio_err = HistogramHelper.calc_ratio_and_errors(
                     norm_hist_list[i], norm_hist_list[0],
                     norm_err_list[i], norm_err_list[0]
                 )
-                ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color=colors[i])
+                ax2.errorbar(error_x, ratio, yerr=ratio_err, markersize=3, fmt='o', color=colors[i], elinewidth=0.9)
 
         ax2.axhline(1, color='gray', linestyle='--', linewidth=1)
         ax2.set_ylim(0.5, 1.5)

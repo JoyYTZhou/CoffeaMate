@@ -89,22 +89,39 @@ class HistogramHelper:
             bins = np.linspace(*range, bins+1)
             data = np.clip(data, bins[0], bins[-1])
         return np.histogram(data, bins=bins, weights=weights, density=density)
-
     @staticmethod
     def calc_ratio_and_errors(num, den, num_err, den_err):
-        """Calculate ratio and its error"""
-        ratio = np.nan_to_num(num / den, nan=0., posinf=0.)
-        ratio_err = np.nan_to_num(
-            ratio * np.sqrt((num_err/num)**2 + (den_err/den)**2), 
-            nan=0., posinf=0.
+        """Calculate ratio and its error with proper handling of zero values.
+        
+        Parameters:
+        num (array): Numerator values
+        den (array): Denominator values
+        num_err (array): Numerator errors
+        den_err (array): Denominator errors
+        
+        Returns:
+        tuple: (ratio, ratio_error) with zeros where undefined
+        """
+        valid_mask = (num != 0) & (den != 0)
+        
+        ratio = np.zeros_like(num, dtype=float)
+        ratio_err = np.zeros_like(num, dtype=float)
+        
+        ratio[valid_mask] = num[valid_mask] / den[valid_mask]
+        
+        ratio_err[valid_mask] = ratio[valid_mask] * np.sqrt(
+            (num_err[valid_mask]/num[valid_mask])**2 + 
+            (den_err[valid_mask]/den[valid_mask])**2
         )
+        
         return ratio, ratio_err
 
     @staticmethod
     def normalize_histogram(hist, weights, bin_width):
         """Normalize histogram and calculate errors"""
-        norm_hist = hist / (np.sum(weights) * bin_width)
-        norm_err = np.sqrt(hist) / (np.sum(weights) * bin_width)
+        den = np.sum(weights) * bin_width
+        norm_hist = hist / den
+        norm_err = np.where(den!=0, np.sqrt(hist) / den, np.nan) 
         return norm_hist, norm_err
     
     @staticmethod
