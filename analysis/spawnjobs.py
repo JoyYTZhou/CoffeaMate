@@ -68,7 +68,7 @@ class JobRunner:
     """
     Attributes
     - `selclass`: Event selection class. Derived from BaseEventSelections"""
-    def __init__(self, runsetting, jobfile, eventSelection, dasksetting=None):
+    def __init__(self, runsetting, jobfile, eventSelection, procClass, dasksetting=None):
         """Initialize the job runner with the job file and event selection class.
         
         Parameters
@@ -76,6 +76,7 @@ class JobRunner:
         - `jobfile`: Job file path
         - `eventSelection`: Event selection class"""
         self.selclass = eventSelection
+        self.procClass = procClass
         self.rs = runsetting 
         with open(jobfile, 'r') as job:
             self.loaded = json.load(job)
@@ -97,8 +98,7 @@ class JobRunner:
         Parameters
         - `kwargs`: Additional keyword arguments to be passed to the processor.writeevts() method.
         """
-        proc_class = self.rs.get("PROC_NAME", "Processor")
-        proc = proc_class(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, proc_kwargs=proc_kwargs)
+        proc = self.procClass(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, proc_kwargs=proc_kwargs)
         read_kwargs = {}
         filter_name = self.rs.get("FILTER_NAME", None)
         if filter_name:
