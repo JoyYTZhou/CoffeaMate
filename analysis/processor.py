@@ -268,7 +268,7 @@ class SkimProcessor(Processor):
                     future_loaded = self.__load_for_skims(
                         fileargs=batch_dict,
                         executor=executor,
-                        readkwargs=readkwargs)
+                        uproot_args=readkwargs)
                     
                     future_cf, future_writes, future_passed = [], [], {}
                     log_memory(process, "before processing")
