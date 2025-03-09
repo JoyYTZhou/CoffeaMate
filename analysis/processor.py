@@ -301,8 +301,7 @@ class SkimProcessor(Processor):
                         for cutflow_file in cutflow_files:
                             self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True)
                         self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True)
-                    if not self.rtcfg.get("REMOTE_LOAD", True):
-                        self.filehelper.close_open_files_delete(self.copydir, "*.root")
+                    self.filehelper.close_open_files_delete(self.copydir, "*.root")
                 release_mapped_memory()
                 check_open_files()
                 check_and_release_memory(process)
