@@ -265,9 +265,9 @@ class CSVPlotter:
                     weights=df['weight']
                 )
                 hist_list.append(counts)
-                wgt_list.append(df['weight'])
+                wgt_list.append(df['weight'].sum())
             
-            ObjectPlotter.plot_var_with_err(
+            ObjectPlotter.plot_hist_with_err(
                 ax=axs[0],
                 ax2=ax2s[0],
                 hist_list=hist_list,
@@ -385,7 +385,7 @@ class ObjectPlotter():
         ax.set_xlim(*xrange)
 
     @staticmethod
-    def plot_var_with_err(ax, ax2, hist_list, wgt_list, bins, label, xrange, **kwargs):
+    def plot_hist_with_err(ax, ax2, hist_list, wgt_list, bins, label, xrange, **kwargs):
         """Plot multiple histograms with error bars and ratio panel.
         
         Parameters
@@ -397,7 +397,7 @@ class ObjectPlotter():
         hist_list : list
             List of histograms to plot
         wgt_list : list
-            List of weights for each histogram
+            List of total weights for each histogram
         bins : array-like
             Bin edges
         label : list

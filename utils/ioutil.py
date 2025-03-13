@@ -177,7 +177,9 @@ def submit_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3) -> 
     return results
 
 def parallel_copy_and_load(fileargs, copydir, executor, delayed_open=True, uproot_args={}) -> dict:
-    """Runs file copying and loading in parallel"""
+    """Runs file copying and loading in parallel
+    
+    Return: a dictionary of futures to file names"""
     future_to_file = {filename: executor.submit(process_file, filename, fileinfo, copydir, delayed_open, uproot_args) for filename, fileinfo in fileargs['files'].items()}
     return future_to_file
 
