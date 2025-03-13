@@ -4,8 +4,7 @@ import pandas as pd
 
 from src.analysis.objutil import Object
 from src.utils.filesysutil import FileSysHelper, pjoin, pbase, pdir
-from src.utils.cutflowutil import combine_cf, calc_eff, load_csvs
-from src.utils.datautil import extract_leaf_values
+from src.utils.datautil import extract_leaf_values, combine_cf, calc_eff, load_csvs
 
 class PostProcessor():
     """Class for loading and hadding data from skims/predefined selections produced directly by Processor.

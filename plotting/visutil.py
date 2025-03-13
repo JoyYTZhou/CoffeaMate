@@ -4,10 +4,9 @@ import pandas as pd
 import json
 from matplotlib.ticker import ScalarFormatter
 
-from src.utils.datautil import arr_handler, iterwgt
+from src.utils.datautil import arr_handler, iterwgt, load_csvs
 from src.analysis.objutil import Object
 from src.utils.filesysutil import FileSysHelper, pjoin, pdir, pbase
-from src.utils.cutflowutil import load_csvs
 from src.utils.plotutil import HistogramHelper, PlotStyle
 
 class CSVPlotter:
