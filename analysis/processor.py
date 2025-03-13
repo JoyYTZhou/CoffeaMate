@@ -257,10 +257,10 @@ class SkimProcessor(Processor):
 
         batch_dicts = fragment_files(self.dsdict, frag_threshold)
         frag_size = len(batch_dicts)
-        self._load_semaphore = threading.Semaphore(min(frag_size, 2))
-        self._write_semaphore = threading.Semaphore(min(frag_size, 2))
+        self._load_semaphore = threading.Semaphore(min(frag_size, 1))
+        self._write_semaphore = threading.Semaphore(min(frag_size, 1))
 
-        worker_no = 2
+        worker_no = 1
             
         for batch_dict in batch_dicts:
             try: 
