@@ -98,11 +98,12 @@ class ABCDUtil:
         """Get all stats of the ABCD method."""
         print(self.ABCD_table(self.dfA, self.dfB, self.dfC, self.dfD, weight=self.weight))
         print("====================================")
-        print("The closure stats for Events (Raw): ")
-        print(self.ABCD_closure(len(self.dfA), len(self.dfB), len(self.dfC), len(self.dfD)))
-        print("====================================")
-        print("The closure stats for Events (Weighted): ")
-        print(self.ABCD_closure(self.dfA['weight'].sum(), self.dfB['weight'].sum(), self.dfC['weight'].sum(), self.dfD['weight'].sum()))
+        print("The closure stats for Events: ")
+        Raw_stats = self.ABCD_closure(len(self.dfA), len(self.dfB), len(self.dfC), len(self.dfD))
+        Weighted_stats = self.ABCD_closure(self.dfA['weight'].sum(), self.dfB['weight'].sum(), self.dfC['weight'].sum(), self.dfD['weight'].sum())
+        total_stats = pd.concat([Raw_stats, Weighted_stats], axis=1)
+        total_stats.columns = ['Raw', 'Weighted']
+        print(total_stats)
         
     @staticmethod
     def ABCD_closure(N_A, N_B, N_C, N_D) -> pd.DataFrame:

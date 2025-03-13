@@ -4,6 +4,7 @@ import numpy as np
 import seaborn as sns
 import mplhep as hep
 import matplotlib as mpl
+import logging
 
 class PlotStyle:
     """Handles basic plot styling and setup"""
@@ -89,6 +90,7 @@ class HistogramHelper:
             bins = np.linspace(*range, bins+1)
             data = np.clip(data, bins[0], bins[-1])
         return np.histogram(data, bins=bins, weights=weights, density=density)
+
     @staticmethod
     def calc_ratio_and_errors(num, den, num_err, den_err):
         """Calculate ratio and its error with proper handling of zero values.
@@ -117,12 +119,39 @@ class HistogramHelper:
         return ratio, ratio_err
 
     @staticmethod
-    def normalize_histogram(hist, weights, bin_width):
-        """Normalize histogram and calculate errors"""
-        den = np.sum(weights) * bin_width
-        norm_hist = hist / den
-        norm_err = np.where(den!=0, np.sqrt(hist) / den, np.nan) 
-        return norm_hist, norm_err
+    def normalize_histogram(hist, total_wgt, bin_width):
+        """Normalize histogram to get probability density and calculate errors.
+
+        Parameters:
+        hist (array): Raw histogram counts/weights
+        total_wgt (float): Sum of all weights/events
+        bin_width (float): Width of each histogram bin
+
+        Returns:
+        tuple: (normalized_histogram, errors)
+            - normalized_histogram is in units of probability density (events/bin_width)
+            - errors are propagated appropriately
+
+        Note:
+        To get a proper probability density function (PDF), we need to:
+        1. Divide by total events/weights to get probability per bin
+        2. Divide by bin width to convert to density (per unit x)
+        This ensures the total integral of the PDF equals 1
+        """
+        # First normalize by total events/weights
+        prob_hist = hist / total_wgt
+
+        # Then convert to density by dividing by bin width
+        density_hist = prob_hist / bin_width
+
+        # Propagate errors, assuming Poisson statistics
+        # Error = sqrt(N)/N * normalized value, where N is raw counts
+        density_err = np.where(
+            hist > 0,  # Only calculate errors for non-empty bins
+            density_hist * (np.sqrt(hist)/hist),
+            0
+        )
+        return density_hist, density_err
     
     @staticmethod
     def _prepare_data(df, Y, Y_range):
