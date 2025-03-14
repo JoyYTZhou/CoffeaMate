@@ -10,36 +10,43 @@ from src.utils.filesysutil import XRootDHelper, pjoin
 import logging
 from datetime import datetime
 
-def setup_logging(console_level=logging.WARNING, file_level=logging.DEBUG, log_to_file=True):
-    """Setup logging with an option to log to a file or only to the console."""
-
-    logging.getLogger().handlers.clear()  # Clear existing handlers
-
-    # Ensure the root logger level is set based on the lowest level requested
-    logging.getLogger().setLevel(min(console_level, file_level))  # Set root logger level
-
-    if log_to_file:
-        debug_filename = f'debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
-        logging.basicConfig(
-            filename=debug_filename,
-            level=file_level,
-            format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
-        )
-
-    # Always add a console handler
+def setup_logging(console_level=logging.INFO, file_level=logging.DEBUG, log_to_file=True):  # Changed default console_level to INFO
+    """Setup logging configuration."""
+    # Remove any existing handlers
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    
+    # Create formatters
+    console_formatter = logging.Formatter('%(levelname)s: %(message)s')
+    file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    
+    # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(console_level)
-    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    logging.getLogger().addHandler(console_handler)
-
-    # Set specific library log levels
-    logging.getLogger("uproot").setLevel(logging.WARNING)
-    logging.getLogger("dask").setLevel(logging.DEBUG)
-    logging.getLogger("distributed").setLevel(logging.DEBUG)
-    logging.getLogger("fsspec").setLevel(logging.WARNING)
-
-    logging.info(f"Logging setup: Console Level = {console_level}, File logging is {'enabled' if log_to_file else 'disabled'}.")
-
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
+    
+    # File handler if requested
+    if log_to_file:
+        log_file = f'debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(file_level)
+        file_handler.setFormatter(file_formatter)
+        root_logger.addHandler(file_handler)
+    
+    # Set root logger to lowest level of any handler
+    root_logger.setLevel(min(console_level, file_level))
+    
+    # Configure library loggers
+    logging.getLogger('uproot').setLevel(logging.WARNING)
+    logging.getLogger('dask').setLevel(logging.WARNING)
+    logging.getLogger('distributed').setLevel(logging.WARNING)
+    
+    # Test logging
+    logging.debug("Logging setup complete - DEBUG test")
+    logging.info("Logging setup complete - INFO test")
+    logging.warning("Logging setup complete - WARNING test")
+    
 def check_open_files(auto_close_threshold: float = 100, max_objects: int = 10) -> tuple[int, list[str]]:
     """Check and log details about currently open files with error handling.
     
