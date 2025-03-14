@@ -340,7 +340,7 @@ class XRootDHelper:
         """Get the size of a file in bytes.
         
         Parameters
-        - filepath: path to the file (remote)
+        - filepath: path to the file (remote), must start with /store/user/...
         
         Returns
         - int: size of the file in bytes

@@ -201,7 +201,7 @@ class Processor:
             rc = self.writepickle(passed, suffix, **kwargs)
 
         if self.transfer is not None:
-            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True)
+            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True, overwrite=True)
             print(f"Files transferred to: {self.transfer}" )
         return rc
 
