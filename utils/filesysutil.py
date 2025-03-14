@@ -226,6 +226,8 @@ class FileSysHelper:
         if filepath.startswith('/store/user'):
             xrdhelper = XRootDHelper(prefix)
             return xrdhelper.get_file_size(filepath)
+        elif filepath.startswith('root://'):
+            pass
         else:
             return os.path.getsize(filepath) 
            
@@ -254,7 +256,7 @@ class XRootDHelper:
         """Get the size of a file in bytes.
         
         Parameters
-        - filepath: path to the file (remote)
+        - filepath: path to the file (remote), must start with /store/user/...
         
         Returns
         - int: size of the file in bytes
