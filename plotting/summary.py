@@ -1,4 +1,4 @@
-import logging, json, re, os, gzip
+import logging, json, re, os
 import pandas as pd
 
 from src.analysis.objutil import Object

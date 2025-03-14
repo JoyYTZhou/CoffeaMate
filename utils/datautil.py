@@ -1,6 +1,6 @@
 import pandas as pd
 import awkward as ak
-import uproot, pickle, os, subprocess, json
+import uproot, pickle, os, subprocess, json, gzip
 import numpy as np
 from functools import wraps
 import dask_awkward as dak
@@ -384,12 +384,8 @@ class DataSetUtil:
             "DYJetsToLL_M-10to50": ["0f7376a8-61bc-11ee-95cf-3401a8c0beef", ...],
         }
         """
-        # Extract era from filename (assuming format: sample_era.json)
-        base_name = os.path.basename(json_path)
-        sample_name, era = base_name.replace('.json', '').split('_')
-        
         # Read JSON file
-        with open(json_path, 'r') as f:
+        with gzip.open(json_path, 'r') as f:
             data = json.load(f)
         
         # Extract UUIDs and metadata
