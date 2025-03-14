@@ -1,10 +1,12 @@
 import pandas as pd
 import awkward as ak
-import uproot, pickle, os, subprocess
+import uproot, pickle, os, subprocess, json
 import numpy as np
 from functools import wraps
 import dask_awkward as dak
 import logging
+import multiprocessing as mp
+from functools import partial
 from src.utils.filesysutil import pjoin, FileSysHelper
 
 parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -15,23 +17,51 @@ runcom = subprocess.run
 class CutflowProcessor:
     """Processes and manipulates cutflow tables."""
     @staticmethod
-    def check_events_match(df, col_name, rootfiles):
-        """Validates if events count in cutflow matches root files."""
-        if isinstance(rootfiles, str):
-            rootfiles = [rootfiles]
+    def check_events_match(df, col_name, rootfiles, empty_kwd='empty'):
+        """Validates if events count in cutflow matches root files.
         
-        total_events = sum(
-            uproot.open(f)["Events"].num_entries 
-            for f in rootfiles
-        )
+        Parameters
+        - df: pandas DataFrame containing cutflow
+        - col_name: column name in DataFrame containing event counts
+        - rootfiles: single root file path or list of root file paths
+        - empty_kwd: keyword to identify empty files
         
+        Returns
+        - bool: True if events match or file is properly marked as empty, False if mismatch or corruption
+        """
         cutflow_events = df[col_name].iloc[-1]
+
+        if isinstance(rootfiles, str):
+            if empty_kwd in rootfiles:
+                return cutflow_events == 0
+            else:
+                rootfiles = [rootfiles]
         
-        logging.debug("Checking event counts...")
-        logging.debug(f"Events in root files: {total_events}")
-        logging.debug(f"Events in cutflow: {cutflow_events}")
+        try:
+            total_events = 0
+            corrupted_files = []
+            
+            for root_file in rootfiles:
+                try:
+                    with uproot.open(root_file) as f:
+                        total_events += f["Events"].num_entries
+                except Exception as e:
+                    logging.error(f"Corrupted root file detected - {root_file}: {str(e)}")
+                    corrupted_files.append(root_file)
+            
+            if corrupted_files:
+                logging.warning(f"Found {len(corrupted_files)} corrupted root files")
+                return False
+            
+            logging.debug("Checking event counts...")
+            logging.debug(f"Events in root files: {total_events}")
+            logging.debug(f"Events in cutflow: {cutflow_events}")
+            
+            return total_events == cutflow_events
         
-        return total_events == cutflow_events
+        except Exception as e:
+            logging.error(f"Error checking events match: {str(e)}")
+            return False
 
     @staticmethod
     def merge_cutflows(inputdir, dataset_name, keyword='cutflow', save=True, outpath=None):
@@ -335,6 +365,169 @@ class DataLoader:
             df = df.sum(axis=1).to_frame(name=group)
         return df
 
+class DataSetUtil:
+    @staticmethod
+    def extract_uuids(json_path: str) -> dict:
+        """Extract UUIDs from dataset JSON files.
+        
+        Parameters
+        - json_path: path to the JSON file
+        
+        Returns
+        - dict: Nested dictionary containing dataset information and UUIDs
+            Format: {dataset_era: {sample_name: {"shortname": str, "uuids": list[str]}}}
+        
+        Example:
+        >>> extract_uuids("data/preprocessed/DYJets_2022PostEE.json")
+        {
+            "DYJetsToLL_M-50": ["0f7376a8-61bc-11ee-95cf-3401a8c0beef", ...],
+            "DYJetsToLL_M-10to50": ["0f7376a8-61bc-11ee-95cf-3401a8c0beef", ...],
+        }
+        """
+        # Extract era from filename (assuming format: sample_era.json)
+        base_name = os.path.basename(json_path)
+        sample_name, era = base_name.replace('.json', '').split('_')
+        
+        # Read JSON file
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        
+        # Extract UUIDs and metadata
+        shortname = None
+        result = {}
+        
+        # Iterate through each dataset
+        for dataset_info in data.values():
+            uuids = []
+            # Get metadata
+            if 'metadata' in dataset_info and 'shortname' in dataset_info['metadata']:
+                shortname = dataset_info['metadata']['shortname']
+            
+            # Get UUIDs from files
+            if 'files' in dataset_info:
+                for file_info in dataset_info['files'].values():
+                    if 'uuid' in file_info:
+                        uuids.append(file_info['uuid'])
+            result[shortname] = uuids
+        
+        return result
+
+    @staticmethod
+    def _validate_single_pair(uuid_info, root_dir, csv_dir):
+        """Helper function to validate a single UUID pair.
+        
+        Parameters
+        - uuid_info: tuple of (shortname, uuid)
+        - root_dir: directory containing root files
+        - csv_dir: directory containing cutflow CSV files
+        
+        Returns
+        - dict: Validation result for this UUID
+        """
+        shortname, uuid = uuid_info
+        base_pattern = f"{shortname}_{uuid}"
+        
+        # Find matching files
+        root_files = FileSysHelper.glob_files(
+            root_dir, 
+            filepattern=f"{base_pattern}*.root"
+        )
+        csv_files = FileSysHelper.glob_files(
+            csv_dir, 
+            filepattern=f"{base_pattern}*cutflow.csv"
+        )
+        
+        # Check if files exist
+        if not root_files or not csv_files:
+            return ("missing", {
+                "shortname": shortname,
+                "uuid": uuid,
+                "missing_root": len(root_files) == 0,
+                "missing_csv": len(csv_files) == 0
+            })
+        
+        # Validate event counts
+        try:
+            df = pd.read_csv(csv_files[0], index_col=0)
+            events_match = CutflowProcessor.check_events_match(
+                df=df,
+                col_name=df.columns[0],
+                rootfiles=root_files
+            )
+            
+            if events_match:
+                return ("valid", {
+                    "shortname": shortname,
+                    "root": root_files[0],
+                    "csv": csv_files[0],
+                    "uuid": uuid
+                })
+            else:
+                return ("mismatched", {
+                    "shortname": shortname,
+                    "root": root_files[0],
+                    "csv": csv_files[0],
+                    "uuid": uuid
+                })
+        except Exception as e:
+            logging.error(f"Error validating files for {shortname} UUID {uuid}: {str(e)}")
+            return ("missing", {
+                "shortname": shortname,
+                "uuid": uuid,
+                "error": str(e)
+            })
+
+    @staticmethod
+    def validate_file_pairs(json_path: str, root_dir: str, csv_dir: str, n_workers: int = None) -> dict:
+        """Validate matching root and cutflow CSV files for a dataset in parallel.
+        
+        Parameters
+        - json_path: path to the JSON file containing dataset information
+        - root_dir: directory containing root files
+        - csv_dir: directory containing cutflow CSV files
+        - n_workers: number of worker processes (default: number of CPU cores - 1)
+        
+        Returns
+        - dict: Dictionary with validation results
+        """
+        # Get dataset information
+        dataset_info = DataSetUtil.extract_uuids(json_path)
+        
+        # Prepare list of work items
+        work_items = [
+            (shortname, uuid) 
+            for shortname, uuids in dataset_info.items()
+            for uuid in uuids
+        ]
+        
+        # Set up multiprocessing
+        if n_workers is None:
+            n_workers = max(1, mp.cpu_count() - 2)
+            
+        # Prepare results container
+        results = {
+            "valid_pairs": [],
+            "mismatched_events": [],
+            "missing_files": []
+        }
+        
+        # Process in parallel
+        with mp.Pool(n_workers) as pool:
+            validate_func = partial(DataSetUtil._validate_single_pair, 
+                                 root_dir=root_dir, 
+                                 csv_dir=csv_dir)
+            
+            # Process all pairs and collect results
+            for result_type, result_info in pool.imap_unordered(validate_func, work_items):
+                if result_type == "valid":
+                    results["valid_pairs"].append(result_info)
+                elif result_type == "mismatched":
+                    results["mismatched_events"].append(result_info)
+                else:  # missing
+                    results["missing_files"].append(result_info)
+        
+        return results
+     
 def iterwgt(func):
     @wraps(func)
     def wrapper(instance, *args, **kwargs):

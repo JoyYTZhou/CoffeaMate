@@ -1,9 +1,9 @@
-import logging, json, re, os
+import logging, json, re, os, gzip
 import pandas as pd
 
 from src.analysis.objutil import Object
 from src.utils.filesysutil import FileSysHelper, pjoin, pbase, pdir
-from src.utils.datautil import extract_leaf_values, CutflowProcessor
+from src.utils.datautil import extract_leaf_values, CutflowProcessor, DataSetUtil
 from src.utils.rootutil import RootFileHandler
 
 class PostProcessor():
@@ -126,19 +126,18 @@ class PostProcessor():
         
         Parameters
         - `rq_keys`: list of required keys to check for in the root files"""
-        helper = FileSysHelper()
+        corrupted ={}
         for year in self.years:
             for group in self.groups(year):
-                possible_corrupted = []
-                for root_file in helper.glob_files(pjoin(self.inputdir, year, group), '*.root', full_path=True):
-                    is_bad = RootFileHandler.check_root_file(root_file)
-                    if is_bad: possible_corrupted.append(root_file)
-                if possible_corrupted:
-                    logging.warning(f"There are bad files for {group}!")
-                    with open(f'{group}_corrupted_files.txt', 'w') as f:
-                        f.write('\n'.join(possible_corrupted))
-                else:
-                    logging.debug("No bad files for {group} : > : > : > : >")
+                ori_samples = pjoin(self.cfg['DATA_DIR'], 'preprocessed', f"{group}_{year}.json.gz")
+                dt_dir = pjoin(self.inputdir, year, group)
+                results = DataSetUtil.validate_file_pairs(ori_samples, dt_dir, dt_dir, n_workers=2)
+                corrupted[year][group] = results
+        if corrupted:
+            logging.warning(f"Corrupted files found: {corrupted}")
+            with open('all_corrupted.json', 'w') as f:
+                json.dump(corrupted, f)
+            logging.error(f"Saved corrupted files to all_corrupted.json")
     
     def clean_roots(self) -> None:
         """Delete the corrupted files in the filelist."""
