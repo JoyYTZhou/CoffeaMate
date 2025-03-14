@@ -290,5 +290,5 @@ def compute_and_write_skimmed(passed, outdir, dataset, suffix, write_args={}) ->
     if computed_array is not None:
         return write_computed_array(computed_array, outdir, dataset, suffix, write_args)
     else:
-        write_empty_root(pjoin(outdir, f'{dataset}_{suffix}.root'))
+        write_empty_root(pjoin(outdir, f'{dataset}_{suffix}_empty.root'))
         return 0

@@ -25,6 +25,39 @@ def release_mapped_memory():
             logging.debug(f"Unmapped memory-mapped file {obj}")
             time.sleep(1)
 
+def is_remote(filepath: str) -> bool:
+    """Check if a file path is remote (XRootD) or local.
+    
+    Parameters
+    - filepath: path to check
+    
+    Returns
+    - bool: True if the path is remote (starts with 'root://' or '/store/user'), False otherwise
+    """
+    return filepath.startswith('root://') or filepath.startswith('/store/user')
+
+def strip_xrd_prefix(filepath: str) -> str:
+    """Strip the XRootD prefix (root://*/) from a file path.
+    
+    Parameters
+    - filepath: full file path including XRootD prefix
+    
+    Returns
+    - str: file path without the XRootD prefix
+    
+    Example:
+    >>> strip_xrd_prefix("root://cmseos.fnal.gov//store/user/file.root")
+    '/store/user/file.root'
+    """
+    if filepath.startswith('root://'):
+        # Find the index after the host name (after the next '/' after '//')
+        double_slash_idx = filepath.find('//')
+        if double_slash_idx != -1:
+            next_slash_idx = filepath.find('/', double_slash_idx + 2)
+            if next_slash_idx != -1:
+                return filepath[next_slash_idx:]
+    return filepath
+
 class FileSysHelper:
     """Helper class for file system operations. Can be used for both local and remote file systems."""
     def __init__(self) -> None:
@@ -92,26 +125,39 @@ class FileSysHelper:
         return False
 
     @staticmethod
-    def glob_files(dirname, filepattern='*', full_path=True, **kwargs) -> list:
+    def glob_files(dirname, filepattern='*', full_path=True, exclude=None, **kwargs) -> list:
         """Returns a SORTED list of files matching a pattern in a directory. By default will return all files.
         
         Parameters
         - `dirname`: directory path (remote/local)
         - `filepattern`: pattern to match the file name. Wildcards allowed
-        - `full_path`: whether to return the full path or with just file name globbed.
+        - `full_path`: whether to return the full path or with just file name globbed
+        - `exclude`: pattern or list of patterns to exclude. Wildcards allowed
         - `kwargs`: additional arguments for filtering files
 
         Return
         - A SORTED list of files (str)
         """
-        if dirname.startswith('/store/user'):
+        if is_remote(dirname):
             xrdhelper = XRootDHelper(kwargs.get("prefix", PREFIX))
-            files = xrdhelper.glob_files(dirname, filepattern, full_path)
+            files = xrdhelper.glob_files(dirname, filepattern, full_path, exclude=exclude)
         else:
             if filepattern == '*':
                 files = [str(file.absolute()) for file in Path(dirname).iterdir() if file.is_file()]
             else:
-                files = glob.glob(pjoin(dirname, filepattern)) 
+                files = glob.glob(pjoin(dirname, filepattern))
+            
+            # Handle exclusions for local files
+            if exclude:
+                if isinstance(exclude, str):
+                    exclude = [exclude]
+                filtered_files = []
+                for file in files:
+                    basename = pbase(file)
+                    if not any(fnmatch.fnmatch(basename, exc_pattern) for exc_pattern in exclude):
+                        filtered_files.append(file)
+                files = filtered_files
+
         return sorted(files)
     
     @staticmethod
@@ -192,7 +238,7 @@ class FileSysHelper:
         - `remove`: whether to remove the files from srcpath after transferring
         - `overwrite`: whether to overwrite the files in the destination
         """
-        if destpath.startswith('/store/user'):
+        if is_remote(destpath):
             xrdhelper = XRootDHelper(kwargs.get("prefix", PREFIX))
             xrdhelper.transfer_files(srcpath, destpath, filepattern, remove, overwrite)
         else:
@@ -223,9 +269,10 @@ class FileSysHelper:
         - FileNotFoundError: if the file doesn't exist
         - Exception: if there's an error getting the size
         """
-        if filepath.startswith('/store/user'):
+        if is_remote(filepath):
             xrdhelper = XRootDHelper(prefix)
-            return xrdhelper.get_file_size(filepath)
+            clean_path = strip_xrd_prefix(filepath)
+            return xrdhelper.get_file_size(clean_path)
         else:
             return os.path.getsize(filepath) 
            
@@ -248,6 +295,45 @@ class XRootDHelper:
             files = [entry.name for entry in listing.dirlist if match(entry.name, filepattern)]
         if full_path:
             files = [f'{self.prefix}/{os.path.join(dirname, f)}' for f in files]
+        return files
+    
+    def glob_files(self, dirname, filepattern="*", full_path=True, exclude=None, **kwargs) -> list:
+        """Returns a list of files matching a pattern in a directory. By default will return all files/subdirectories.
+        
+        Parameters
+        - dirname: directory path
+        - filepattern: pattern to match the file name
+        - full_path: whether to return full paths
+        - exclude: pattern or list of patterns to exclude
+        """
+        clean_dirname = strip_xrd_prefix(dirname)
+        exist = self.check_path(clean_dirname, createdir=False, raiseError=False)
+        if exist == False:
+            return []
+            
+        status, listing = self.xrdfs_client.dirlist(clean_dirname)
+        if not status.ok:
+            raise Exception(f"Failed to list directory {clean_dirname}: {status.message}")
+        
+        # First apply inclusion pattern
+        if filepattern == '*':
+            files = [entry.name for entry in listing.dirlist]
+        else:
+            files = [entry.name for entry in listing.dirlist if match(entry.name, filepattern)]
+        
+        # Then apply exclusion patterns
+        if exclude:
+            if isinstance(exclude, str):
+                exclude = [exclude]
+            filtered_files = []
+            for file in files:
+                if not any(fnmatch.fnmatch(file, exc_pattern) for exc_pattern in exclude):
+                    filtered_files.append(file)
+            files = filtered_files
+        
+        if full_path:
+            files = [f'{self.prefix}/{os.path.join(clean_dirname, f)}' for f in files]
+        
         return files
 
     def get_file_size(self, filepath) -> int:
@@ -317,15 +403,17 @@ class XRootDHelper:
         - `destpath`: destination path (remote), a directory
         - `filepattern`: pattern to match the file name. Passed into glob.glob(filepattern)
         - `remove`: whether to remove the files from srcpath after transferring"""
-        if srcpath.startswith('/store/user'):
+        if is_remote(srcpath):
             raise ValueError("Source path should be a local directory. Why are you transferring from one EOS to another?")
         else:
             files = glob.glob(pjoin(srcpath, filepattern))
         
-        if not(destpath.startswith('/store/user')):
+        if not is_remote(destpath):
             raise ValueError("Destination path should be a remote directory. Use FileSysHelper for local transfers.")
-
+        
+        destpath = strip_xrd_prefix(destpath)
         self.check_path(destpath)
+
         for file in files:
             src_file = file
             dest_file = pjoin(destpath, pbase(file))
