@@ -207,7 +207,28 @@ class FileSysHelper:
                         os.remove(file)
                 else:
                     logging.debug(f"File {dest_file} exists. Skipping.")
-    
+
+    @staticmethod
+    def get_file_size(filepath, prefix=PREFIX) -> int:
+        """Get the size of a file in bytes. Works for both local and remote files.
+        
+        Parameters
+        - filepath: path to the file (local or remote)
+        - prefix: XRootD prefix for remote files (default: root://cmseos.fnal.gov)
+        
+        Returns
+        - int: size of the file in bytes
+        
+        Raises
+        - FileNotFoundError: if the file doesn't exist
+        - Exception: if there's an error getting the size
+        """
+        if filepath.startswith('/store/user'):
+            xrdhelper = XRootDHelper(prefix)
+            return xrdhelper.get_file_size(filepath)
+        else:
+            return os.path.getsize(filepath) 
+           
 class XRootDHelper:
     def __init__(self, prefix=PREFIX) -> None:
         self.xrdfs_client = client.FileSystem(prefix)
@@ -228,6 +249,23 @@ class XRootDHelper:
         if full_path:
             files = [f'{self.prefix}/{os.path.join(dirname, f)}' for f in files]
         return files
+
+    def get_file_size(self, filepath) -> int:
+        """Get the size of a file in bytes.
+        
+        Parameters
+        - filepath: path to the file (remote)
+        
+        Returns
+        - int: size of the file in bytes
+        
+        Raises
+        - Exception: if the file doesn't exist or there's an error getting the size
+        """
+        status, stat_info = self.xrdfs_client.stat(filepath)
+        if not status.ok:
+            raise Exception(f"Failed to get file size for {filepath}: {status.message}")
+        return stat_info.size
     
     def check_path(self, dirname, createdir=True, raiseError=False) -> bool:
         """Check if a directory exists. If not will create one.

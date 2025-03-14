@@ -1,5 +1,6 @@
 #import ROOT
 import os, uproot, logging, subprocess, re
+from src.utils.filesysutil import FileSysHelper
 
 class RootFileHandler:
 #    @staticmethod
@@ -15,21 +16,18 @@ class RootFileHandler:
     @staticmethod
     def check_root_file(file_path) -> bool:
         """Check if a ROOT file is empty or corrupt.
-
-        Parameters:
         - file_path: path to the ROOT file
+
         Returns:
         - True if file is empty or corrupt, False otherwise
         """
         MIN_SIZE_BYTES = 1024 * 2
         try:
-            # Check file size first
-            file_size = os.path.getsize(file_path)
+            file_size = FileSysHelper.get_file_size(file_path)
             if file_size < MIN_SIZE_BYTES:
                 logging.warning(f"File {file_path} is too small (< {MIN_SIZE_BYTES} bytes)")
                 return True
 
-            # Try to open and read the file
             with uproot.open(file_path) as file:
                 # Check if file can be opened
                 if file is None:
@@ -40,7 +38,6 @@ class RootFileHandler:
                     logging.warning(f"File {file_path} has no keys")
                     return True
 
-                # Check content of each key
                 for key in keys:
                     try:
                         data = file[key]
@@ -56,10 +53,6 @@ class RootFileHandler:
 
                 logging.warning(f"File {file_path} contains keys but all are empty")
                 return True
-
-        except uproot.exceptions.BadRootFile as e:
-            logging.error(f"File {file_path} is corrupted: {e}")
-            return True
         except Exception as e:
             logging.error(f"Error checking file {file_path}: {e}")
             return True
