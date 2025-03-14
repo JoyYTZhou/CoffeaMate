@@ -4,7 +4,7 @@ import pandas as pd
 
 from src.analysis.objutil import Object
 from src.utils.filesysutil import FileSysHelper, pjoin, pbase, pdir
-from src.utils.datautil import extract_leaf_values, combine_cf, calc_eff, load_csvs
+from src.utils.datautil import extract_leaf_values, CutflowProcessor, load_csvs
 
 class PostProcessor():
     """Class for loading and hadding data from skims/predefined selections produced directly by Processor.
@@ -197,7 +197,7 @@ class PostProcessor():
         def process_cf(dsname, dtdir, outdir):
             print(f"Dealing with {dsname} cutflow hadding now ...............................")
             try:
-                df = combine_cf(inputdir=dtdir, dsname=dsname, output=False)
+                df = CutflowProcessor.combine_cf(inputdir=dtdir, dsname=dsname, output=False)
                 df.to_csv(pjoin(outdir, f"{dsname}_cutflow.csv"))
                 return df
             except Exception as e:
@@ -248,7 +248,7 @@ class PostProcessor():
             wgt_resolved.to_csv(pjoin(outputdir, year, "ResolvedWgtOnly.csv"))
             resolved_wgted[year] = wgt_resolved
 
-            wgtEff = calc_eff(wgt_resolved, None, 'incremental')
+            wgtEff = PostProcessor.calc_eff(wgt_resolved, None, 'incremental')
             wgtEff.filter(like='eff', axis=1).to_csv(pjoin(outputdir, year, "ResolvedEffOnly.csv"))
 
             combined_df = pd.concat(combined_list, axis=1)
@@ -272,45 +272,6 @@ class PostProcessor():
         yield_df.to_csv(pjoin(outputdir, 'scaledyield.csv'))
         
         return yield_df
-    
-    @staticmethod
-    def process_yield(yield_df, signals) -> pd.DataFrame:
-        """group the yield dataframe to include signal and background efficiencies.
-
-        Parameters
-        - `yield_df`: dataframe of yields
-        - `signals`: list of signal group names
-        
-        Return
-        - processed yield dataframe"""
-        sig_list = [signal for signal in signals if signal in yield_df.columns]
-        bkg_list = yield_df.columns.difference(sig_list)
-
-        yield_df['Tot Bkg'] = yield_df[bkg_list].sum(axis=1)
-        yield_df['Bkg Eff'] = calc_eff(yield_df, 'Tot Bkg', inplace=False)
-
-        for signal in sig_list:
-            yield_df[f'{signal} Eff'] = calc_eff(yield_df, signal, inplace=False)
-
-        new_order = list(bkg_list) + ['Tot Bkg', 'Bkg Eff']
-        for signal in sig_list:
-            new_order.extend([signal, f'{signal} Eff'])
-            
-        yield_df = yield_df[new_order]
-        return yield_df
-    
-    @staticmethod
-    def categorize(df, group_kwd:'dict') -> pd.DataFrame:
-        """Recalculate/categorize a table by the group keyword.
-        
-        Parameters
-        - `group_kwd`: {name of new column: [keywords to search for in the column names]}"""
-        for newcol, kwdlist in group_kwd.items():
-            cols = [col for col in df.columns if any(kwd in col for kwd in kwdlist)]
-            if cols:
-                df[newcol] = df[cols].sum(axis=1)
-                df.drop(columns=cols, inplace=True)
-        return df
     
     @staticmethod
     def calc_wgt(datasrcpath, meta_dict, dict_outpath, groups) -> dict:
@@ -365,21 +326,6 @@ class PostProcessor():
         return resolved_df, combined_cf
 
     @staticmethod
-    def sum_kwd(cfdf, keyword, name) -> pd.Series:
-        """Add a column to the cutflow table by summing up all columns with the keyword.
-
-        Parameters
-        - `cfdf`: cutflow dataframe
-        - `keyword`: keyword to search for in the column names
-        - `name`: name of the new column
-
-        Return
-        - Series of the summed column"""
-        same_cols = cfdf.filter(like=keyword)
-        sumcol = same_cols.sum(axis=1)
-        return sumcol
-
-    @staticmethod
     def write_obj(writable, filelist, objnames, extra=[]) -> None:
         """Writes the selected, concated objects to root files.
         Parameters:
@@ -429,28 +375,6 @@ class PostProcessor():
 
         for file in filelist: FileSysHelper.remove_files(dirname, file)
         
-def check_last_no(df, col_name, rootfiles):
-    """Check if the last number in the cutflow table matches the number of events in the root files.
-    
-    Parameters
-    - `df`: cutflow dataframe
-    - `col_name`: name of the column to check
-    - `rootfiles`: list of root files
-    """
-    if isinstance(rootfiles, str):
-        rootfiles = [rootfiles]
-    
-    raw = 0
-    for file in rootfiles:
-        with uproot.open(file) as f:
-            thisraw = f.get("Events").num_entries
-        raw += thisraw
-    
-    print(f'Got {raw} events in root files!')
-    print(f'Got {df[col_name].iloc[-1]} events in cutflow table!')
-    
-    return df[col_name].iloc[-1] == raw
-
 def find_branches(file_path, object_list, tree_name, extra=[]) -> list:
     """Return a list of branches for objects in object_list
 

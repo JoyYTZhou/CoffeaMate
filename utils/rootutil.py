@@ -10,17 +10,15 @@ def check_corrupt(file_path):
     except Exception as e:
         print(f"File {file_path} might be truncated or corrupted. Error: {e}")
 
-def check_empty(file_path) -> bool:
+def check_empty_root(file_path) -> bool:
     """Check if a ROOT file is empty."""
-    # First check file size - if it's larger than 1KB, consider it non-empty
-    MIN_SIZE_BYTES = 1024  # 1KB threshold, adjust as needed
+    MIN_SIZE_BYTES = 1024 * 2
 
     try:
         file_size = os.path.getsize(file_path)
         if file_size > MIN_SIZE_BYTES:
             return False
 
-        # If file is very small, do detailed check
         with uproot.open(file_path) as file:
             keys = file.keys()
             if len(keys) == 0:
