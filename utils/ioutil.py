@@ -1,4 +1,5 @@
 import uproot, dask, logging, psutil, os
+import pandas as pd
 import concurrent.futures
 import awkward as ak
 import dask_awkward as dak
@@ -135,6 +136,20 @@ def write_empty_root(filename):
     """Creates an empty ROOT file as a placeholder."""
     with uproot.recreate(filename):
         pass
+
+def write_root(evts: 'ak.Array | pd.DataFrame', destination, outputtree="Events", title="Events", compression=None):
+    """Write arrays to root file. Highly inefficient methods in terms of data storage.
+
+    Parameters
+    - `destination`: path to the output root file
+    - `outputtree`: name of the tree to write to
+    - `title`: title of the tree
+    - `compression`: compression algorithm to use"""
+    branch_types = {name: evts[name].type for name in evts.fields}
+    with uproot.recreate(destination, compression=compression) as file:
+        file.mktree(name=outputtree, branch_types=branch_types, title=title)
+        file[outputtree].extend({name: evts[name] for name in evts.fields}) 
+
         
 def process_file(filename, fileinfo, copydir, delayed_open=True, uproot_args={}) -> tuple:
     """Handles file copying and loading"""

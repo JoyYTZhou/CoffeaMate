@@ -1,10 +1,10 @@
-import uproot, json, subprocess, re, os
-import awkward as ak
+import logging, json, re, os
 import pandas as pd
 
 from src.analysis.objutil import Object
 from src.utils.filesysutil import FileSysHelper, pjoin, pbase, pdir
-from src.utils.datautil import extract_leaf_values, CutflowProcessor, load_csvs
+from src.utils.datautil import extract_leaf_values, CutflowProcessor
+from src.utils.rootutil import RootFileHandler
 
 class PostProcessor():
     """Class for loading and hadding data from skims/predefined selections produced directly by Processor.
@@ -121,7 +121,7 @@ class PostProcessor():
             self.meta_dict[year] = PostProcessor.calc_wgt(pjoin(outputdir, year), self.meta_dict[year],
                                 pjoin(new_meta_dir, f'{year}.json'), self.groups(year))
     
-    def check_roots(self, rq_keys=['Events']) -> None:
+    def check_roots(self) -> None:
         """Check if the root files are corrupted by checking if the required keys are present. Save the corrupted files (full path with xrdfs prefix) to a text file.
         
         Parameters
@@ -131,20 +131,14 @@ class PostProcessor():
             for group in self.groups(year):
                 possible_corrupted = []
                 for root_file in helper.glob_files(pjoin(self.inputdir, year, group), '*.root', full_path=True):
-                    try: 
-                        with uproot.open(root_file) as f:
-                            f.keys()
-                            if not all(tree in f for tree in rq_keys):
-                                possible_corrupted.append(root_file)
-                    except Exception as e:
-                        print(f"Error reading file {root_file}: {e}")
-                        possible_corrupted.append(root_file)
+                    is_bad = RootFileHandler.check_root_file(root_file)
+                    if is_bad: possible_corrupted.append(root_file)
                 if possible_corrupted:
-                    print(f"There are corrupted files for {group}!")
+                    logging.warning(f"There are bad files for {group}!")
                     with open(f'{group}_corrupted_files.txt', 'w') as f:
                         f.write('\n'.join(possible_corrupted))
                 else:
-                    print(f"No corrupted files for {group} : > : > : > : >")
+                    logging.debug("No bad files for {group} : > : > : > : >")
     
     def clean_roots(self) -> None:
         """Delete the corrupted files in the filelist."""
@@ -197,7 +191,7 @@ class PostProcessor():
         def process_cf(dsname, dtdir, outdir):
             print(f"Dealing with {dsname} cutflow hadding now ...............................")
             try:
-                df = CutflowProcessor.combine_cf(inputdir=dtdir, dsname=dsname, output=False)
+                df = CutflowProcessor.merge_cutflows(inputdir=dtdir, dsname=dsname, output=False)
                 df.to_csv(pjoin(outdir, f"{dsname}_cutflow.csv"))
                 return df
             except Exception as e:
@@ -212,50 +206,67 @@ class PostProcessor():
                     transferP = f"{self.transferP}/{year}/{group}"
                     FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
                 
-    def merge_cf(self, inputdir, outputdir, extra_kwd='') -> dict:
-        """Merge all cutflow tables for all processes into one. Save to LOCALOUTPUT.
-        Output formatted cutflow table as well. Produces four files: allDatasetCutflow.csv, ResolvedWgtOnly.csv, ResolvedEffOnly.csv.
-        The weighting is done by xsection/nwgt * per event weight.
-
-        allDatasetCutflow.csv: contains all the datasets raw and weighted events
-        ResolvedWgtOnly.csv: contains all the datasets weighted events. 
-        ResolvedEffOnly.csv: contains all the datasets efficiency.
-
+    def merge_cf(self, inputdir, outputdir, extra_kwd=''):
+        """Merges and weights all cutflow tables across years and groups.
         
-        Return 
-        - a dictionary of resolved cutflow tables for each year."""
+        Creates three output files per year:
+        - allDatasetCutflow.csv: Raw and weighted events for all datasets
+        - ResolvedWgtOnly.csv: Only weighted events
+        - ResolvedEffOnly.csv: Selection efficiencies
+        
+        Returns
+        -------
+        tuple[dict, dict]
+            (Weighted cutflows per year, Combined weights per year)
+        """
         resolved_wgted = {}
         combined_wgted = {}
 
         self.__update_meta()
 
         for year in self.years:
-            lumi = self.lumi[year]
+            # Setup output directory
+            year_outdir = pjoin(outputdir, year)
+            FileSysHelper.checkpath(year_outdir, createdir=True)
+            
             resolved_list = []
             combined_list = []
-            FileSysHelper.checkpath(pjoin(outputdir, year), createdir=True)
-
+            
+            # Process each group
             for group in self.groups(year):
-                if FileSysHelper.checkpath(pjoin(inputdir, year, group), createdir=False):
-                    resolved, combined = PostProcessor.scale_cf(group, self.meta_dict[year], pjoin(inputdir, year), lumi, extra_kwd)
-                    resolved_list.append(resolved)
-                    combined_list.append(combined)
+                if not FileSysHelper.checkpath(pjoin(inputdir, year, group)):
+                    continue
+                    
+                resolved, combined = self.process_group_cutflow(
+                    group,
+                    self.meta_dict[year],
+                    pjoin(inputdir, year),
+                    self.lumi[year],
+                    extra_kwd
+                )
+                resolved_list.append(resolved)
+                combined_list.append(combined)
 
+            # Combine results
             resolved_all = pd.concat(resolved_list, axis=1)
-            resolved_all.to_csv(pjoin(outputdir, year, f"allDatasetCutflow.csv"))
+            resolved_all.to_csv(pjoin(year_outdir, "allDatasetCutflow.csv"))
+            
+            # Extract weighted events
             wgt_resolved = resolved_all.filter(like='wgt', axis=1)
             wgt_resolved.columns = wgt_resolved.columns.str.replace('_wgt$', '', regex=True)
-            wgt_resolved.to_csv(pjoin(outputdir, year, "ResolvedWgtOnly.csv"))
-            resolved_wgted[year] = wgt_resolved
-
-            wgtEff = PostProcessor.calc_eff(wgt_resolved, None, 'incremental')
-            wgtEff.filter(like='eff', axis=1).to_csv(pjoin(outputdir, year, "ResolvedEffOnly.csv"))
-
-            combined_df = pd.concat(combined_list, axis=1)
+            wgt_resolved.to_csv(pjoin(year_outdir, "ResolvedWgtOnly.csv"))
             
-            combined_wgted[year] = combined_df
+            # Calculate efficiencies
+            eff_df = CutflowProcessor.calculate_efficiency(wgt_resolved)
+            eff_df.filter(like='eff', axis=1).to_csv(
+                pjoin(year_outdir, "ResolvedEffOnly.csv")
+            )
+            
+            # Store results
+            resolved_wgted[year] = wgt_resolved
+            combined_wgted[year] = pd.concat(combined_list, axis=1)
         
-        return resolved_wgted, combined_wgted
+        return resolved_wgted, combined_wgted 
     
     @staticmethod
     def present_yield(wgt_resolved, signals, outputdir, regroup_dict=None) -> pd.DataFrame:
@@ -266,9 +277,9 @@ class PostProcessor():
         - `regroup_dict`: dictionary of regrouping keywords. Passed into `PostProcessor.categorize`.
         """
         if regroup_dict is not None:
-            wgt_resolved = PostProcessor.categorize(wgt_resolved, regroup_dict)
+            wgt_resolved = CutflowProcessor.categorize_processes(wgt_resolved, regroup_dict)
         
-        yield_df = PostProcessor.process_yield(wgt_resolved, signals)
+        yield_df = CutflowProcessor.calculate_yield(wgt_resolved, signals)
         yield_df.to_csv(pjoin(outputdir, 'scaledyield.csv'))
         
         return yield_df
@@ -305,61 +316,47 @@ class PostProcessor():
         return new_meta
 
     @staticmethod
-    def scale_cf(group, meta_dict, datasrcpath, luminosity, extra_kwd='') -> tuple[pd.DataFrame]:
-        """Scale cutflow tables for one group of datasets by xsection * luminosity
-
-        Parameters
-        -`group`: the name of the cutflow that will be grepped from datasrcpath
-        -`datasrcpath`: path to the output directory (base level)
-        -`luminosity`: the luminosity of the dataset, in pb^-1
+    def process_group_cutflow(group, meta_dict, inputdir, luminosity, extra_kwd=''):
+        """Process cutflow tables for a physics group with appropriate scaling.
         
+        Parameters
+        ----------
+        group : str
+            Name of the physics process group
+        meta_dict : dict
+            Metadata dictionary for the group
+        inputdir : str
+            Input directory containing cutflow files
+        luminosity : float
+            Luminosity in pb^-1
+        extra_kwd : str, optional
+            Additional keyword for file matching
+            
         Returns
-        - tuple of resolved (per channel) cutflow dataframe and combined cutflow (per group) dataframe"""
-        resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*{extra_kwd}*cf.csv')[0], index_col=0)
-        for _, dsitems in meta_dict[group].items():
-            dsname = dsitems['shortname']
-            per_evt_wgt = 1/dsitems['nwgt'] * dsitems['xsection'] * luminosity
-            sel_cols = resolved_df.filter(like=dsname).filter(like='wgt')
-            resolved_df[sel_cols.columns] = sel_cols * per_evt_wgt
-            combined_cf = PostProcessor.sum_kwd(resolved_df, 'wgt', f"{group}_wgt")
-            combined_cf.name = group
-        return resolved_df, combined_cf
-
-    @staticmethod
-    def write_obj(writable, filelist, objnames, extra=[]) -> None:
-        """Writes the selected, concated objects to root files.
-        Parameters:
-        - `writable`: the uproot.writable directory
-        - `filelist`: list of root files to extract info from
-        - `objnames`: list of objects to load. Required to be entered in the selection config file.
-        - `extra`: list of extra branches to save"""
-
-        all_names = objnames + extra
-        all_data = {name: [] for name in objnames}
-        all_data['extra'] = {name: [] for name in extra}
-        for file in filelist:
-            evts = load_fields(file)
-            print(f"events loaded for file {file}")
-            for name in all_names:
-                if name in objnames:
-                    obj = Object(evts, name)
-                    zipped = obj.getzipped()
-                    all_data[name].append(zipped)
-                else:
-                    all_data['extra'][name].append(evts[name])
-        for name, arrlist in all_data.items():
-            if name != 'extra':
-                writable[name] = ak.concatenate(arrlist)
-            else:
-                writable['extra'] = {branchname: ak.concatenate(arrlist[branchname]) for branchname in arrlist.keys()}
-    
-    @staticmethod
-    def process_file(path, group, resolution):
-        """Read and group a file based on resolution."""
-        df = pd.read_csv(path, index_col=0)
-        if resolution == 0:
-            df = df.sum(axis=1).to_frame(name=group)
-        return df
+        -------
+        tuple[pd.DataFrame, pd.Series]
+            (Scaled cutflow dataframe, Combined group weights)
+        """
+        # Load cutflow
+        cutflow_df = pd.read_csv(
+            FileSysHelper.glob_files(
+                pjoin(inputdir, group), 
+                f'{group}*{extra_kwd}*cf.csv'
+            )[0],
+            index_col=0
+        )
+        
+        # Apply physics scaling
+        scaled_df, combined = CutflowProcessor.apply_physics_scale(
+            cutflow_df,
+            meta_dict[group],
+            luminosity
+        )
+        
+        # Set group name for combined weights
+        combined.name = group
+        
+        return scaled_df, combined
 
     @staticmethod
     def delete_corrupted(filelist_path):
@@ -375,89 +372,6 @@ class PostProcessor():
 
         for file in filelist: FileSysHelper.remove_files(dirname, file)
         
-def find_branches(file_path, object_list, tree_name, extra=[]) -> list:
-    """Return a list of branches for objects in object_list
 
-    Paremters
-    - `file_path`: path to the root file
-    - `object_list`: list of objects to find branches for
-    - `tree_name`: name of the tree in the root file
-    - `extra`: list of extra branches to include
 
-    Returns
-    - list of branches
-    """
-    file = uproot.open(file_path)
-    tree = file[tree_name]
-    branch_names = tree.keys()
-    branches = []
-    for object in object_list:
-        branches.extend([name for name in branch_names if name.startswith(object)])
-    if extra != []:
-        branches.extend([name for name in extra if name in branch_names])
-    return branches
 
-def load_fields(file, branch_names=None, tree_name='Events', lib='ak') -> tuple[ak.Array, list]:
-    """Load specific fields if any. Otherwise load all. If the file is a list, concatenate the data from all files.
-    
-    Parameters:
-    - file: path to the root file or list of paths
-    - branch_names: list of branch names to load
-    - tree_name: name of the tree in the root file
-    - lib: library to use for loading the data
-
-    Returns:
-    - awkward array of the loaded data (, list of empty files)
-    """
-    def load_one(fi):
-        with uproot.open(fi) as file:
-            if file.keys() == []:
-                return False
-            else:
-                tree = file[tree_name] 
-        return tree.arrays(branch_names, library=lib)
-
-    returned = None
-    if isinstance(file, str):
-        file = [file]
-    dfs = []
-    emptylist = []
-    for root_file in file:
-        result = load_one(root_file)
-        if result: dfs.append(load_one(file))
-        else: emptylist.append(root_file)
-    combined_evts = ak.concatenate(dfs)
-    return combined_evts, emptylist
-
-def write_root(evts: 'ak.Array | pd.DataFrame', destination, outputtree="Events", title="Events", compression=None):
-    """Write arrays to root file. Highly inefficient methods in terms of data storage.
-
-    Parameters
-    - `destination`: path to the output root file
-    - `outputtree`: name of the tree to write to
-    - `title`: title of the tree
-    - `compression`: compression algorithm to use"""
-    branch_types = {name: evts[name].type for name in evts.fields}
-    with uproot.recreate(destination, compression=compression) as file:
-        file.mktree(name=outputtree, branch_types=branch_types, title=title)
-        file[outputtree].extend({name: evts[name] for name in evts.fields}) 
-
-def call_hadd(output_file, input_files) -> tuple[int, set]:
-    """Merge ROOT files using hadd.
-
-    Parameters
-    - `output_file`: path to the output file
-    - `input_files`: list of paths to the input files
-    
-    Return
-    """
-    command = ['hadd', '-f2 -O -k', output_file] + input_files
-    result = subprocess.run(command, capture_output=True, text=True)
-    unique_filenames = None
-    if result.returncode == 0:
-        print(f"Merged files into {output_file}")
-    else:
-        print(f"Error merging files: {result.stderr}")    
-        filenames = re.findall(r"root://[^\s]*\.root", result.stderr)
-        unique_filenames = set(filenames)
-    return unique_filenames

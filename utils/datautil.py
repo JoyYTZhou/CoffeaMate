@@ -4,6 +4,7 @@ import uproot, pickle, os, subprocess
 import numpy as np
 from functools import wraps
 import dask_awkward as dak
+import logging
 from src.utils.filesysutil import pjoin, FileSysHelper
 
 parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -12,153 +13,230 @@ datadir = pjoin(parent_directory, 'data', 'preprocessed')
 runcom = subprocess.run
 
 class CutflowProcessor:
+    """Processes and manipulates cutflow tables."""
     @staticmethod
-    def check_last_no(df, col_name, rootfiles):
-        """Check if the last number in the cutflow table matches the number of events in the root files.
-        
-        Parameters
-        - `df`: cutflow dataframe
-        - `col_name`: name of the column to check
-        - `rootfiles`: list of root files
-        """
+    def check_events_match(df, col_name, rootfiles):
+        """Validates if events count in cutflow matches root files."""
         if isinstance(rootfiles, str):
             rootfiles = [rootfiles]
         
-        raw = 0
-        for file in rootfiles:
-            with uproot.open(file) as f:
-                thisraw = f.get("Events").num_entries
-            raw += thisraw
+        total_events = sum(
+            uproot.open(f)["Events"].num_entries 
+            for f in rootfiles
+        )
         
-        print(f'Got {raw} events in root files!')
-        print(f'Got {df[col_name].iloc[-1]} events in cutflow table!')
+        cutflow_events = df[col_name].iloc[-1]
         
-        return df[col_name].iloc[-1] == raw
+        logging.debug("Checking event counts...")
+        logging.debug(f"Events in root files: {total_events}")
+        logging.debug(f"Events in cutflow: {cutflow_events}")
+        
+        return total_events == cutflow_events
 
     @staticmethod
-    def combine_cf(inputdir, dsname, keyword='cutflow', output=True, outpath=None):
-        """Combines(sums) all cutflow tables in a source directory belonging to one datset and output them into output directory.
-        Essentially this will grep files of pattern "{dsname}*{keyword}*.csv" and combine them to one csv file.
+    def merge_cutflows(inputdir, dataset_name, keyword='cutflow', save=True, outpath=None):
+        """Merges multiple cutflow tables for a single dataset."""
+        # Load and concatenate all matching cutflow files
+        pattern = f'{dataset_name}*{keyword}*.csv'
+        cutflow_dfs = DataLoader.load_csvs(
+            dirname=inputdir, 
+            filepattern=pattern,
+            func=lambda dfs: pd.concat(dfs)
+        )
         
-        Parameters
-        - `inputdir`: source directory
-        - `dsname`: dataset name. 
-        - `keyword`: keyword to search for 
-        - `output`: whether to save the combined table into a csv file
-        - `outpath`: path to the output
-        """
-        concat_df = load_csvs(dirname=inputdir, filepattern=f'{dsname}*{keyword}*.csv', 
-                            func=lambda dfs: pd.concat(dfs))
-        combined = concat_df.groupby(concat_df.index, sort=False).sum()
-        if combined.shape[1] != 1:
-            combined.columns = [f"{dsname}_{col}" for col in combined.columns]
+        merged_df = cutflow_dfs.groupby(cutflow_dfs.index, sort=False).sum()
+        
+        # Standardize column names
+        if merged_df.shape[1] > 1:
+            merged_df.columns = [f"{dataset_name}_{col}" for col in merged_df.columns]
         else:
-            combined.columns = [dsname]
-        if output and outpath is not None: combined.to_csv(outpath)
-        return combined
-
-    @staticmethod
-    def add_selcutflow(cutflowlist, save=True, outpath=None):
-        """Add cutflows sequentially.
-        
-        Parameters
-        - `cutflowlist`: list of cutflow csv files
-        - `save`: whether to save the combined table into a csv file
-        - `outpath`: path to the output
-        
-        Return
-        - combined cutflow table"""
-        dfs = load_csvs(cutflowlist)
-        dfs = [df.iloc[1:] for i, df in enumerate(dfs) if i != 0]
-        result = pd.concat(dfs, axis=1)
-        if save: result.to_csv(outpath)
-        return result
-    
-    @staticmethod
-    def weight_cf(wgt_dict, raw_cf, save=False, outname=None, lumi=50):
-        """Calculate weighted table based on raw table.
-        
-        Parameters
-        - `wgt_dict`: dictionary of weights
-        - `raw_cf`: raw cutflow table
-        - `lumi`: luminosity (pb^-1)
-
-        Return
-        - `wgt_df`: weighted cutflow table
-        """ 
-        weights = {key: wgt*lumi for key, wgt in wgt_dict.items()}
-        wgt_df = raw_cf.mul(weights)
-        if save and outname is not None: wgt_df.to_csv(outname)
-        return wgt_df
-
-    @staticmethod
-    def calc_eff(cfdf, column_name=None, type='incremental', inplace=True) -> pd.DataFrame:
-        """Return efficiency for each column in the DataFrame right after the column itself.
-        
-        Parameters:
-        - `cfdf`: DataFrame to calculate efficiency on
-        - `column_name`: specific column to calculate efficiency on (optional)
-        - `type`: type of efficiency calculation. 'incremental' or 'overall'
-        """
-        def calculate_efficiency(series):
-            if type == 'incremental':
-                return series.div(series.shift(1)).fillna(1)
-            elif type == 'overall':
-                return series.div(series.iloc[0]).fillna(1)
-            else:
-                raise ValueError("Invalid type. Expected 'incremental' or 'overall'.")
-
-        if column_name:
-            eff_series = calculate_efficiency(cfdf[column_name])
-            eff_series.replace([np.inf, -np.inf], np.nan, inplace=True)
-            eff_series.fillna(0 if type == 'incremental' else 1, inplace=True)
-        else:
-            for col in cfdf.columns[::-1]:  # Iterate in reverse to avoid column shifting issues
-                eff_series = calculate_efficiency(cfdf[col])
-                eff_series.replace([np.inf, -np.inf], np.nan, inplace=True)
-                eff_series.fillna(0 if type == 'incremental' else 1, inplace=True)
-                cfdf.insert(cfdf.columns.get_loc(col) + 1, f"{col}_eff", eff_series)
-        if inplace: return cfdf
-        else: return eff_series
-
-    @staticmethod
-    def process_yield(yield_df, signals) -> pd.DataFrame:
-        """group the yield dataframe to include signal and background efficiencies.
-
-        Parameters
-        - `yield_df`: dataframe of yields
-        - `signals`: list of signal group names
-        
-        Return
-        - processed yield dataframe"""
-        sig_list = [signal for signal in signals if signal in yield_df.columns]
-        bkg_list = yield_df.columns.difference(sig_list)
-
-        yield_df['Tot Bkg'] = yield_df[bkg_list].sum(axis=1)
-        yield_df['Bkg Eff'] = CutflowProcessor.calc_eff(yield_df, 'Tot Bkg', inplace=False)
-
-        for signal in sig_list:
-            yield_df[f'{signal} Eff'] = CutflowProcessor.calc_eff(yield_df, signal, inplace=False)
-
-        new_order = list(bkg_list) + ['Tot Bkg', 'Bkg Eff']
-        for signal in sig_list:
-            new_order.extend([signal, f'{signal} Eff'])
+            merged_df.columns = [dataset_name]
             
-        yield_df = yield_df[new_order]
-        return yield_df
+        if save and outpath:
+            merged_df.to_csv(outpath)
+            
+        return merged_df
+
+    @staticmethod
+    def combine_selections(cutflow_files, save=True, outpath=None):
+        """Combines cutflow tables from different selection steps."""
+        # Load all cutflow files
+        cutflows = DataLoader.load_csvs(cutflow_files)
+        
+        # Skip first row (usually total events) except for first file
+        processed_dfs = [
+            df.iloc[1:] if i > 0 else df 
+            for i, df in enumerate(cutflows)
+        ]
+        
+        # Combine all selections
+        combined = pd.concat(processed_dfs, axis=1)
+        
+        if save and outpath:
+            combined.to_csv(outpath)
+            
+        return combined
     
     @staticmethod
-    def categorize(df, group_kwd:'dict') -> pd.DataFrame:
-        """Recalculate/categorize a table by the group keyword.
+    def apply_weights(cutflow_df, weight_dict, luminosity=50.0, save=False, outpath=None):
+        """Applies physics weights to cutflow table."""
+        # Calculate final weights including luminosity
+        final_weights = {
+            process: weight * luminosity 
+            for process, weight in weight_dict.items()
+        }
+        
+        # Apply weights to each process
+        weighted_df = cutflow_df.copy()
+        for process, weight in final_weights.items():
+            cols = weighted_df.filter(like=process).columns
+            weighted_df[cols] = weighted_df[cols] * weight
+            
+        if save and outpath:
+            weighted_df.to_csv(outpath)
+            
+        return weighted_df
+
+    @staticmethod
+    def apply_physics_scale(cutflow_df, metadata, luminosity):
+        """Applies physics-specific scaling factors to cutflow.
         
         Parameters
-        - `group_kwd`: {name of new column: [keywords to search for in the column names]}"""
-        for newcol, kwdlist in group_kwd.items():
-            cols = [col for col in df.columns if any(kwd in col for kwd in kwdlist)]
-            if cols:
-                df[newcol] = df[cols].sum(axis=1)
-                df.drop(columns=cols, inplace=True)
-        return df
+        ----------
+        cutflow_df : pd.DataFrame
+            Input cutflow dataframe
+        metadata : dict
+            Dataset metadata containing {dataset: {xsection, nwgt, ...}}
+        luminosity : float
+            Luminosity in pb^-1
+            
+        Returns
+        -------
+        tuple[pd.DataFrame, pd.Series]
+            (Scaled cutflow dataframe, Combined group weights)
+        """
+        # Calculate physics weights
+        physics_weights = {
+            dsinfo['shortname']: (1/dsinfo['nwgt']) * dsinfo['xsection']
+            for dsname, dsinfo in metadata.items()
+        }
+        
+        # Apply weights using existing method
+        scaled_df = CutflowProcessor.apply_weights(
+            cutflow_df, 
+            physics_weights, 
+            luminosity=luminosity
+        )
+        
+        # Get combined weights
+        combined = CutflowProcessor.sum_kwd(scaled_df, 'wgt')
+        
+        return scaled_df, combined
+    
+    @staticmethod
+    def calculate_efficiency(df, column=None, method='incremental', inplace=True):
+        """Calculates selection efficiencies."""
+        def _calc_single_efficiency(series, method):
+            if method == 'incremental':
+                eff = series.div(series.shift(1)).fillna(1)
+            elif method == 'overall':
+                eff = series.div(series.iloc[0]).fillna(1)
+            else:
+                raise ValueError("Method must be 'incremental' or 'overall'")
+                
+            # Clean up infinities and NaNs
+            eff.replace([np.inf, -np.inf], np.nan, inplace=True)
+            eff.fillna(0 if method == 'incremental' else 1, inplace=True)
+            return eff
+
+        result_df = df.copy() if inplace else df
+        
+        if column:
+            # Calculate efficiency for single column
+            return _calc_single_efficiency(result_df[column], method)
+        else:
+            # Calculate efficiency for all columns
+            for col in result_df.columns[::-1]:
+                eff = _calc_single_efficiency(result_df[col], method)
+                result_df.insert(
+                    result_df.columns.get_loc(col) + 1,
+                    f"{col}_eff",
+                    eff
+                )
+                
+        return result_df
+    
+    @staticmethod
+    def calculate_yield(df, signal_processes):
+        """Calculates physics yields with background and signal efficiencies."""
+        result_df = df.copy()
+        
+        # Separate signals and backgrounds
+        sig_cols = [col for col in df.columns if col in signal_processes]
+        bkg_cols = df.columns.difference(sig_cols)
+
+        # Calculate total background
+        result_df['Total_Background'] = result_df[bkg_cols].sum(axis=1)
+        
+        # Calculate efficiencies
+        result_df['Background_Efficiency'] = CutflowProcessor.calculate_efficiency(
+            result_df, 'Total_Background', inplace=False
+        )
+
+        # Calculate signal efficiencies
+        for signal in sig_cols:
+            result_df[f'{signal}_Efficiency'] = CutflowProcessor.calculate_efficiency(
+                result_df, signal, inplace=False
+            )
+
+        # Organize columns
+        column_order = (
+            list(bkg_cols) +
+            ['Total_Background', 'Background_Efficiency'] +
+            sum([[sig, f'{sig}_Efficiency'] for sig in sig_cols], [])
+        )
+        
+        return result_df[column_order]
+
+    @staticmethod
+    def categorize_processes(df, grouping_dict):
+        """Groups processes into categories based on keywords."""
+        result_df = df.copy()
+        
+        for new_category, process_keywords in grouping_dict.items():
+            # Find columns matching any keyword
+            matching_cols = [
+                col for col in df.columns 
+                if any(kwd in col for kwd in process_keywords)
+            ]
+            
+            if matching_cols:
+                # Sum matching processes into new category
+                result_df[new_category] = result_df[matching_cols].sum(axis=1)
+                # Remove original columns
+                result_df.drop(columns=matching_cols, inplace=True)
+                
+        return result_df
+
+    @staticmethod
+    def get_process_summary(df, step_name):
+        """Creates a summary of all processes at a specific selection step.
+        
+        New utility method for quick process comparisons.
+        """
+        if step_name not in df.index:
+            raise ValueError(f"Step '{step_name}' not found in cutflow")
+            
+        summary = pd.Series({
+            'Total Events': df.loc[step_name].sum(),
+            'N Processes': len(df.columns),
+            'Largest Process': df.loc[step_name].idxmax(),
+            'Smallest Process': df.loc[step_name].idxmin(),
+            'Mean Events': df.loc[step_name].mean(),
+            'Std Events': df.loc[step_name].std()
+        })
+        
+        return summary
    
     @staticmethod
     def sum_kwd(cfdf, keyword) -> pd.Series:
@@ -190,7 +268,72 @@ class DataLoader:
         else:
             return func(dfs, *args, **kwargs)
 
+    @staticmethod
+    def load_fields(file, branch_names=None, tree_name='Events', lib='ak') -> tuple[ak.Array, list]:
+        """Load specific fields if any. Otherwise load all. If the file is a list, concatenate the data from all files.
+        
+        Parameters:
+        - file: path to the root file or list of paths
+        - branch_names: list of branch names to load
+        - tree_name: name of the tree in the root file
+        - lib: library to use for loading the data
 
+        Returns:
+        - awkward array of the loaded data (, list of empty files)
+        """
+        def load_one(fi):
+            with uproot.open(fi) as file:
+                if file.keys() == []:
+                    return False
+                else:
+                    tree = file[tree_name] 
+            return tree.arrays(branch_names, library=lib)
+
+        returned = None
+        if isinstance(file, str):
+            file = [file]
+        dfs = []
+        emptylist = []
+        for root_file in file:
+            result = load_one(root_file)
+            if result: dfs.append(load_one(file))
+            else: emptylist.append(root_file)
+        combined_evts = ak.concatenate(dfs)
+        return combined_evts, emptylist
+
+    @staticmethod
+    def load_pkl(filename):
+        """Load a pickle file and return the data."""
+        with open(filename, 'rb') as f:
+            data = pickle.load(f)
+        return data
+
+    @staticmethod
+    def load_data(source, **kwargs):
+        """Load a data file and return the data."""
+        if isinstance(source, str):
+            if source.endswith('.csv'):
+                data = pd.read_csv(source, **kwargs)
+            elif source.endswith('.root'):
+                data = uproot.open(source)
+            elif source.endswith('.parquet'):
+                data = pd.read_parquet(source, **kwargs)
+            else:
+                raise ValueError("This is not a valid file type.")
+        elif checkevents(source):
+            data = source
+        else:
+            data = source
+            raise UserWarning(f"This might not be a valid source. The data type is {type(source)}")
+        return data
+    
+    @staticmethod
+    def process_file(path, group, resolution):
+        """Read and group a file based on resolution."""
+        df = pd.read_csv(path, index_col=0)
+        if resolution == 0:
+            df = df.sum(axis=1).to_frame(name=group)
+        return df
 
 def iterwgt(func):
     @wraps(func)
@@ -215,54 +358,8 @@ def extract_leaf_values(d) -> list:
             leaf_values.append(value)
 
     return leaf_values
-    
-def get_compression(**kwargs):
-    """Returns the compression algorithm to use for writing root files."""
-    compression = kwargs.pop('compression', None)
-    compression_level = kwargs.pop('compression_level', 1)
 
-    if compression in ("LZMA", "lzma"):
-        compression_code = uproot.const.kLZMA
-    elif compression in ("ZLIB", "zlib"):
-        compression_code = uproot.const.kZLIB
-    elif compression in ("LZ4", "lz4"):
-        compression_code = uproot.const.kLZ4
-    elif compression in ("ZSTD", "zstd"):
-        compression_code = uproot.const.kZSTD
-    elif compression is None:
-        raise UserWarning("Not sure if this option is supported, should be...")
-    else:
-        msg = f"unrecognized compression algorithm: {compression}. Only ZLIB, LZMA, LZ4, and ZSTD are accepted."
-        raise ValueError(msg)
-    
-    if compression is not None: 
-        compression = uproot.compression.Compression.from_code_pair(compression_code, compression_level)
 
-    return compression
-
-def load_pkl(filename):
-    """Load a pickle file and return the data."""
-    with open(filename, 'rb') as f:
-        data = pickle.load(f)
-    return data
-
-def load_data(source, **kwargs):
-    """Load a data file and return the data."""
-    if isinstance(source, str):
-        if source.endswith('.csv'):
-            data = pd.read_csv(source, **kwargs)
-        elif source.endswith('.root'):
-            data = uproot.open(source)
-        elif source.endswith('.parquet'):
-            data = pd.read_parquet(source, **kwargs)
-        else:
-            raise ValueError("This is not a valid file type.")
-    elif checkevents(source):
-        data = source
-    else:
-        data = source
-        raise UserWarning(f"This might not be a valid source. The data type is {type(source)}")
-    return data
 
 def arr_handler(dfarr, allow_delayed=True) -> ak.Array:
     """Handle different types of data arrays to convert them to awkward arrays."""
@@ -303,25 +400,3 @@ def findfields(dframe):
         return dframe.keys()
     else:
         return "Not supported yet..."
-
-def find_branches(file_path, object_list, tree_name, extra=[]) -> list:
-    """ Return a list of branches for objects in object_list
-
-    Paremters
-    - `file_path`: path to the root file
-    - `object_list`: list of objects to find branches for
-    - `tree_name`: name of the tree in the root file
-
-    Returns
-    - list of branches
-    """
-    file = uproot.open(file_path)
-    tree = file[tree_name]
-    branch_names = tree.keys()
-    branches = []
-    for object in object_list:
-        branches.extend([name for name in branch_names if name.startswith(object)])
-    if extra != []:
-        branches.extend([name for name in extra if name in branch_names])
-    return branches
-
