@@ -371,7 +371,7 @@ class DataSetUtil:
         """Extract UUIDs from dataset JSON files.
         
         Parameters
-        - json_path: path to the JSON file
+        - json_path: path to the JSON.GZ file containing dataset information
         
         Returns
         - dict: Nested dictionary containing dataset information and UUIDs
@@ -547,7 +547,6 @@ def extract_leaf_values(d) -> list:
             leaf_values.append(value)
 
     return leaf_values
-
 
 
 def arr_handler(dfarr, allow_delayed=True) -> ak.Array:

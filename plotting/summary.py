@@ -128,6 +128,7 @@ class PostProcessor():
         - `rq_keys`: list of required keys to check for in the root files"""
         corrupted ={}
         for year in self.years:
+            corrupted[year] = {}
             for group in self.groups(year):
                 ori_samples = pjoin(self.cfg['DATA_DIR'], 'preprocessed', f"{group}_{year}.json.gz")
                 dt_dir = pjoin(self.inputdir, year, group)
@@ -358,7 +359,7 @@ class PostProcessor():
         return scaled_df, combined
 
     @staticmethod
-    def delete_corrupted(filelist_path):
+    def delete_corrupted(results_dict):
         """Delete the corrupted files in the filelist."""
         with open(filelist_path, 'r') as f:
             filelist = f.read().splitlines()
