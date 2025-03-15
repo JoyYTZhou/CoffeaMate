@@ -447,7 +447,7 @@ class DataSetUtil:
             df = pd.read_csv(csv_files[0], index_col=0)
             events_match = CutflowProcessor.check_events_match(
                 df=df,
-                col_name=df.columns[0],
+                col_name='raw',
                 rootfiles=root_files
             )
             

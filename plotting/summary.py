@@ -361,8 +361,6 @@ class PostProcessor():
     @staticmethod
     def delete_corrupted(results_dict):
         """Delete the corrupted files in the filelist."""
-        with open(filelist_path, 'r') as f:
-            filelist = f.read().splitlines()
         
         dirname = pdir(filelist[0]).replace('root://cmseos.fnal.gov/', '')
         
