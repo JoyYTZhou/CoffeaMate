@@ -389,7 +389,7 @@ class PostSkimProcessor(PostProcessor):
         """Delete the corrupted files in the filelist."""
         for year in results_dict:
             for group in results_dict[year]:
-                all_mismatched = results_dict[year][group]['mismatched']
+                all_mismatched = results_dict[year][group]['mismatched_events']
                 root_files = [d.get('root') for d in all_mismatched]
                 logging.debug(f"Deleting corrupted files: {root_files}")
                 FileSysHelper.remove_filelist(root_files)
