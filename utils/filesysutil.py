@@ -217,9 +217,10 @@ class FileSysHelper:
         Parameters
         - `filelist`: list of files to delete
         """
-        if filelist[0].startswith('/store/user'):
+        if is_remote(filelist[0]):
             xrdhelper = XRootDHelper(prefix)
             for file in filelist:
+                file = strip_xrd_prefix(file)
                 status, _ = xrdhelper.xrdfs_client.rm(file)
                 if not status.ok:
                     raise Exception(f"Failed to remove {file}: {status.message}")
