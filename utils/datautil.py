@@ -625,7 +625,6 @@ class DataSetUtil:
             
         # Prepare results container
         results = {
-            "valid_pairs": [],
             "mismatched_events": [],
             "missing_files": []
         }
@@ -639,7 +638,7 @@ class DataSetUtil:
             # Process all pairs and collect results
             for result_type, result_info in pool.imap_unordered(validate_func, work_items):
                 if result_type == "valid":
-                    results["valid_pairs"].append(result_info)
+                    pass
                 elif result_type == "mismatched":
                     results["mismatched_events"].append(result_info)
                 else:  # missing
