@@ -108,6 +108,25 @@ class CutflowProcessor:
         return combined
     
     @staticmethod
+    def get_weighted_events(cutflow_df: pd.DataFrame, dataset_name: str) -> float:
+        """Extract weighted events for a specific dataset from cutflow.
+        
+        Parameters
+        ----------
+        cutflow_df : pd.DataFrame
+            Cutflow DataFrame containing event counts
+        dataset_name : str
+            Name of dataset to extract weights for
+            
+        Returns
+        -------
+        float
+            Total weighted events, or 0 if dataset not found
+        """
+        weighted_cols = cutflow_df.filter(like=dataset_name).filter(like='wgt')
+        return weighted_cols.iloc[0,0] if not weighted_cols.empty else 0
+    
+    @staticmethod
     def apply_weights(cutflow_df, weight_dict, luminosity=50.0, save=False, outpath=None):
         """Applies physics weights to cutflow table."""
         # Calculate final weights including luminosity
@@ -365,7 +384,111 @@ class DataLoader:
             df = df.sum(axis=1).to_frame(name=group)
         return df
 
+class DatasetIterator:
+    """Helper class to iterate over dataset structure organized by year and group."""
+    
+    def __init__(self, years, groups_func, meta_dict, input_root_dir, temp_root_dir, transfer_root=None):
+        """
+        Parameters:
+        - years: list of years to process
+        - groups_func: function that returns list of groups for a given year
+        - meta_dict: metadata dictionary {year: {group: {dataset: metadata}}}
+        """
+        self.years = years
+        self.groups_func = groups_func
+        self.meta_dict = meta_dict
+        self.input_root = input_root_dir
+        self.temp_root = temp_root_dir
+        self.transfer_root = transfer_root
+
+    def iterate_datasets(self):
+        """Iterator that yields (year, group, dataset_name, dataset_info)."""
+        for year in self.years:
+            meta = self.meta_dict[year]
+            for group in self.groups_func(year):
+                datasets = meta[group]
+                for ds_key, ds_info in datasets.items():
+                    yield year, group, ds_info['shortname'], ds_info
+
+    def iterate_groups(self):
+        """Iterator that yields (year, group, group_datasets)."""
+        for year in self.years:
+            meta = self.meta_dict[year]
+            for group in self.groups_func(year):
+                yield year, group, meta[group]
+
+    def process_datasets(self, callback, setup_dirs=True):
+        """Process all datasets using a callback function.
+        
+        Parameters:
+        - callback: function(dsname, input_dir, output_dir) -> Any
+        - setup_dirs: whether to create output directories
+        - transfer_output: whether to transfer results
+        
+        Returns:
+        - dict: {year: {group: {dataset: callback_result}}}
+        """
+        results = {}
+        
+        for year, group, dsname, _ in self.iterate_datasets():
+            # Setup result structure
+            if year not in results:
+                results[year] = {}
+            if group not in results[year]:
+                results[year][group] = {}
+                
+            # Setup directories
+            input_dir = f"{self.input_root}/{year}/{group}"
+            output_dir = f"{self.temp_root}/{year}/{group}"
+            
+            if setup_dirs:
+                FileSysHelper.checkpath(output_dir, createdir=True)
+            if not FileSysHelper.checkpath(input_dir, createdir=False):
+                continue
+                
+            # Process dataset
+            results[year][group][dsname] = callback(dsname, input_dir, output_dir)
+            
+            # Transfer if needed
+            if self.transfer_root:
+                transfer_dir = f"{self.transfer_root}/{year}/{group}"
+                FileSysHelper.transfer_files(output_dir, transfer_dir, 
+                                          remove=True, overwrite=True)
+                
+        return results
+
 class DataSetUtil:
+    @staticmethod
+    def extract_leaf_values(d) -> list:
+        """Extract leaf values from a nested dictionary.
+
+        Parameters
+        ----------
+        d : dict
+            Input dictionary that may contain nested dictionaries
+
+        Returns
+        -------
+        list
+            List of all non-dictionary values found in the dictionary
+
+        Example
+        -------
+        >>> d = {'a': 1, 'b': {'c': 2, 'd': {'e': 3}}, 'f': 4}
+        >>> DataSetUtil.extract_leaf_values(d)
+        [1, 2, 3, 4]
+        """
+        leaf_values = []
+
+        for value in d.values():
+            if isinstance(value, dict):
+                # Recursive call should use the class method name
+                leaf_values.extend(DataSetUtil.extract_leaf_values(value))
+            else:
+                leaf_values.append(value)
+
+        return leaf_values
+    
     @staticmethod
     def extract_uuids(json_path: str) -> dict:
         """Extract UUIDs from dataset JSON files.
@@ -530,22 +653,6 @@ def iterwgt(func):
             for ds in dsinfo.keys():
                 func(instance, process, ds, *args, **kwargs)
     return wrapper
-
-def extract_leaf_values(d) -> list:
-    """Extract leaf values from a dictionary.
-    
-    Return
-    - list of leaf values
-    """
-    leaf_values = []
-    
-    for value in d.values():
-        if isinstance(value, dict):
-            leaf_values.extend(extract_leaf_values(value))
-        else:
-            leaf_values.append(value)
-
-    return leaf_values
 
 
 def arr_handler(dfarr, allow_delayed=True) -> ak.Array:
