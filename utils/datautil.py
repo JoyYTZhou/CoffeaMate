@@ -421,43 +421,66 @@ class DatasetIterator:
                 yield year, group, meta[group]
 
     def process_datasets(self, callback, setup_dirs=True):
-        """Process all datasets using a callback function.
-        
-        Parameters:
-        - callback: function(dsname, input_dir, output_dir) -> Any
-        - setup_dirs: whether to create output directories
-        - transfer_output: whether to transfer results
-        
-        Returns:
-        - dict: {year: {group: {dataset: callback_result}}}
+        """Process multiple datasets across years and groups using a provided callback function.
+
+        This function iterates over:
+        1. All available years in self.years
+        2. All groups within each year (determined by self.groups_func)
+        3. All datasets within each group (from self.meta_dict)
+
+        For each dataset, it:
+        1. Creates necessary directory structure if setup_dirs=True
+            2. Executes the callback function with dataset information
+            3. Optionally transfers results to transfer_root if specified
+
+        Parameters
+        ----------
+        callback : callable
+            Function that processes individual datasets
+            Must have signature: callback(dsname, input_dir, output_dir) -> Any
+            - dsname: str, short name of the dataset
+            - input_dir: str, path to input files (format: {input_root}/{year}/{group})
+            - output_dir: str, path for output files (format: {temp_root}/{year}/{group})
+
+        setup_dirs : bool, default=True
+            If True, creates output directories before processing
+
+        Returns
+        -------
+        dict
+            Nested dictionary containing callback results for each dataset
+            Structure: {year: {group: {dataset_name: callback_result}}}
+
+        Notes
+        -----
+        - Input files are read from: self.input_root/{year}/{group}
+        - Temporary outputs are written to: self.temp_root/{year}/{group}
+        - If self.transfer_root is set, results are moved to: self.transfer_root/{year}/{group}
+        - Skips processing if input directory doesn't exist
         """
         results = {}
-        
+
         for year, group, dsname, _ in self.iterate_datasets():
-            # Setup result structure
             if year not in results:
                 results[year] = {}
             if group not in results[year]:
                 results[year][group] = {}
-                
-            # Setup directories
+
             input_dir = f"{self.input_root}/{year}/{group}"
             output_dir = f"{self.temp_root}/{year}/{group}"
-            
+
             if setup_dirs:
                 FileSysHelper.checkpath(output_dir, createdir=True)
             if not FileSysHelper.checkpath(input_dir, createdir=False):
                 continue
-                
-            # Process dataset
+
             results[year][group][dsname] = callback(dsname, input_dir, output_dir)
-            
-            # Transfer if needed
+
             if self.transfer_root:
                 transfer_dir = f"{self.transfer_root}/{year}/{group}"
-                FileSysHelper.transfer_files(output_dir, transfer_dir, 
+                FileSysHelper.transfer_files(output_dir, transfer_dir,
                                           remove=True, overwrite=True)
-                
+
         return results
 
 class DataSetUtil:

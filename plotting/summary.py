@@ -304,6 +304,7 @@ class PostSkimProcessor(PostProcessor):
     def hadd_results(self):
         self.__hadd_roots()
         self.__hadd_cutflows()
+        self.__get_total_nwgt_events()
     
     def __clean_roots(self):
         """Delete the corrupted files in the filelist."""
@@ -395,43 +396,55 @@ class PostSkimProcessor(PostProcessor):
                 logging.debug(f"Deleting corrupted files: {csv_files}")
                 FileSysHelper.remove_filelist(csv_files)
         
-    # def __get_total_nwgt_events(self):
-    #     """Calculate the sum of `Generator_weight` per each dataset and save to a json file with provided metadata.
-        
-    #     Parameters
-    #     - `datasrcpath`: path to the output directory (base level)
-    #     - `meta_dict`: metadata dictionary for all datasets. {group: {dataset: {metadata}}}"""
-    #     new_meta_outpath = pjoin(self.cfg['DATA_DIR'], 'weightedMC')
-    #     FileSysHelper.checkpath(new_meta_outpath, createdir=True)
-        
-        # def get_nwgt_per_group(group):
-        #     resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0)
-        #     for ds, dsitems in meta_dict[group].items():
-        #         if not resolved_df.filter(like=dsitems['shortname']).empty:
-        #             nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
-        #             meta_dict[group][ds]['nwgt'] = nwgt
-        #         else:
-        #             del meta_dict[group][ds]
-        
-        #     if os.path.exists(dict_outpath):
-        #         with open(dict_outpath, 'r') as f:
-        #             new_meta = json.load(f)
+    def __get_total_nwgt_events(self):
+        """Calculate the sum of `Generator_weight` per each dataset and save to a json file with provided metadata.
+        Updates existing metadata if present, otherwise creates new metadata file.
 
-        #     for group in groups:
-        #         print(f"Globbing from {pjoin(datasrcpath, group)}")
-        #         resolved_df = pd.read_csv(FileSysHelper.glob_files(pjoin(datasrcpath, group), f'{group}*cf.csv')[0], index_col=0) 
-        #         if not(group in new_meta):
-        #             new_meta[group] = meta_dict[group].copy()
-        #         for ds, dsitems in meta_dict[group].items(): 
-        #             if not (ds in new_meta[group]):
-        #                 new_meta[group][ds] = meta_dict[group][ds].copy()
-        #             if not resolved_df.filter(like=dsitems['shortname']).empty:
-        #                 nwgt = resolved_df.filter(like=dsitems['shortname']).filter(like='wgt').iloc[0,0]
-        #                 new_meta[group][ds]['nwgt'] = nwgt
-        #             else:
-        #                 del new_meta[group][ds]
+        The function will:
+        1. Load existing metadata if present
+        2. Update with new information from current processing
+        3. Save the combined metadata back to file
+        """
+        new_meta_outpath = pjoin(self.cfg['DATA_DIR'], 'weightedMC')
+        FileSysHelper.checkpath(new_meta_outpath, createdir=True)
+        new_meta_dict = {}
+
+        # Load existing metadata if present
+        for year in self.years:
+            meta_file = pjoin(new_meta_outpath, f"{year}.json")
+            if os.path.exists(meta_file):
+                with open(meta_file, 'r') as f:
+                    new_meta_dict[year] = json.load(f)
+            else:
+                new_meta_dict[year] = {}
+
+        def get_nwgt_per_group(dsname, dtdir):
+            resolved_df = pd.read_csv(FileSysHelper.glob_files(dtdir, f'*cf.csv')[0], index_col=0)
+            if not resolved_df.filter(like=dsname).empty:
+                nwgt = resolved_df.filter(like=dsname).filter(like='wgt').iloc[0,0]
+                logging.debug(f"nwgt for {dsname} is {nwgt}")
+                return nwgt
+            else:
+                return None
+        
+        root_dtdir = self.tempdir if not self.__will_trsf else self.transferP
+
+        # Update metadata with new information
+        for year, group, dsname, _ in self.dataset_iter.iterate_datasets():
+        # Initialize group dictionary if it doesn't exist
+            if group not in new_meta_dict[year]:
+                new_meta_dict[year][group] = {}
+
+            if dsname not in new_meta_dict[year][group]:
+                new_meta_dict[year][group][dsname] = self.meta_dict[year][group][dsname].copy()
             
-        #     with open(pjoin(dict_outpath), 'w') as f:
-        #         json.dump(new_meta, f)
-            
-        #     return new_meta
+            datadir = pjoin(root_dtdir, year, group)
+
+            nwgt = get_nwgt_per_group(dsname, datadir)
+            if nwgt is not None:
+                new_meta_dict[year][group][dsname]['nwgt'] = nwgt
+
+        for year, items in new_meta_dict.items():
+            logging.debug(f"Saving metadata for {year}")
+            with open(pjoin(new_meta_outpath, f"{year}.json"), 'w') as f:
+                json.dump(items, f, indent=4)
