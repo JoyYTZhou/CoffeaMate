@@ -53,9 +53,12 @@ class CutflowProcessor:
                 logging.warning(f"Found {len(corrupted_files)} corrupted root files")
                 return False
             
-            logging.debug("Checking event counts...")
-            logging.debug(f"Events in root files: {total_events}")
-            logging.debug(f"Events in cutflow: {cutflow_events}")
+            logging.info("Checking event counts...")
+            logging.info(f"Events in root files: {total_events}")
+            logging.info(f"Events in cutflow: {cutflow_events}")
+
+            if total_events != cutflow_events:
+                logging.warning(f"Eventts count from root files {total_events} does not match cutflow {cutflow_events}")
             
             return total_events == cutflow_events
         
@@ -574,18 +577,16 @@ class DataSetUtil:
                 rootfiles=root_files
             )
             
-            if events_match:
-                return ("valid", {
+            if not events_match:
+                return ("mismatched", {
                     "shortname": shortname,
                     "root": root_files[0],
                     "csv": csv_files[0],
                     "uuid": uuid
                 })
             else:
-                return ("mismatched", {
+                return ("valid", {
                     "shortname": shortname,
-                    "root": root_files[0],
-                    "csv": csv_files[0],
                     "uuid": uuid
                 })
         except Exception as e:
