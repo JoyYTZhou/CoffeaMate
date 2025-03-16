@@ -307,16 +307,12 @@ class PostSkimProcessor(PostProcessor):
     
     def __clean_roots(self):
         """Delete the corrupted files in the filelist."""
-        # for year in self.years:
-        #     for group in self.groups(year):
-        #         if os.path.exists(f'{group}_corrupted_files.txt'):
-        #             self.delete_corrupted(f'{group}_corrupted_files.txt')
         if os.path.exists('all_corrupted.json'):
             with open('all_corrupted.json', 'r') as f:
                 all_corrupted = json.load(f)
             self.__delete_corrupted(all_corrupted)
     
-    def __check_roots(self) -> None:
+    def __check_roots(self) -> dict:
         """Check if the root files are corrupted by checking if the required keys are present. Save the corrupted files (full path with xrdfs prefix) to a text file.
         
         Parameters
@@ -334,6 +330,8 @@ class PostSkimProcessor(PostProcessor):
             with open('all_corrupted.json', 'w') as f:
                 json.dump(corrupted, f)
             logging.error(f"Saved corrupted files to all_corrupted.json")
+        
+        return corrupted
 
     def __hadd_roots(self) -> str:
         """Hadd root files of datasets into appropriate size based on settings"""
