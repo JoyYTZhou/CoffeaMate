@@ -184,18 +184,17 @@ class JobLoader():
                     with open(finame, 'w') as fp:
                         json.dump(baby_job, fp)
                 job_files.append(os.path.basename(finame))
-
-            table.add_row(
-                ds,
-                "[green]Needs Processing[/green]",
-                "\n".join(job_files)
-            )
-        else:
-            table.add_row(
-                ds,
-                "[blue]All Processed[/blue]",
-                "[dim]No job files needed[/dim]"
-            )
+                table.add_row(
+                    ds,
+                    "[green]Needs Processing[/green]",
+                    "\n".join(job_files)
+                )
+            else:
+                table.add_row(
+                    ds,
+                    "[blue]All Processed[/blue]",
+                    "[dim]No job files needed[/dim]"
+                )
         console.print(table)
 
 def process_futures(futures, results_file='futureresult.txt', errors_file='futureerror.txt'):
