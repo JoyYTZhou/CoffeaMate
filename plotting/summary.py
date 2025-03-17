@@ -366,8 +366,7 @@ class PostSkimProcessor(PostProcessor):
         def process_cf(dsname, dtdir, outdir):
             print(f"Dealing with {dsname} cutflow hadding now ...............................")
             try:
-                df = CutflowProcessor.merge_cutflows(inputdir=dtdir, dsname=dsname, save=False)
-                df.to_csv(pjoin(outdir, f"{dsname}_cutflow.csv"))
+                df = CutflowProcessor.merge_cutflows(inputdir=dtdir, dataset_name=dsname, save=True, outpath=pjoin(outdir, f"{dsname}_cutflow.csv"))
                 return df
             except Exception as e:
                 logging.error(f"Error combining cutflow tables for {dsname}: {e}")
