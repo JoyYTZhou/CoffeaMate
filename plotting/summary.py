@@ -88,15 +88,20 @@ class PostProcessor():
                     self.meta_dict[year] = json.load(f)
 
     def _init_groups(self, groups):
-        """Initialize processing groups."""
+        """Initialize processing groups.
+
+        If groups is provided, only returns groups that exist in the year's directory.
+        If groups is None, returns all groups found in the year's directory.
+        """
         if groups is None:
             self.groups = self.__generate_groups
         else:
-            self.groups = lambda year: groups
-                
+            self.groups = lambda year: [group for group in groups
+                                      if FileSysHelper.checkpath(pjoin(self.inputdir, year, group), createdir=False, raiseError=False)]
+
     def __del__(self):
         FileSysHelper.remove_emptydir(self.tempdir)
-    
+
     def __generate_groups(self, year):
         """Generate the groups to process based on the input directory."""
         return [pbase(subdir) for subdir in FileSysHelper.glob_subdirs(pjoin(self.inputdir, year), full_path=False)]
@@ -337,7 +342,7 @@ class PostSkimProcessor(PostProcessor):
     def __hadd_roots(self) -> str:
         """Hadd root files of datasets into appropriate size based on settings"""
         def process_ds(dsname, dtdir, outdir):
-            root_files = FileSysHelper.glob_files(dtdir, f'{dsname}*.root', add_prefix=True)
+            root_files = FileSysHelper.glob_files(dtdir, f'{dsname}*.root', add_prefix=True, exclude='empty')
             batch_size = 100 
             corrupted = set()
             for i in range(0, len(root_files), batch_size):
