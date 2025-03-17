@@ -3,18 +3,35 @@ import dask, logging
 import pandas as pd
 import awkward as ak
 from typing import Optional
-from src.utils.coffeautil import weightedSelection, weightedCutflow
+from src.utils.coffeautil import weightedSelection, PackedSelection 
 from src.analysis.objutil import Object
 from functools import lru_cache
 
 class BaseEventSelections:
-    def __init__(self, 
-                 trigcfg: dict[str, bool], 
-                 objselcfg: dict[str, dict[str, float]], 
-                 mapcfg: dict[str, dict[str, str]], 
+    """Base class for handling event selections in particle physics analysis.
+
+    This class provides the fundamental structure for applying various selection criteria
+    to particle physics event data. It handles trigger configurations, object selections,
+    and name mapping between different data formats (AOD/NANOAOD).
+
+    Attributes:
+        _trigcfg (dict): Configuration for trigger selections
+        _objselcfg (dict): Configuration for object selections
+        _mapcfg (dict): Name mapping between different data formats
+        _sequential (bool): Flag for sequential selection application
+        objsel (Optional[weightedSelection]): Selection object for storing selection results
+        objcollect (dict): Dictionary for collected objects
+        cfno: Cutflow number object
+        cfobj: Cutflow object
+    """
+    def __init__(self,
+                 trigcfg: dict[str, bool],
+                 objselcfg: dict[str, dict[str, float]],
+                 mapcfg: dict[str, dict[str, str]],
+                 is_mc: bool = True,
                  sequential: bool = True) -> None:
         """Initialize the event selection object.
-        
+
         Args:
             trigcfg: Trigger configuration mapping trigger names to boolean flags
             objselcfg: Object selection configuration mapping AOD prefixes to selection criteria
@@ -27,16 +44,20 @@ class BaseEventSelections:
         self._sequential = sequential
         self.objsel: Optional[weightedSelection] = None
         self.objcollect: dict = {}
+        self._with_wgt = is_mc
         self.cfno = None
         self.cfobj = None
-    
+
     def __del__(self):
+        """Cleanup method called when the instance is being destroyed."""
         print(f"Deleting instance of {self.__class__.__name__}")
-    
+
     def __enter__(self):
+        """Context manager entry point."""
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit point. Cleans up resources."""
         self.objsel = None
         self.objcollect.clear()
         self.cfno = None
@@ -44,76 +65,117 @@ class BaseEventSelections:
 
     @property
     def trigcfg(self):
+        """Returns the trigger configuration dictionary."""
         return self._trigcfg
 
     @property
     def objselcfg(self):
+        """Returns the object selection configuration dictionary."""
         return self._objselcfg
-    
+
     @property
     def mapcfg(self):
+        """Returns the name mapping configuration dictionary."""
         return self._mapcfg
-    
-    def triggersel(self, events):
-        """Custom function to set the object selections on event levels based on config.
-        Mask should be N*bool 1-D array.
-        """
-        pass
 
-    def setevtsel(self, events, **kwargs):
-        """Custom function to set the object selections based on config.
-        Mask should be N*bool 1-D array.
+    def callevtsel(self, events, wgtname='Generator_weight') -> tuple[ak.Array, 'BaseEventSelections']:
+        """Apply all selections to the events sequentially.
 
-        :param events: events loaded from a .root file
-        """
-        pass
+        Args:
+            events: Input events array
+            wgtname: Name of the weight column
+            compute: Whether to compute results immediately
 
-    def callevtsel(self, events, wgtname='Generator_weight', compute=False) -> tuple[ak.Array, 'BaseEventSelections']:
-        """Apply all the selections in line on the events
-        Parameters
-        
-        :return: passed events, vetoed events
+        Returns:
+            tuple: (Passed events, self reference)
         """
         logging.debug(f"Performing selections on events with {len(events)} entries!")
-        self.objsel = weightedSelection(events[wgtname])
-        self.triggersel(events)
-        self.setevtsel(events)
-        if self.objsel.names:
-            self.cfobj = self.objsel.cutflow(*self.objsel.names)
-            self.cfno = self.cfobj.result()
-        else:
-            raise NotImplementedError("Events selections not set, this is base selection!")
-        if not self.objcollect:
-            passed = events[self.cfno.maskscutflow[-1]]
-            return passed, self
-        else:
-            return self.objcollect_to_df(), self
+        self._setobjsel(events)
+        self._triggersel(events)
+        self._setevtsel(events)
+        self._getcutflow()
+        return self._getpassed(events), self
     
+    def _setobjsel(self, events):
+        """Initialize selection object based on data type.
+
+        Uses weightedSelection for MC and PackedSelection for real data.
+        """
+        if self._with_wgt:
+            self.objsel = weightedSelection(events['Generator_weight'])
+        else:
+            self.objsel = PackedSelection()
+
+    def _getcutflow(self) -> pd.DataFrame:
+        """Calculate and store cutflow information."""
+        self.cfobj = self.objsel.cutflow(*self.objsel.names)
+        self.cfno = self.cfobj.result()
+    
+    def _getpassed(self, events) -> ak.Array:
+        raise NotImplementedError("Method must be implemented in derived class!")
+
     @lru_cache(maxsize=32)
     def cf_to_df(self) -> pd.DataFrame:
-        """Return a dataframe for a single EventSelections.cutflow object."""
+        """Convert cutflow information to a pandas DataFrame.
+
+        Returns:
+            DataFrame containing raw counts and (if applicable) weighted counts
+        """
         row_names = self.cfno.labels
         dfdata = {}
-        if self.cfno.wgtevcutflow is not None:
+        if self._with_wgt:
             wgt_number = dask.compute(self.cfno.wgtevcutflow)[0]
             dfdata['wgt'] = wgt_number
         number = dask.compute(self.cfno.nevcutflow)[0]
         dfdata['raw'] = number
         return pd.DataFrame(dfdata, index=row_names)
+
+class SkimSelections(BaseEventSelections):
+    """Class for handling both Monte Carlo and real data skim selections.
+
+    This class combines functionality for both MC and real data skims,
+    with weight handling determined by a flag at initialization.
+    """
+    def _triggersel(self, events):
+        """Apply trigger selections based on configuration."""
+        for trigname, value in self.trigcfg.items():
+            if value:
+                self.objsel.add(trigname, events[trigname])
+            else:
+                inverted = ~events[trigname]
+                self.objsel.add(trigname, inverted)
     
+    def _getpassed(self, events):
+        return events[self.cfno.maskscutflow[-1]]
+
+class PreselSelections(BaseEventSelections):
+    """Class for handling selections that produce n-tuples."""
+    def _getpassed(self, events):
+        return self.objcollect_to_df()
+
     def objcollect_to_df(self) -> pd.DataFrame:
-        """Return a dataframe for the collected objects."""
-        # Pre-allocate list with known size
+        """Convert collected objects to a pandas DataFrame.
+
+        Returns:
+            DataFrame containing all collected object information
+        """
         listofdf = [None] * len(self.objcollect)
         for i, (prefix, zipped) in enumerate(self.objcollect.items()):
             listofdf[i] = Object.object_to_df(zipped, f"{prefix}_")
         return pd.concat(listofdf, axis=1)
     
+    def saveWeights(self, events: ak.Array, weights=['Generator_weight', 'LHEReweightingWeight']) -> None:
+        """Save weights to the collected objects."""
+        self.objcollect.update({weight: events[weight] for weight in weights})
+    
+    def getObj(self, name, events, **kwargs) -> Object:
+        return Object(events, name, self.objselcfg[name], self.mapcfg[name], **kwargs)
+    
     def selobjhelper(self, events: ak.Array, name, obj: Object, mask: 'ak.Array') -> tuple[Object, ak.Array]:
         """Update event level and object level. Apply the reducing mask on the objects already booked as well as the events.
         
         - `mask`: event-shaped array."""
-        print(f"Trying to add {name} mask!")
+        logging.info(f"Applying selection {name} to events with {len(events)} entries!")
         if self._sequential and len(self.objsel.names) >= 1:
             lastmask = self.objsel.any(self.objsel.names[-1])
             self.objsel.add_sequential(name, mask, lastmask)
@@ -124,23 +186,3 @@ class BaseEventSelections:
         events = events[mask]
         obj.events = events
         return obj, events
-    
-    def saveWeights(self, events: ak.Array, weights=['Generator_weight', 'LHEReweightingWeight']) -> None:
-        """Save weights to the collected objects."""
-        self.objcollect.update({weight: events[weight] for weight in weights})
-    
-    def getObj(self, name, events, **kwargs) -> Object:
-        return Object(events, name, self.objselcfg[name], self.mapcfg[name], **kwargs)
-
-class TriggerEventSelections(BaseEventSelections):
-    """A class to skim the events based on the trigger selections."""
-    def __init__(self, trigcfg, objselcfg, mapcfg, sequential=True):
-        super().__init__(trigcfg, objselcfg, mapcfg, sequential)
-    
-    def triggersel(self, events):
-        for trigname, value in self.trigcfg.items():
-            if value:
-                self.objsel.add(trigname, events[trigname])
-            else:
-                inverted = ~events[trigname]
-                self.objsel.add(trigname, inverted)
