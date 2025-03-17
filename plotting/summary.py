@@ -54,17 +54,17 @@ class PostProcessor():
         self.inputdir = self.cfg['INPUTDIR']
         self.tempdir = self.cfg['LOCALOUTPUT']
         self.transferP = self.cfg.get("TRANSFERPATH", None)
-        self.__will_trsf = self.transferP is not None
+        self._will_trsf = self.transferP is not None
         
         logging.debug(f"Input directory: {self.inputdir}")
         logging.debug(f"Output directory: {self.tempdir}")
-        if self.__will_trsf:
+        if self._will_trsf:
             logging.debug(f"Transfer directory: {self.transferP}")
 
         # Validate paths
         FileSysHelper.checkpath(self.inputdir, createdir=False, raiseError=True)
         FileSysHelper.checkpath(self.tempdir, createdir=True, raiseError=False)
-        if self.__will_trsf:
+        if self._will_trsf:
             FileSysHelper.checkpath(self.transferP, createdir=True, raiseError=False)
 
     def _init_years(self, years):
@@ -76,7 +76,7 @@ class PostProcessor():
             for year in self.years:
                 FileSysHelper.checkpath(pjoin(self.inputdir, year), createdir=False, raiseError=True)
 
-        if self.__will_trsf:
+        if self._will_trsf:
             for year in self.years:
                 FileSysHelper.checkpath(pjoin(self.transferP, year), createdir=True, raiseError=False)
 
@@ -124,7 +124,7 @@ class PostProcessor():
     #     if output_type is None:
     #         output_type = self.cfg.get("OUTTYPE", 'root')
     #     if outputdir is None:
-    #         outputdir = self.tempdir if not self.__will_trsf else self.transferP
+    #         outputdir = self.tempdir if not self._will_trsf else self.transferP
         
     #     FileSysHelper.checkpath(outputdir)
 
@@ -381,7 +381,7 @@ class PostSkimProcessor(PostProcessor):
                 if valid_dfs:
                     total_df = pd.concat(valid_dfs.values(), axis=1)
                     total_df.to_csv(pjoin(self.tempdir, f"{group}_{year}_cf.csv"))
-                    if self.__will_trsf:
+                    if self._will_trsf:
                         transferP = f"{self.transferP}/{year}/{group}"
                         FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
 
@@ -431,7 +431,7 @@ class PostSkimProcessor(PostProcessor):
             else:
                 return None
         
-        root_dtdir = self.tempdir if not self.__will_trsf else self.transferP
+        root_dtdir = self.tempdir if not self._will_trsf else self.transferP
 
         # Update metadata with new information
         for year, group, dsname, _ in self.dataset_iter.iterate_datasets():
