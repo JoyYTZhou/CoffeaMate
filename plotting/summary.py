@@ -303,8 +303,8 @@ class PostSkimProcessor(PostProcessor):
         self.__clean_roots()
     
     def hadd_results(self):
-        self.__hadd_roots()
-        self.__hadd_cutflows()
+        # self.__hadd_roots()
+        # self.__hadd_cutflows()
         self.__get_total_nwgt_events()
     
     def __clean_roots(self):
@@ -435,12 +435,17 @@ class PostSkimProcessor(PostProcessor):
         root_dtdir = self.tempdir if not self._will_trsf else self.transferP
 
         # Update metadata with new information
-        for year, group, dsname, _ in self.dataset_iter.iterate_datasets():
+        for year, group, dsname, _ in self.dataset_iter.iterate_datasets(True):
+            logging.debug(f"Processing {year}, {group}, {dsname}")
         # Initialize group dictionary if it doesn't exist
             if group not in new_meta_dict[year]:
+                logging.debug(f'{group} not detected in currently loaded weighted stats!')
                 new_meta_dict[year][group] = {}
+            
+            logging.debug(new_meta_dict[year][group])
 
             if dsname not in new_meta_dict[year][group]:
+                logging.debug(f'{dsname} not detected in currently loaded weighted stats!')
                 new_meta_dict[year][group][dsname] = self.meta_dict[year][group][dsname].copy()
             
             datadir = pjoin(root_dtdir, year, group)

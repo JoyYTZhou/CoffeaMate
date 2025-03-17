@@ -408,14 +408,17 @@ class DatasetIterator:
         self.temp_root = temp_root_dir
         self.transfer_root = transfer_root
 
-    def iterate_datasets(self):
+    def iterate_datasets(self, fullname=False):
         """Iterator that yields (year, group, dataset_name, dataset_info)."""
         for year in self.years:
             meta = self.meta_dict[year]
             for group in self.groups_func(year):
                 datasets = meta[group]
                 for ds_key, ds_info in datasets.items():
-                    yield year, group, ds_info['shortname'], ds_info
+                    if fullname:
+                        yield year, group, ds_key, ds_info
+                    else:
+                        yield year, group, ds_info['shortname'], ds_info
 
     def iterate_groups(self):
         """Iterator that yields (year, group, group_datasets)."""
