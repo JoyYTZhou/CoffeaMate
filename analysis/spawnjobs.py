@@ -2,6 +2,8 @@ from dask.distributed import as_completed
 import json as json
 import gzip, glob, traceback, os
 from itertools import islice
+from rich.console import Console
+from rich.table import Table
 
 from src.analysis.processor import Processor
 from src.utils.filesysutil import FileSysHelper, pjoin
@@ -155,25 +157,47 @@ class JobLoader():
     def prepjobs_from_dict(self, inputdatap, batch_size=5, **kwargs) -> bool:
         """Prepare job files from a group dictionary containing datasets and the files. Job files are created in the jobpath,
         with name format: {groupname}_{year}_{shortname}_job_{j}.json"""
+        console = Console()
+        table = Table(title="Job Preparation Status")
+        table.add_column("Dataset", style="cyan")
+        table.add_column("Status", style="green")
+        table.add_column("Job Files", style="yellow")
+
         with gzip.open(inputdatap, 'rt') as samplepath:
             keys = read_pattern(inputdatap)
             grp_name = keys[0]
             yr = keys[1]
             loaded = json.load(samplepath)
+
+        console.print(f"\n[bold cyan]Processing input file: {inputdatap}[/bold cyan]\n")
+
         for ds, dsdata in loaded.items():
             shortname = dsdata['metadata']['shortname']
-            print(f"===============Preparing job files for {ds}========================")
-            need_process = filterExisting(shortname, dsdata, tsferP=pjoin(self.tsferP, yr, grp_name), out_endpattern=self.out_endpattern)
+            job_files = []
+            need_process = filterExisting(shortname, dsdata, tsferP=pjoin(self.tsferP, yr, grp_name),
+                                    out_endpattern=self.out_endpattern)
+
             if need_process:
                 for j, sliced in enumerate(div_dict(dsdata['files'], batch_size)):
                     baby_job = {'metadata': dsdata['metadata'], 'files': sliced}
                     finame = pjoin(self.jobpath, f'{grp_name}_{yr}_{shortname}_job_{j}.json')
                     with open(finame, 'w') as fp:
                         json.dump(baby_job, fp)
-                    print("Job file created: ", finame)
-            else:
-                print(f"All the files have been processed for {ds}! No job files are needed!")
-    
+                job_files.append(os.path.basename(finame))
+
+            table.add_row(
+                ds,
+                "[green]Needs Processing[/green]",
+                "\n".join(job_files)
+            )
+        else:
+            table.add_row(
+                ds,
+                "[blue]All Processed[/blue]",
+                "[dim]No job files needed[/dim]"
+            )
+        console.print(table)
+
 def process_futures(futures, results_file='futureresult.txt', errors_file='futureerror.txt'):
     """Process a list of Dask futures.
     :param futures: List of futures returned by client.submit()
