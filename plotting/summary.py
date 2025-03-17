@@ -389,7 +389,7 @@ class PostSkimProcessor(PostProcessor):
         for year in results_dict:
             for group in results_dict[year]:
                 all_mismatched = results_dict[year][group]['mismatched_events']
-                root_files = [d.get('root') for d in all_mismatched]
+                root_files = list(chain(*[d.get('root') for d in all_mismatched]))
                 if root_files:
                     logging.debug(f"Deleting corrupted files: {root_files}")
                     FileSysHelper.remove_filelist(root_files)
@@ -435,12 +435,17 @@ class PostSkimProcessor(PostProcessor):
         root_dtdir = self.tempdir if not self._will_trsf else self.transferP
 
         # Update metadata with new information
-        for year, group, dsname, _ in self.dataset_iter.iterate_datasets():
+        for year, group, dsname, _ in self.dataset_iter.iterate_datasets(True):
+            logging.debug(f"Processing {year}, {group}, {dsname}")
         # Initialize group dictionary if it doesn't exist
             if group not in new_meta_dict[year]:
+                logging.debug(f'{group} not detected in currently loaded weighted stats!')
                 new_meta_dict[year][group] = {}
+            
+            logging.debug(new_meta_dict[year][group])
 
             if dsname not in new_meta_dict[year][group]:
+                logging.debug(f'{dsname} not detected in currently loaded weighted stats!')
                 new_meta_dict[year][group][dsname] = self.meta_dict[year][group][dsname].copy()
             
             datadir = pjoin(root_dtdir, year, group)
