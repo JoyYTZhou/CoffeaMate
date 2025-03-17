@@ -17,7 +17,7 @@ runcom = subprocess.run
 class CutflowProcessor:
     """Processes and manipulates cutflow tables."""
     @staticmethod
-    def check_events_match(df, col_name, rootfiles, empty_kwd='empty'):
+    def check_events_match(df, col_name, rootfiles, empty_kwd='empty') -> bool:
         """Validates if events count in cutflow matches root files.
         
         Parameters
@@ -33,6 +33,7 @@ class CutflowProcessor:
 
         if isinstance(rootfiles, str):
             if empty_kwd in rootfiles:
+                logging.warning(f"Empty root file detected - {rootfiles}")
                 return cutflow_events == 0
             else:
                 rootfiles = [rootfiles]
@@ -603,7 +604,7 @@ class DataSetUtil:
             if not events_match:
                 return ("mismatched", {
                     "shortname": shortname,
-                    "root": root_files[0],
+                    "root": root_files,
                     "csv": csv_files[0],
                     "uuid": uuid
                 })

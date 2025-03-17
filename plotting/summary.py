@@ -418,8 +418,11 @@ class PostSkimProcessor(PostProcessor):
             if os.path.exists(meta_file):
                 with open(meta_file, 'r') as f:
                     new_meta_dict[year] = json.load(f)
+                logging.debug(f"Loaded metadata with weights for {year}")
+                logging.debug(new_meta_dict[year])
             else:
                 new_meta_dict[year] = {}
+                logging.debug(f"Metadata file not found for {year}. Creating new metadata table.")
 
         def get_nwgt_per_group(dsname, dtdir):
             resolved_df = pd.read_csv(FileSysHelper.glob_files(dtdir, f'*cf.csv')[0], index_col=0)
