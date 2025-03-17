@@ -390,11 +390,14 @@ class PostSkimProcessor(PostProcessor):
             for group in results_dict[year]:
                 all_mismatched = results_dict[year][group]['mismatched_events']
                 root_files = [d.get('root') for d in all_mismatched]
-                logging.debug(f"Deleting corrupted files: {root_files}")
-                FileSysHelper.remove_filelist(root_files)
+                if root_files:
+                    logging.debug(f"Deleting corrupted files: {root_files}")
+                    FileSysHelper.remove_filelist(root_files)
+
                 csv_files = [d.get('csv') for d in all_mismatched]
-                logging.debug(f"Deleting corrupted files: {csv_files}")
-                FileSysHelper.remove_filelist(csv_files)
+                if csv_files:
+                    logging.debug(f"Deleting corrupted files: {csv_files}")
+                    FileSysHelper.remove_filelist(csv_files)
         
     def __get_total_nwgt_events(self):
         """Calculate the sum of `Generator_weight` per each dataset and save to a json file with provided metadata.
