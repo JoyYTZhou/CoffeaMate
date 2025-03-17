@@ -94,17 +94,13 @@ class PostProcessor():
         If groups is None, returns all groups found in the year's directory.
         """
         if groups is None:
-            self.groups = self.__generate_groups
+            self.groups = lambda year: [pbase(subdir) for subdir in FileSysHelper.glob_subdirs(pjoin(self.inputdir, year), full_path=False)]
         else:
             self.groups = lambda year: [group for group in groups
                                       if FileSysHelper.checkpath(pjoin(self.inputdir, year, group), createdir=False, raiseError=False)]
 
     def __del__(self):
         FileSysHelper.remove_emptydir(self.tempdir)
-
-    def __generate_groups(self, year):
-        """Generate the groups to process based on the input directory."""
-        return [pbase(subdir) for subdir in FileSysHelper.glob_subdirs(pjoin(self.inputdir, year), full_path=False)]
     
     def __update_meta(self):
         for year in self.years:

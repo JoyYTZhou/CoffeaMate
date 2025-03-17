@@ -113,10 +113,10 @@ class Processor:
         self.evtselclass = evtselclass
         self.transfer = transferP
         self.filehelper = FileSysHelper()
-        self.initdir()
+        self.__initdir()
         self.proc_kwargs = proc_kwargs
     
-    def initdir(self) -> None:
+    def __initdir(self) -> None:
         """Initialize the output directory and copy directory if necessary.
         If the copy directory is specified, it will be created and checked.
         The output directory will be checked and created if necessary."""
@@ -205,9 +205,6 @@ class Processor:
             print(f"Files transferred to: {self.transfer}" )
         return rc
 
-    def writedask(self, passed: dak.lib.core.Array, suffix, parquet=False) -> int:
-        pass
-    
     def writeak(self, passed: 'ak.Array', suffix, fields=None) -> int:
         """Writes an awkward array to a root file. Wrapper around ak_to_root."""
         rc = 0
@@ -238,6 +235,12 @@ class Processor:
             pickle.dump(passed, f)
         return 0 
 
+class PreselProcessor(Processor):
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, **kwargs):
+        super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs, **kwargs)
+    
+    
+    
 class SkimProcessor(Processor):
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, **kwargs):
         super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs, **kwargs)
