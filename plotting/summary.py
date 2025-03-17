@@ -418,8 +418,7 @@ class PostSkimProcessor(PostProcessor):
             if os.path.exists(meta_file):
                 with open(meta_file, 'r') as f:
                     new_meta_dict[year] = json.load(f)
-                logging.debug(f"Loaded metadata with weights for {year}")
-                logging.debug(new_meta_dict[year])
+                DataSetUtil.print_json_as_rich_table(new_meta_dict[year])
             else:
                 new_meta_dict[year] = {}
                 logging.debug(f"Metadata file not found for {year}. Creating new metadata table.")

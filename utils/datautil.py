@@ -1,6 +1,9 @@
 import pandas as pd
 import awkward as ak
 import uproot, pickle, os, subprocess, json, gzip
+from tabulate import tabulate
+from rich.console import Console
+from rich.table import Table
 import numpy as np
 from functools import wraps
 import dask_awkward as dak
@@ -670,7 +673,49 @@ class DataSetUtil:
                     results["missing_files"].append(result_info)
         
         return results
-     
+    
+    @staticmethod
+    def print_json_as_rich_table(data):
+        # Create a Rich Table
+        table = Table(title="Dataset Metadata", show_lines=True)
+        table.add_column("Group", style="cyan", no_wrap=True)
+        table.add_column("Shortname", style="magenta")
+        table.add_column("Cross Section", style="green")
+        table.add_column("Weight", style="yellow")
+
+        # Populate the table with data
+        for group, datasets in data.items():
+            for dataset, details in datasets.items():
+                table.add_row(
+                    group,
+                    details.get("shortname", "N/A"),
+                    str(details.get("xsection", "N/A")),
+                    str(details.get("nwgt", "N/A"))
+                )
+        
+        # Print the table to the console
+        console = Console()
+        console.print(table)
+    
+    @staticmethod
+    def tabulate_weighted_stats(data):
+        # Prepare the table data
+        table_data = []
+        for group, datasets in data.items():
+            for dataset, details in datasets.items():
+                table_data.append([
+                    group, 
+                    details.get("shortname", "N/A"), 
+                    details.get("xsection", "N/A"), 
+                    details.get("nwgt", "N/A")
+                ])
+        
+        # Define table headers
+        headers = ["Group", "Shortname", "Cross Section", "Weight"]
+        
+        # Print the table
+        print(tabulate(table_data, headers=headers, tablefmt="grid"))  
+
 def iterwgt(func):
     @wraps(func)
     def wrapper(instance, *args, **kwargs):
