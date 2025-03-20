@@ -70,23 +70,62 @@ class weightedSelection(PackedSelection):
         """
         super().__init__(dtype)
         self._perevtwgt = perevtwgt
-    
-    def add_sequential(self, name, thissel, lastsel, fill_value=False):
+
+    def add_sequential(self, name: str, thissel, lastsel, fill_value: bool = False) -> None:
+        """Add a sequential selection to the existing selection set.
+
+        This method applies a new selection ('thissel') only to events that passed
+        the previous selection ('lastsel'). The result is stored under 'name'.
+
+        Parameters
+        ----------
+        name : str
+            The name to identify this selection in the selection set
+        thissel : array-like
+            The current selection mask to be applied
+        lastsel : array-like
+            The previous selection mask that defines which events to consider
+        fill_value : bool, optional
+            The value to use for events that don't pass the previous selection,
+            defaults to False
+
+        Raises
+        ------
+        ValueError
+            If either thissel or lastsel are dask arrays instead of dask_awkward arrays
+
+        Notes
+        -----
+        - Both selection masks must be either numpy arrays or dask_awkward arrays
+        - The method flattens both selection masks before processing
+        - The result maintains the shape of lastsel, filling non-selected events with fill_value
+        """
+        # Validate input arrays aren't dask arrays
         if isinstance(thissel, dask.array.Array) or isinstance(lastsel, dask.array.Array):
-            raise ValueError(
-                "Dask arrays are not supported, please convert them to dask_awkward.Array by using dask_awkward.from_dask_array()"
-            )
-        thissel = coffea.util._ensure_flat(thissel, allow_missing=True)
-        lastsel = coffea.util._ensure_flat(lastsel, allow_missing=True)
-        last1 = lastsel[lastsel==True]
-        result1 = last1 & thissel
-        result = np.full(lastsel.shape, False)
-        result[lastsel==True] = result1
-        if isinstance(result, np.ndarray):
-            self._PackedSelection__add_eager(name, result, fill_value)
-        elif isinstance(result, dask_awkward.Array):
-            self._PackedSelection__add_delayed(name, result, fill_value)
-    
+                raise ValueError(
+                "Dask arrays are not supported, please convert them to dask_awkward.Array "
+                "by using dask_awkward.from_dask_array()"
+                )
+
+        # Ensure inputs are flat arrays
+        thissel_flat = coffea.util._ensure_flat(thissel, allow_missing=True)
+        lastsel_flat = coffea.util._ensure_flat(lastsel, allow_missing=True)
+
+        # Apply sequential selection
+        selected_events = lastsel_flat == True
+        passed_previous = thissel_flat[selected_events]
+        combined_result = passed_previous & thissel_flat
+
+        # Create final mask with same shape as input
+        final_mask = np.full(lastsel_flat.shape, fill_value)
+        final_mask[selected_events] = combined_result
+
+        # Add to selection set based on array type
+        if isinstance(final_mask, np.ndarray):
+            self._PackedSelection__add_eager(name, final_mask, fill_value)
+        elif isinstance(final_mask, dask_awkward.Array):
+            self._PackedSelection__add_delayed(name, final_mask, fill_value)
+        
     def cutflow(self, *names) -> weightedCutflow:
         for cut in names:
             if not isinstance(cut, str) or cut not in self._names:
