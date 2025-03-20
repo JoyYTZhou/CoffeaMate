@@ -28,8 +28,8 @@ class BaseEventSelections:
                  trigcfg: dict[str, bool],
                  objselcfg: dict[str, dict[str, float]],
                  mapcfg: dict[str, dict[str, str]],
-                 is_mc: bool = True,
-                 sequential: bool = True) -> None:
+                 is_mc: bool,
+                 sequential: bool) -> None:
         """Initialize the event selection object.
 
         Args:

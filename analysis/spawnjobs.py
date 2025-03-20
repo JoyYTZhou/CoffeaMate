@@ -92,7 +92,7 @@ class JobRunner:
             self.transferPBase = f'{self.transferPBase}/{year}'
             helper.checkpath(self.transferPBase, createdir=True)
     
-    def submitjobs(self, client, proc_kwargs={}, **kwargs) -> int:
+    def submitjobs(self, client, proc_kwargs={}, evtsel_kwargs={}) -> int:
         """Run jobs based on client settings.
         If a valid client is found and future mode is true, submit simultaneously run jobs.
         If not, fall back into a loop mode. Note that even in this mode, any dask computations will be managed by client explicitly or implicitly.
@@ -100,7 +100,7 @@ class JobRunner:
         Parameters
         - `kwargs`: Additional keyword arguments to be passed to the processor.writeevts() method.
         """
-        proc = self.procClass(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, proc_kwargs=proc_kwargs)
+        proc = self.procClass(self.rs, self.loaded, f'{self.transferPBase}/{self.grp_name}', self.selclass, proc_kwargs=proc_kwargs, evtsel_kwargs=evtsel_kwargs)
         read_kwargs = {}
         filter_name = self.rs.get("FILTER_NAME", None)
         if filter_name:
