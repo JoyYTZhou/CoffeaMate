@@ -100,7 +100,7 @@ def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
     
 class Processor:
     """Process individual file or filesets given strings/dicts belonging to one dataset."""
-    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, **kwargs):
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, evtsel_kwargs={'is_mc': True}):
         """
         Parameters
         - `ds_dict`: Example dictionary should look like this,
@@ -109,7 +109,7 @@ class Processor:
         self.rtcfg = rtcfg
         self.dsdict = dsdict
         self.dataset = dsdict['metadata']['shortname']
-        self.evtsel_kwargs = kwargs
+        self.evtsel_kwargs = evtsel_kwargs
         self.evtselclass = evtselclass
         self.transfer = transferP
         self.filehelper = FileSysHelper()
@@ -236,14 +236,12 @@ class Processor:
         return 0 
 
 class PreselProcessor(Processor):
-    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, **kwargs):
-        super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs, **kwargs)
-    
-    
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, evtsel_kwargs={'is_mc': True}):
+        super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs, evtsel_kwargs)
     
 class SkimProcessor(Processor):
-    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, **kwargs):
-        super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs, **kwargs)
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, evtsel_kwargs={'is_mc': True}):
+        super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs, evtsel_kwargs)
         self._write_semaphore = threading.Semaphore()
         self._load_semaphore = threading.Semaphore()
     
