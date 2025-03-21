@@ -100,7 +100,7 @@ def writeCF(evtsel, suffix, outdir, dataset, write_npz=False) -> str:
     
 class Processor:
     """Process individual file or filesets given strings/dicts belonging to one dataset."""
-    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, evtsel_kwargs={'is_mc': True}):
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}):
         """
         Parameters
         - `ds_dict`: Example dictionary should look like this,
@@ -109,7 +109,7 @@ class Processor:
         self.rtcfg = rtcfg
         self.dsdict = dsdict
         self.dataset = dsdict['metadata']['shortname']
-        self.evtsel_kwargs = evtsel_kwargs
+        self._ismc = dsdict['metadata']['is_mc']
         self.evtselclass = evtselclass
         self.transfer = transferP
         self.filehelper = FileSysHelper()
@@ -236,12 +236,12 @@ class Processor:
         return 0 
 
 class PreselProcessor(Processor):
-    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, evtsel_kwargs={'is_mc': True}):
-        super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs, evtsel_kwargs)
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}):
+        super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs)
     
 class SkimProcessor(Processor):
-    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}, evtsel_kwargs={'is_mc': True}):
-        super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs, evtsel_kwargs)
+    def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}):
+        super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs)
         self._write_semaphore = threading.Semaphore()
         self._load_semaphore = threading.Semaphore()
     
@@ -277,7 +277,7 @@ class SkimProcessor(Processor):
                         filename = next(f for f, future in future_loaded.items() if future == future)
                         try: 
                             events, suffix = future.result()
-                            future_passed[suffix] = executor.submit(self.evtselclass(**self.evtsel_kwargs).callevtsel, events)
+                            future_passed[suffix] = executor.submit(self.evtselclass(is_mc=self._ismc).callevtsel, events)
                         except Exception as e:
                             logging.exception(f"Error copying and loading {filename}: {e}")
                     for future in concurrent.futures.as_completed(future_passed.values()):
