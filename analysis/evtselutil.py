@@ -172,10 +172,6 @@ class PreselSelections(BaseEventSelections):
     def _saveAttributes(self, events, attribute_names) -> None:
         """Save attributes to the collected objects."""
         self.objcollect.update({attr: events[attr] for attr in attribute_names})
-    
-    def saveArrays(self, newcol, colname) -> None:
-        """Save arrays to the collected objects."""
-        self.objcollect.update({colname: newcol})
 
     def objcollect_to_df(self) -> pd.DataFrame:
         """Convert collected objects to a pandas DataFrame.
