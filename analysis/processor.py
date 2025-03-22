@@ -300,8 +300,8 @@ class SkimProcessor(Processor):
                     log_memory(process, "after computing + writing + garbage collection")
                     if self.transfer:
                         for cutflow_file in cutflow_files:
-                            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True)
-                        self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True)
+                            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True, overwrite=True)
+                        self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True, overwrite=True)
                     self.filehelper.close_open_files_delete(self.copydir, "*.root")
                 release_mapped_memory()
                 check_open_files()

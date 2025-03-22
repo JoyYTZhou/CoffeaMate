@@ -62,7 +62,7 @@ class ObjectMasker:
                     logging.info(f"Consider adding the nanoaodname for {propname} in AOD namemap configuration file.")
         return aodname
 
-    def custommask(self, propname: str, op, func=None):
+    def custommask(self, propname: str, op, func=None) -> ak.Array:
         """Creates a boolean mask based on property value comparison.
 
         Parameters
@@ -81,6 +81,8 @@ class ObjectMasker:
         aodarr = self.events[aodname]
         if func is not None:
             return op(func(aodarr), selval)
+        else:
+            return op(aodarr, selval)
 
     def create_combined_mask(self, conditions):
         """Combines multiple selection conditions into a single mask.
@@ -88,21 +90,39 @@ class ObjectMasker:
         Parameters
         ----------
         conditions : dict
-            {field: (operator, [function])} selection criteria
+            {field: (operator,)} or {field: (operator, function)} selection criteria
+            where operator is a comparison operator and function is optional
+        Returns
+        -------
+        awkward.Array
+            Combined boolean mask where True indicates passing all conditions
         """
-        masks = []
-        for field, (op, *funcs) in conditions.items():
-            func = funcs[0] if funcs else None
-            masks.append(self.custommask(field, op, func))
-        return ak.all(ak.stack(masks), axis=0)
+        if not conditions:
+            return None
+
+        # Get first field and create initial mask
+        field, op_func = next(iter(conditions.items()))
+        # Handle tuple of (operator,) or (operator, function)
+        op = op_func[0]
+        func = op_func[1] if len(op_func) > 1 else None
+        combined_mask = self.custommask(field, op, func)
+
+        # Combine remaining conditions
+        for field, op_func in list(conditions.items())[1:]:
+            # Handle tuple of (operator,) or (operator, function)
+            op = op_func[0]
+            func = op_func[1] if len(op_func) > 1 else None
+            mask = self.custommask(field, op, func)
+            combined_mask = combined_mask & mask  # Creates new array instead of modifying in place
+        return combined_mask
 
     def numselmask(self, mask, op):
         """Creates event-level mask based on number of selected objects."""
-        return ObjectProcessor.maskredmask(mask, op, self._selcfg.count)
+        return ObjectMasker.maskredmask(mask, op, self._selcfg.count)
 
     def vetomask(self, mask):
         """Creates mask for events with no selected objects."""
-        return ObjectProcessor.maskredmask(mask, opr.eq, 0)
+        return ObjectMasker.maskredmask(mask, opr.eq, 0)
 
     def evtosmask(self, selmask):
         """Creates mask for events with opposite-sign object pairs."""
