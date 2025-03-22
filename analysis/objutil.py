@@ -15,7 +15,6 @@ class ObjectMasker:
     - `events`: a weak proxy of the events
     - `selcfg`: selection configuration for the object, {key=abbreviation, value=threshold}
     - `mapcfg`: mapping configuration for the object
-    - `fields`: list of fields in the object
     """
 
     def __init__(self, events, name, selcfg, mapcfg, weakrefEvt=True):
@@ -24,7 +23,6 @@ class ObjectMasker:
         self.events = events  # This will use the property setter
         self._selcfg = selcfg
         self._mapcfg = mapcfg
-        self.fields = list(self.mapcfg.keys())
 
     @property
     def events(self):
