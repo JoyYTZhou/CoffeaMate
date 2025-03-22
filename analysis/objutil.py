@@ -8,14 +8,31 @@ import awkward as ak
 from src.utils.datautil import arr_handler
 
 class ObjectMasker:
-    """Class for handling object selections and creating masks, meant as an observer of the events.
+    """Handles object selections and mask creation for physics event data.
 
-    Attributes:
-    - `name`: name of the object
-    - `events`: a weak proxy of the events
-    - `selcfg`: selection configuration for the object, {key=abbreviation, value=threshold}
-    - `mapcfg`: mapping configuration for the object
-    """
+    Creates and combines boolean masks for filtering physics objects based on
+    configured selection criteria and properties.
+    Attributes
+        ----------
+    name : str
+        Name identifier for the physics object (e.g. 'Electron', 'Muon')
+    events : awkward.Array
+        Event data array (optionally stored as weak reference)
+    selcfg : dict
+        Selection thresholds {property_name: threshold_value}
+    mapcfg : dict
+        Maps internal names to NanoAOD branch names
+
+    Examples
+    --------
+    >>> masker = ObjectMasker(events, "Electron",
+    ...                      selcfg={"pt": 20, "eta": 2.4},
+    ...                      mapcfg={"pt": "Electron_pt"})
+    >>> pt_mask = masker.custommask("pt", operator.ge)
+    >>> eta_mask = masker.custommask("eta", operator.le, abs)
+    >>> combined = masker.create_combined_mask({"pt": (operator.ge,),
+    ...                                        "eta": (operator.le, abs)})
+        """
 
     def __init__(self, events, name, selcfg, mapcfg, weakrefEvt=True):
         self._name = name
@@ -33,7 +50,7 @@ class ObjectMasker:
         self._events = weakref.proxy(value) if self.__weakref else value
 
     def _get_prop_name(self, propname) -> str:
-        """Get the nanoaodname for the property."""
+        """Maps internal property name to NanoAOD branch name."""
         aodname = self.mapcfg.get(propname, None)
         if aodname is None:
             aodname = f'{self.name}_{propname}'
@@ -45,8 +62,18 @@ class ObjectMasker:
                     logging.info(f"Consider adding the nanoaodname for {propname} in AOD namemap configuration file.")
         return aodname
 
-    def custommask(self, propname: 'str', op, func=None):
-        """Create custom mask based on input."""
+    def custommask(self, propname: str, op, func=None):
+        """Creates a boolean mask based on property value comparison.
+
+        Parameters
+        ----------
+        propname : str
+            Property to apply selection on
+        op : callable
+            Comparison operator function
+        func : callable, optional
+            Function to apply to property values before comparison
+        """
         aodname = self._get_prop_name(propname)
         if self.selcfg.get(propname, None) is None:
             raise ValueError(f"threshold value {propname} is not given for object {self.name}")
@@ -54,20 +81,14 @@ class ObjectMasker:
         aodarr = self.events[aodname]
         if func is not None:
             return op(func(aodarr), selval)
-        
+
     def create_combined_mask(self, conditions):
-        """Create a mask combining multiple selection conditions.
-        
+        """Combines multiple selection conditions into a single mask.
+
         Parameters
         ----------
         conditions : dict
-            Dictionary of {field: (operator, [function])} pairs
-            e.g. {'pt': (opr.ge,), 'eta': (opr.le, abs)}
-        
-        Returns
-        -------
-        awkward.Array
-            Combined boolean mask
+            {field: (operator, [function])} selection criteria
         """
         masks = []
         for field, (op, *funcs) in conditions.items():
@@ -76,15 +97,15 @@ class ObjectMasker:
         return ak.all(ak.stack(masks), axis=0)
 
     def numselmask(self, mask, op):
-        """Returns event-level boolean mask."""
+        """Creates event-level mask based on number of selected objects."""
         return ObjectProcessor.maskredmask(mask, op, self.selcfg.count)
 
     def vetomask(self, mask):
-        """Returns the veto mask for events."""
+        """Creates mask for events with no selected objects."""
         return ObjectProcessor.maskredmask(mask, opr.eq, 0)
 
     def evtosmask(self, selmask):
-        """Create mask on events with OS objects."""
+        """Creates mask for events with opposite-sign object pairs."""
         aodname = self.mapcfg['charge']
         aodarr = self.events[aodname][selmask]
         sum_charge = abs(ak.sum(aodarr, axis=1))
@@ -92,7 +113,7 @@ class ObjectMasker:
 
     @staticmethod
     def maskredmask(mask, op, count) -> ak.Array:
-        """Reduces the mask to event level selections."""
+        """Reduces per-object mask to event-level selections."""
         return op(ak.sum(mask, axis=1), count)
 
 class ObjectProcessor:
