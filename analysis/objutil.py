@@ -51,13 +51,13 @@ class ObjectMasker:
 
     def _get_prop_name(self, propname) -> str:
         """Maps internal property name to NanoAOD branch name."""
-        aodname = self.mapcfg.get(propname, None)
+        aodname = self._mapcfg.get(propname, None)
         if aodname is None:
-            aodname = f'{self.name}_{propname}'
+            aodname = f'{self._name}_{propname}'
             if not aodname in self.events.fields:
                 aodname = propname
                 if not propname in self.events.fields:
-                    raise ValueError(f"Nanoaodname is not given for {propname} of object {self.name}")
+                    raise ValueError(f"Nanoaodname is not given for {propname} of object {self._name}")
                 else:
                     logging.info(f"Consider adding the nanoaodname for {propname} in AOD namemap configuration file.")
         return aodname
@@ -75,9 +75,9 @@ class ObjectMasker:
             Function to apply to property values before comparison
         """
         aodname = self._get_prop_name(propname)
-        if self.selcfg.get(propname, None) is None:
-            raise ValueError(f"threshold value {propname} is not given for object {self.name}")
-        selval = self.selcfg[propname]
+        if self._selcfg.get(propname, None) is None:
+            raise ValueError(f"threshold value {propname} is not given for object {self._name}")
+        selval = self._selcfg[propname]
         aodarr = self.events[aodname]
         if func is not None:
             return op(func(aodarr), selval)
@@ -98,7 +98,7 @@ class ObjectMasker:
 
     def numselmask(self, mask, op):
         """Creates event-level mask based on number of selected objects."""
-        return ObjectProcessor.maskredmask(mask, op, self.selcfg.count)
+        return ObjectProcessor.maskredmask(mask, op, self._selcfg.count)
 
     def vetomask(self, mask):
         """Creates mask for events with no selected objects."""
@@ -106,7 +106,7 @@ class ObjectMasker:
 
     def evtosmask(self, selmask):
         """Creates mask for events with opposite-sign object pairs."""
-        aodname = self.mapcfg['charge']
+        aodname = self._mapcfg['charge']
         aodarr = self.events[aodname][selmask]
         sum_charge = abs(ak.sum(aodarr, axis=1))
         return (sum_charge < ak.num(aodarr, axis=1))
@@ -222,7 +222,7 @@ class ObjectProcessor:
         Returns:
         - Zipped awkward array of object attributes
         """
-        zipped = ObjectProcessor.set_zipped(events, self.name, self.mapcfg)
+        zipped = ObjectProcessor.set_zipped(events, self._name, self._mapcfg)
         if mask is not None:
             zipped = zipped[mask]
         if sort:
@@ -352,7 +352,7 @@ trigger_obj_map = {"id": "TrigObj_id", "eta": "TrigObj_eta", "phi": "TrigObj_phi
 #         self._selcfg = selcfg
 #         self.events = events
 #         self._mapcfg = trigger_obj_map
-#         self.fields = list(self.mapcfg.keys())
+#         self.fields = list(self._mapcfg.keys())
 #         self._maskcollec = {}
     
 #     def custommask(self, propname, op, value, func=None):
@@ -362,7 +362,7 @@ trigger_obj_map = {"id": "TrigObj_id", "eta": "TrigObj_eta", "phi": "TrigObj_phi
         
 #     def bitmask(self, bit):
 #         """Create mask based on trigger bit."""
-#         aodarr = self.events[self.mapcfg['filterBits']]
+#         aodarr = self.events[self._mapcfg['filterBits']]
 #         return (aodarr & bit) > 0
 
 #     def passedTrigObj(self):
