@@ -189,7 +189,7 @@ class PreselSelections(BaseEventSelections):
         weights = ['Generator_weight', 'LHEReweightingWeight']
         self._saveAttributes(events, weights)
     
-    def selobjhelper(self, events: ak.Array, name: str, obj: ObjectMasker, mask: ak.Array) -> tuple[Object, ak.Array]:
+    def selobjhelper(self, events: ak.Array, name: str, obj: ObjectMasker, mask: ak.Array) -> tuple[ObjectMasker, ak.Array]:
         """Apply selection mask to events and update object collections.
 
         This function handles both event-level and object-level selections by:
