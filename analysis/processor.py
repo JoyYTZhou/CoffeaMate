@@ -270,6 +270,7 @@ class Processor:
 
     
 class PreselProcessor(Processor):
+    """Processor for preselections."""
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}):
         super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs)
     
