@@ -12,7 +12,7 @@ from itertools import islice
 from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper, release_mapped_memory
 from src.analysis.evtselutil import BaseEventSelections
 from src.utils.memoryutil import check_and_release_memory, log_memory, dynamic_worker_number
-from src.utils.ioutil import ak_to_root, parallel_copy_and_load, compute_and_write_skimmed, check_open_files
+from src.utils.ioutil import ak_to_root, parallel_process_files, compute_and_write_skimmed, check_open_files
 
 def infer_fragment_size(files_dict, available_memory) -> int:
     """Infer the fragment size based on the filesize and available memory.
@@ -125,39 +125,85 @@ class Processor:
         self.filehelper.checkpath(self.outdir)
         self.filehelper.checkpath(self.copydir)
     
-    def loadfile(self, fileargs: dict, copy_local: bool = False, **kwargs) -> ak.Array:
-        """Load a ROOT file either directly or after copying locally.
+    def _load_files(self, fileargs, executor, uproot_args={}) -> ak.Array:
+        raise NotImplementedError("Processor._load_files() must be implemented in a subclass.")
+    
+    def _write_events(self, passed, suffix, **kwargs) -> int:
+        raise NotImplementedError("Processor._write_events() must be implemented in a subclass.")
+    
+    def _process_batch(self, batch_dict, worker_no, process, readkwargs, writekwargs) -> tuple[int, int]:
+        """Process a single batch of files.
 
-        Parameters
-        - fileargs: {"files": {filename1: fileinfo1}, ...}
-        - copy_local: if True, copy the file locally before loading
-        - kwargs: additional arguments passed to uproot.open() or uproot.dask()
+        Args:
+            batch_dict: Dictionary containing files to process
+            worker_no: Number of workers to use
+            process: psutil.Process object for memory monitoring
+            readkwargs: Arguments for reading files
+            writekwargs: Arguments for writing files
 
-        Returns
-        - events as an awkward array
+        Returns:
+            Tuple of (return code, new worker number)
         """
-        filename = list(fileargs['files'].keys())[0]
-        suffix = fileargs['files'][filename]['uuid']
+        rc = 0
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=worker_no) as executor:
+                future_loaded = self._load_files(
+                    fileargs=batch_dict,
+                    executor=executor,
+                    uproot_args=readkwargs)
 
-        if copy_local:
-            if filename.endswith(":Events"):
-                filename = filename.split(":Events")[0]
-            XRootDHelper.copy_local(filename, pjoin(self.copydir, f"{suffix}.root"))
-            filename = pjoin(self.copydir, f"{suffix}.root")
-            fileargs = {"files": {filename: fileargs['files'][list(fileargs['files'].keys())[0]]}}
+                future_cf, future_writes, future_passed = [], [], {}
+                log_memory(process, "before processing")
 
-        delayed_open = self.rtcfg.get("DELAYED_OPEN", True)
-        if delayed_open:
-            events = uproot.dask(**fileargs, **kwargs)
-        else:
-            logging.debug("Loading %s", filename)
-            if not filename.endswith(":Events"):
-                filename += ":Events"
-            events = uproot.open(filename, **kwargs).arrays(
-                filter_name=self.rtcfg.get("FILTER_NAME", None)
-            )
-        return events
+                for future in concurrent.futures.as_completed(future_loaded.values()):
+                    filename = next(f for f, future in future_loaded.items() if future == future)
+                    try:
+                        events, suffix = future.result()
+                        future_passed[suffix] = executor.submit(self.evtselclass(is_mc=self._ismc).callevtsel, events)
+                    except Exception as e:
+                        logging.exception(f"Error copying and loading {filename}: {e}")
 
+                for future in concurrent.futures.as_completed(future_passed.values()):
+                    suffix = next(s for s, f in future_passed.items() if f == future)
+                    try:
+                        log_memory(process, f"before computing/writing {suffix}")
+                        passed, evtsel_state = future.result()
+                        future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
+                        future_writes.append(executor.submit(self._write_events, passed, suffix, **writekwargs))
+                    except Exception as e:
+                        logging.exception(f"Error processing {suffix}: {e}")
+
+                cutflow_files = []
+                for future in concurrent.futures.as_completed(future_cf + future_writes):
+                    if future in future_cf:
+                        cutflow_files.append(future.result())
+                    else:
+                        rc += future.result()
+                    del future
+
+                del future_cf, future_writes, future_passed, future_loaded
+                log_memory(process, "after computing + writing + garbage collection")
+
+                if self.transfer:
+                    for cutflow_file in cutflow_files:
+                        self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True, overwrite=True)
+                    self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True, overwrite=True)
+
+                self.filehelper.close_open_files_delete(self.copydir, "*.root")
+
+            release_mapped_memory()
+            check_open_files()
+            check_and_release_memory(process)
+
+        except Exception as e:
+            logging.exception(f"Error encountered when processing {self.dataset}: {e}")
+
+        peak_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024**2)
+        curr_mem = process.memory_info().rss / (1024**3)
+        new_worker_no = dynamic_worker_number(peak_mem, curr_mem, current_worker=worker_no)
+
+        return rc, new_worker_no
+   
     def run(self, *args, **kwargs) -> int:
         raise NotImplementedError("Processor.run() must be implemented in a subclass.")
 
@@ -186,39 +232,26 @@ class Processor:
             if not remote_load: self.filehelper.remove_files(self.copydir)
         return rc
     
-    def writeevts(self, passed, suffix, **kwargs) -> int:
-        """Write the events to a file, filename formated as {dataset}_{suffix}*."""
-        output_format = self.rtcfg.get("OUTPUT_FORMAT", None)
-        print(type(passed))
-        if isinstance(passed, dak.lib.core.Array):
-            if_parquet = (output_format == 'parquet')
-            rc = self.writedask(passed, suffix, parquet=if_parquet)
-        elif isinstance(passed, ak.Array):
-            rc = self.writeak(passed, suffix)
-        elif isinstance(passed, pd.DataFrame):
-            rc = self.writedf(passed, suffix)
-        else:
-            rc = self.writepickle(passed, suffix, **kwargs)
+    # def writeevts(self, passed, suffix, **kwargs) -> int:
+    #     """Write the events to a file, filename formated as {dataset}_{suffix}*."""
+    #     output_format = self.rtcfg.get("OUTPUT_FORMAT", None)
+    #     print(type(passed))
+    #     if isinstance(passed, dak.lib.core.Array):
+    #         if_parquet = (output_format == 'parquet')
+    #         rc = self.writedask(passed, suffix, parquet=if_parquet)
+    #     elif isinstance(passed, ak.Array):
+    #         rc = self.writeak(passed, suffix)
+    #     elif isinstance(passed, pd.DataFrame):
+    #         rc = self.writedf(passed, suffix)
+    #     else:
+    #         rc = self.writepickle(passed, suffix, **kwargs)
 
-        if self.transfer is not None:
-            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True, overwrite=True)
-            print(f"Files transferred to: {self.transfer}" )
-        return rc
+    #     if self.transfer is not None:
+    #         self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True, overwrite=True)
+    #         print(f"Files transferred to: {self.transfer}" )
+    #     return rc
 
-    def writeak(self, passed: 'ak.Array', suffix, fields=None) -> int:
-        """Writes an awkward array to a root file. Wrapper around ak_to_root."""
-        rc = 0
-        outputname = pjoin(self.outdir, f'{self.dataset}_{suffix}.root') 
-        if len(passed) == 0:
-            print(f"Warning: No events passed the selection, writing an empty placeholder ROOT file {outputname}")
-            self.write_empty(outputname)
-        if fields is None:
-            ak_to_root(outputname, passed, tree_name='Events',
-                       counter_name=lambda counted: 'n' + counted, 
-                       field_name=lambda outer, inner: inner if outer == "" else outer + "_" + inner,
-                       storage_options=None, compression="ZLIB", compression_level=1, title="", initial_basket_capacity=50, resize_factor=5)
-    
-    def writedf(self, passed: pd.DataFrame, suffix) -> int:
+    def _write_df(self, passed: pd.DataFrame, suffix) -> int:
         """Writes a pandas DataFrame to a csv file.
         
         Parameters:
@@ -227,17 +260,42 @@ class Processor:
         outname = pjoin(self.outdir, f'{self.dataset}_{suffix}_output.csv')
         passed.to_csv(outname)
         return 0
-        
-    def writepickle(self, passed, suffix):
+
+    def _write_pkl(self, passed, suffix):
         """Writes results to pkl. No constraints on events type."""
         finame = pjoin(self.outdir, f"{self.dataset}_{suffix}.pkl")
         with open(finame, 'wb') as f:
             pickle.dump(passed, f)
         return 0 
 
+    
 class PreselProcessor(Processor):
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}):
         super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs)
+    
+    def _load_files(self, fileargs, executor, uproot_args={}) -> dict:
+        return parallel_process_files(fileargs, executor, None, True, uproot_args)
+    
+    def _write_events(self, passed, suffix, **kwargs) -> int:
+        if isinstance(passed, pd.DataFrame):
+            return self._write_df(passed, suffix)
+        else:
+            logging.error("Unsupported output type")
+            return 1
+    
+    def run(self, readkwargs={}, writekwargs={}) -> int:
+        """Process files in parallel. Recommended for preselection."""
+        total_files = len(self.dsdict['files'])
+        logging.debug(f"Expected to see {total_files} outputs")
+        rc = 0
+        process = psutil.Process()
+       
+        cpu_no = psutil.cpu_count(logical=False) 
+        worker_no = cpu_no
+        logging.debug(f"Using {worker_no} workers")
+
+        rc = self._process_batch(self.dsdict, worker_no, process, readkwargs, writekwargs)
+        return rc
     
 class SkimProcessor(Processor):
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}):
@@ -245,9 +303,9 @@ class SkimProcessor(Processor):
         self._write_semaphore = threading.Semaphore()
         self._load_semaphore = threading.Semaphore()
     
-    def __load_for_skims(self, fileargs, executor, uproot_args={}) -> ak.Array:
+    def _load_files(self, fileargs, executor, uproot_args={}) -> dict:
         with self._load_semaphore:
-            return parallel_copy_and_load(fileargs, self.copydir, executor, True, uproot_args)
+            return parallel_process_files(fileargs, executor, self.copydir, True, uproot_args)
     
     def run(self, write_npz=False, frag_threshold=None, readkwargs={}, writekwargs={}, **kwargs) -> int:
         """Process files in parallel. Recommended for skimming."""
@@ -262,58 +320,13 @@ class SkimProcessor(Processor):
         self._write_semaphore = threading.Semaphore(min(frag_size, 1))
 
         worker_no = 1
-            
+
         for batch_dict in batch_dicts:
-            try: 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=worker_no) as executor:
-                    future_loaded = self.__load_for_skims(
-                        fileargs=batch_dict,
-                        executor=executor,
-                        uproot_args=readkwargs)
-                    
-                    future_cf, future_writes, future_passed = [], [], {}
-                    log_memory(process, "before processing")
-                    for future in concurrent.futures.as_completed(future_loaded.values()):
-                        filename = next(f for f, future in future_loaded.items() if future == future)
-                        try: 
-                            events, suffix = future.result()
-                            future_passed[suffix] = executor.submit(self.evtselclass(is_mc=self._ismc).callevtsel, events)
-                        except Exception as e:
-                            logging.exception(f"Error copying and loading {filename}: {e}")
-                    for future in concurrent.futures.as_completed(future_passed.values()):
-                        suffix = next(s for s, f in future_passed.items() if f == future)
-                        try:
-                            log_memory(process, f"before computing/writing {suffix}")
-                            passed, evtsel_state = future.result()
-                            future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
-                            future_writes.append(executor.submit(self.__writeskimmed, passed, suffix, **writekwargs))
-                        except Exception as e:
-                            logging.exception(f"Error processing {suffix}: {e}")
-                    cutflow_files = []
-                    for future in concurrent.futures.as_completed(future_cf + future_writes):
-                        if future in future_cf:
-                            cutflow_files.append(future.result())
-                        else:
-                            rc += future.result()
-                        del future
-                    del future_cf, future_writes, future_passed, future_loaded
-                    log_memory(process, "after computing + writing + garbage collection")
-                    if self.transfer:
-                        for cutflow_file in cutflow_files:
-                            self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True, overwrite=True)
-                        self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True, overwrite=True)
-                    self.filehelper.close_open_files_delete(self.copydir, "*.root")
-                release_mapped_memory()
-                check_open_files()
-                check_and_release_memory(process)
-            except Exception as e:
-                logging.exception(f"Error encountered when processing {self.dataset}: {e}")
-            peak_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024**2)
-            curr_mem = process.memory_info().rss / (1024**3)
-            worker_no = dynamic_worker_number(peak_mem, curr_mem, current_worker=worker_no)
+            batch_rc, worker_no = self._process_batch(batch_dict, worker_no, process, readkwargs, writekwargs)
+            rc += batch_rc
         return rc
 
-    def __writeskimmed(self, passed, suffix, **kwargs) -> int:
+    def _write_events(self, passed, suffix, **kwargs) -> int:
         with self._write_semaphore:
             return compute_and_write_skimmed(passed, self.outdir, self.dataset, suffix, **kwargs)
     

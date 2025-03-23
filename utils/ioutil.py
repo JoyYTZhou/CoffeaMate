@@ -15,17 +15,17 @@ def setup_logging(console_level=logging.INFO, file_level=logging.DEBUG, log_to_f
     # Remove any existing handlers
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
-    
+
     # Create formatters
     console_formatter = logging.Formatter('%(levelname)s: %(message)s')
     file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
-    
+
     # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(console_level)
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
-    
+
     # File handler if requested
     if log_to_file:
         log_file = f'debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
@@ -33,23 +33,23 @@ def setup_logging(console_level=logging.INFO, file_level=logging.DEBUG, log_to_f
         file_handler.setLevel(file_level)
         file_handler.setFormatter(file_formatter)
         root_logger.addHandler(file_handler)
-    
+
     # Set root logger to lowest level of any handler
     root_logger.setLevel(min(console_level, file_level))
-    
+
     # Configure library loggers
     logging.getLogger('uproot').setLevel(logging.WARNING)
     logging.getLogger('dask').setLevel(logging.WARNING)
     logging.getLogger('distributed').setLevel(logging.WARNING)
-    
+
     # Test logging
     logging.debug("Logging setup complete - DEBUG test")
     logging.info("Logging setup complete - INFO test")
     logging.warning("Logging setup complete - WARNING test")
-    
+
 def check_open_files(auto_close_threshold: float = 100, max_objects: int = 10) -> tuple[int, list[str]]:
     """Check and log details about currently open files with error handling.
-    
+
     Optionally close files exceeding a size threshold.
 
     Args:
@@ -67,13 +67,13 @@ def check_open_files(auto_close_threshold: float = 100, max_objects: int = 10) -
         file_info = []
         closed_files = []
         nfs_files = []  # Track .nfsXXXX files
-        
+
         for file in open_files:
             try:
                 if os.path.exists(file.path):
                     size = os.path.getsize(file.path)
                     file_info.append((file, size))
-                    
+
                     # Auto-close files if they exceed threshold
                     if auto_close_threshold is not None and size > auto_close_threshold * 1024 * 1024:
                         try:
@@ -85,7 +85,7 @@ def check_open_files(auto_close_threshold: float = 100, max_objects: int = 10) -
                             )
                         except Exception as close_error:
                             logging.error(f"Failed to close file {file.path}: {close_error}")
-                
+
                 # Check if file is a .nfsXXXX file
                 if "/.nfs" in file.path:
                     nfs_files.append(file.path)
@@ -155,42 +155,99 @@ def write_root(evts: 'ak.Array | pd.DataFrame', destination, outputtree="Events"
     branch_types = {name: evts[name].type for name in evts.fields}
     with uproot.recreate(destination, compression=compression) as file:
         file.mktree(name=outputtree, branch_types=branch_types, title=title)
-        file[outputtree].extend({name: evts[name] for name in evts.fields}) 
+        file[outputtree].extend({name: evts[name] for name in evts.fields})
 
-        
-def process_file(filename, fileinfo, copydir, delayed_open=True, uproot_args={}) -> tuple:
-    """Handles file copying and loading"""
+def load_files_remote_delayed(files_dict, uproot_args={}, remote_read=True) -> tuple:
+    """Load ROOT files remotely using uproot.dask.
+
+    Parameters
+    ----------
+    files_dict : dict
+        Dictionary containing file information with paths and UUIDs
+        Example format:
+        {
+            "root://path/to/file1.root:Events": {"uuid": "1"},
+            "root://path/to/file2.root:Events": {"uuid": "2"}
+        }
+    uproot_args : dict, optional
+        Additional arguments to pass to uproot
+    remote_read : bool, optional
+        If True, read directly from remote location
+
+    Returns
+    -------
+    tuple
+        (events, suffixes) where events is a dask array and suffixes is a list of UUIDs
+    """
+    try:
+        # Extract suffixes (UUIDs) from the files dictionary
+        suffixes = [info['uuid'] for info in files_dict.values()]
+
+        # Load the files using uproot.dask
+        events = uproot.dask(
+            files=files_dict,
+            **uproot_args
+        )
+
+        logging.debug(f"Successfully loaded {len(suffixes)} files remotely")
+        return (events, suffixes)
+
+    except Exception as e:
+        logging.exception(f"Failed to load files remotely: {str(e)}")
+
+def process_file(filename, fileinfo, copydir, delayed_open=True, uproot_args={}, remote_read=False) -> tuple:
+    """Handles file loading, either remotely or by copying locally first.
+
+    Parameters:
+    --------
+    filename : str
+        Path to the input file
+    fileinfo : dict
+        Dictionary containing file information including 'uuid'
+    copydir : str
+        Directory to copy files to when not reading remotely
+    delayed_open : bool, optional
+        Whether to use delayed (dask) reading
+    uproot_args : dict, optional
+        Additional arguments to pass to uproot
+    remote_read : bool, optional
+        If True, read directly from remote location without copying
+
+    Returns:
+    --------
+    tuple : (events, suffix)
+        events: either a dask array or uproot array depending on delayed_open
+        suffix: the file's uuid
+    """
     suffix = fileinfo['uuid']
-    dest_file = pjoin(copydir, f"{suffix}.root")
-    
-    logging.debug(f"Copying and loading {filename} to {dest_file}")
-    XRootDHelper.copy_local(filename, dest_file)
-    
-    if delayed_open:
-        events = uproot.dask(files={dest_file: fileinfo}, **uproot_args)
-        
-        if hasattr(events, 'npartitions'):
-            nparts = events.npartitions
-            logging.debug(f"File {suffix} has {nparts} partitions")
-            
-            if nparts <= 8:  # You can adjust this threshold
-                logging.debug("Not persisting events")
-                # logging.debug(f"Persisting events for {suffix} ({nparts} partitions)")
-                # events = events.persist()
-            else:
-                logging.debug(f"Skipping persist for {suffix} due to high partition count ({nparts})")
-        
-        return (events, suffix)
+
+    if remote_read:
+        input_path = filename
+        logging.debug(f"Reading remotely from {input_path}")
     else:
-        return (uproot.open(dest_file + ":Events").arrays(**uproot_args), suffix)
+        dest_file = pjoin(copydir, f"{suffix}.root")
+        logging.debug(f"Copying and loading {filename} to {dest_file}")
+        XRootDHelper.copy_local(filename, dest_file)
+        input_path = dest_file
+
+    try:
+        if delayed_open:
+            events = uproot.dask(files={input_path: fileinfo}, **uproot_args)
+            return (events, suffix)
+        else:
+            return (uproot.open(input_path + ":Events").arrays(**uproot_args), suffix)
+
+    except Exception as e:
+        logging.error(f"Failed to read file {input_path}: {str(e)}")
+        raise
 
 def submit_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3) -> list:
     """Runs file copying and loading in parallel"""
     results = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_file = parallel_copy_and_load(fileargs, copydir, executor, rtcfg, read_args)
-        
+        future_to_file = parallel_process_files(fileargs, copydir, executor, rtcfg, read_args)
+
         for future in concurrent.futures.as_completed(future_to_file):
             try:
                 results.append(future.result())
@@ -198,15 +255,36 @@ def submit_copy_and_load(fileargs, copydir, rtcfg, read_args, max_workers=3) -> 
                 logging.exception(f"Error copying and loading {future_to_file[future]}: {e}")
     return results
 
-def parallel_copy_and_load(fileargs, copydir, executor, delayed_open=True, uproot_args={}) -> dict:
-    """Runs file copying and loading in parallel
+def parallel_process_files(fileargs, executor, copydir=None, delayed_open=True, uproot_args={}) -> dict:
+    """Load files individually in parallel using a ThreadPoolExecutor.
     
-    Return: a dictionary of futures to file names"""
-    future_to_file = {filename: executor.submit(process_file, filename, fileinfo, copydir, delayed_open, uproot_args) for filename, fileinfo in fileargs['files'].items()}
+    Parameters 
+    ----------
+    - fileargs : dict
+        { "files": {filename: fileinfo}, "metadata": {metadata} }
+    
+    Returns
+    -------
+    - future_to_file : dict
+        Dictionary of futures to file names
+    """
+    remote_load = False
+    if copydir is None:
+        remote_load = True
+    future_to_file = {
+        filename: executor.submit(
+            process_file,
+            filename,
+            fileinfo,
+            copydir,
+            delayed_open,
+            uproot_args,
+            remote_read=remote_load
+        ) for filename, fileinfo in fileargs['files'].items()
+    }
     return future_to_file
 
 def compute_dask_array(passed, force_compute=True) -> ak.Array:
-    """Compute the dask array and handle zero-length partitions."""
     if hasattr(passed, 'npartitions'):
         passed = passed.persist()
 
@@ -265,7 +343,7 @@ def write_computed_array(computed_array, outdir, dataset, suffix, write_args={})
         output_path = pjoin(outdir, f'{dataset}_{suffix}.root')
         try:
             ak_to_root(
-                output_path, 
+                output_path,
                 computed_array,
                 tree_name="Events",
                 title="",
