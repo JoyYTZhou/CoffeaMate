@@ -124,7 +124,7 @@ class BaseEventSelections:
         return ObjectMasker(events, name, self.objselcfg[name], self.mapcfg[name], **kwargs)
     
     def getObjProc(self, name) -> ObjectProcessor:
-        return ObjectProcessor(self.objsel, name, self.mapcfg[name])
+        return ObjectProcessor(name, self.mapcfg[name])
 
     @lru_cache(maxsize=32)
     def cf_to_df(self) -> pd.DataFrame:
@@ -218,7 +218,7 @@ class PreselSelections(BaseEventSelections):
             - All previously collected objects in self.objcollect are filtered with the same mask
             - The input Object instance is updated with the filtered events
         """
-        logging.info(f"Applying selection '{name}' to {len(events)} events")
+        logging.info(f"Applying selection '{name}' to events")
 
         # Apply selection and update selection history
         if self._sequential and self.objsel.names:

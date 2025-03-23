@@ -317,7 +317,6 @@ class ObjectProcessor:
         zipped = arr_handler(zipped, allow_delayed=False)
         return ak.to_dataframe(zipped).add_prefix(prefix)
 
-
     @staticmethod
     def dRoverlap(vec, veclist: 'vec.Array', threshold=0.4, op=opr.ge) -> ak.highlevel.Array:
         """Return deltaR mask."""

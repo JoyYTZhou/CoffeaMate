@@ -169,7 +169,7 @@ class Processor:
                         future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
                         future_writes.append(executor.submit(self._write_events, passed, suffix, **writekwargs))
                     except Exception as e:
-                        logging.exception(f"Error processing {suffix}: {e}")
+                        logging.exception(f"Error processing file {suffix}: {e}")
 
                 cutflow_files = []
                 for future in concurrent.futures.as_completed(future_cf + future_writes):
