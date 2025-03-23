@@ -1,18 +1,16 @@
 # This file contains the Processor class, which is used to process individual files or filesets.
 # The behavior of the Processor class is highly dependent on run time configurations and the event selection class used.
-import uproot._util
-import uproot, pickle, gc, logging, threading, statistics, resource, os
+import pickle, gc, logging, threading, statistics, resource, os
 import pandas as pd
-import dask_awkward as dak
 import psutil
 import awkward as ak
 import concurrent.futures
 from itertools import islice
 
-from src.utils.filesysutil import FileSysHelper, pjoin, XRootDHelper, release_mapped_memory
+from src.utils.filesysutil import FileSysHelper, pjoin, release_mapped_memory
 from src.analysis.evtselutil import BaseEventSelections
 from src.utils.memoryutil import check_and_release_memory, log_memory, dynamic_worker_number
-from src.utils.ioutil import ak_to_root, parallel_process_files, compute_and_write_skimmed, check_open_files
+from src.utils.ioutil import parallel_process_files, compute_and_write_skimmed, check_open_files
 
 def infer_fragment_size(files_dict, available_memory) -> int:
     """Infer the fragment size based on the filesize and available memory.

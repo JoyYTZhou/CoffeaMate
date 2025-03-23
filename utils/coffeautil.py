@@ -102,29 +102,26 @@ class weightedSelection(PackedSelection):
         """
         # Validate input arrays aren't dask arrays
         if isinstance(thissel, dask.array.Array) or isinstance(lastsel, dask.array.Array):
-                raise ValueError(
-                "Dask arrays are not supported, please convert them to dask_awkward.Array "
-                "by using dask_awkward.from_dask_array()"
-                )
+            raise ValueError(
+            "Dask arrays are not supported, please convert them to dask_awkward.Array "
+            "by using dask_awkward.from_dask_array()"
+            )
 
         # Ensure inputs are flat arrays
         thissel_flat = coffea.util._ensure_flat(thissel, allow_missing=True)
         lastsel_flat = coffea.util._ensure_flat(lastsel, allow_missing=True)
 
-        # Apply sequential selection
-        selected_events = lastsel_flat == True
-        passed_previous = thissel_flat[selected_events]
-        combined_result = passed_previous & thissel_flat
-
-        # Create final mask with same shape as input
-        final_mask = np.full(lastsel_flat.shape, fill_value)
-        final_mask[selected_events] = combined_result
-
-        # Add to selection set based on array type
-        if isinstance(final_mask, np.ndarray):
-            self._PackedSelection__add_eager(name, final_mask, fill_value)
-        elif isinstance(final_mask, dask_awkward.Array):
-            self._PackedSelection__add_delayed(name, final_mask, fill_value)
+        if isinstance(thissel_flat, dask_awkward.Array):
+            result = dask_awkward.ones_like(lastsel_flat, dtype=bool) * fill_value
+            expanded_thissel = dask_awkward.zeros_like(lastsel_flat, dtype=bool)
+            expanded_thissel = expanded_thissel.mask[lastsel_flat].set(thissel_flat)
+            self._PackedSelection__add_delayed(name, expanded_thissel, fill_value)
+        
+        else:
+            result = np.full_like(lastsel_flat, fill_value, dtype=bool)
+            true_indices = np.where(lastsel_flat)[0]
+            result[true_indices] = thissel_flat
+            self._PackedSelection__add_eager(name, result, fill_value)
         
     def cutflow(self, *names) -> weightedCutflow:
         for cut in names:
