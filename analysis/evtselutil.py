@@ -102,11 +102,14 @@ class BaseEventSelections:
         Uses weightedSelection for MC and PackedSelection for real data.
         """
         if self._with_wgt:
+            logging.debug("Using weighted selections")
             self.objsel = weightedSelection(events['Generator_weight'])
         else:
             if self._sequential:
+                logging.debug("Using unweighted, sequential selections.")
                 self.objsel = sequentialSelection()
             else:
+                logging.debug("Using unweighted, PackedSelections")
                 self.objsel = PackedSelection()
 
     def _getcutflow(self) -> pd.DataFrame:
@@ -228,7 +231,7 @@ class PreselSelections(BaseEventSelections):
             previous_mask = self.objsel.any(self.objsel.names[-1])
             self.objsel.add_sequential(name, mask, previous_mask)
         else:
-            self.objsel.add(name, mask)
+            self.objsel.add(name, mask.compute())
 
         # Filter previously collected objects
         if self.objcollect:

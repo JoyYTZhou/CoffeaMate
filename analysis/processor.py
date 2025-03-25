@@ -266,7 +266,6 @@ class Processor:
             pickle.dump(passed, f)
         return 0 
 
-    
 class PreselProcessor(Processor):
     """Processor for preselections."""
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}):
