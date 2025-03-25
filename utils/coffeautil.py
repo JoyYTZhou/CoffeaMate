@@ -6,8 +6,10 @@ import awkward as ak
 import logging
 import time
 import numpy as np
+from functools import wraps
 
 class weightedCutflow(Cutflow):
+    """An inherited class that represents a set of selections on a set of events with weights"""
     def __init__(
         self, names, nevonecut, nevcutflow, wgtevcutflow, masksonecut, maskscutflow, delayed_mode
     ):
@@ -18,6 +20,8 @@ class weightedCutflow(Cutflow):
         self._masksonecut = masksonecut
         self._maskscutflow = maskscutflow
         self._delayed_mode = delayed_mode
+    
+    __init__.__doc__ = Cutflow.__init__.__doc__
     
     def __add__(self, cutflow2):
         if self._delayed_mode != cutflow2._delayed_mode:
@@ -32,24 +36,6 @@ class weightedCutflow(Cutflow):
         return weightedCutflow(names, nevonecut, nevcutflow, wgtevcutflow, masksonecut, maskscutflow, self._delayed_mode)
 
     def result(self):
-        """Returns the results of the cutflow as a namedtuple
-
-        Returns
-        -------
-            result : CutflowResult
-                A namedtuple with the following attributes:
-
-                nevonecut : list of integers or dask_awkward.lib.core.Scalar objects
-                    The number of events that survive each cut alone as a list of integers or delayed integers
-                nevcutflow : list of integers or dask_awkward.lib.core.Scalar objects
-                    The number of events that survive the cumulative cutflow as a list of integers or delayed integers
-                wgtevcutflow: list of integers or dask_awesome.lib.core.Scalar objects
-                    The number of events that survive the weighted cutflow as a list of integers or delayed integers
-                masksonecut : list of boolean numpy.ndarray or dask_awkward.lib.core.Array objects
-                    The boolean mask vectors of which events pass each cut alone as a list of materialized or delayed boolean arrays
-                maskscutflow : list of boolean numpy.ndarray or dask_awkward.lib.core.Array objects
-                    The boolean mask vectors of which events pass the cumulative cutflow a list of materialized or delayed boolean arrays
-        """
         CutflowResult = namedtuple(
             "CutflowResult",
             ["labels", "nevonecut", "nevcutflow", "wgtevcutflow", "masksonecut", "maskscutflow"],
@@ -63,6 +49,12 @@ class weightedCutflow(Cutflow):
             self._masksonecut,
             self._maskscutflow,
         )
+
+    result.__doc__ = (Cutflow.result.__doc__ or "") + """
+    Additional Returns for weightedCutflow:
+        wgtevcutflow: list of integers or dask_awesome.lib.core.Scalar objects
+            The number of events that survive the weighted cutflow as a list of integers or delayed integers
+    """
 
 class sequentialSelection(PackedSelection):
     def add_sequential(self, name: str, thissel, lastsel, fill_value: bool = False) -> None:
