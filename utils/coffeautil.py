@@ -3,6 +3,8 @@ import coffea.util
 import dask_awkward, dask
 from collections import namedtuple
 import awkward as ak
+import logging
+import time
 import numpy as np
 
 class weightedCutflow(Cutflow):
@@ -62,15 +64,7 @@ class weightedCutflow(Cutflow):
             self._maskscutflow,
         )
 
-class weightedSelection(PackedSelection):
-    def __init__(self, perevtwgt, dtype="uint32"):
-        """An inherited class that represents a set of selections on a set of events with weights
-        Parameters
-        - ``perevtwgt`` : dask.array.Array that represents the weights of the events
-        """
-        super().__init__(dtype)
-        self._perevtwgt = perevtwgt
-
+class sequentialSelection(PackedSelection):
     def add_sequential(self, name: str, thissel, lastsel, fill_value: bool = False) -> None:
         """Add a sequential selection to the existing selection set.
 
@@ -107,22 +101,30 @@ class weightedSelection(PackedSelection):
             "by using dask_awkward.from_dask_array()"
             )
 
+        logging.debug(f"Starting sequential selection computation at {time.time()}")
+        # Compute the selections if they are delayed
+        thissel = thissel.compute()
+        lastsel = lastsel.compute()
+        logging.debug(f"Finished sequential selection computation at {time.time()}")
+
         # Ensure inputs are flat arrays
         thissel_flat = coffea.util._ensure_flat(thissel, allow_missing=True)
         lastsel_flat = coffea.util._ensure_flat(lastsel, allow_missing=True)
 
-        if isinstance(thissel_flat, dask_awkward.Array):
-            result = dask_awkward.ones_like(lastsel_flat, dtype=bool) * fill_value
-            expanded_thissel = dask_awkward.zeros_like(lastsel_flat, dtype=bool)
-            expanded_thissel = expanded_thissel.mask[lastsel_flat].set(thissel_flat)
-            self._PackedSelection__add_delayed(name, expanded_thissel, fill_value)
-        
-        else:
-            result = np.full_like(lastsel_flat, fill_value, dtype=bool)
-            true_indices = np.where(lastsel_flat)[0]
-            result[true_indices] = thissel_flat
-            self._PackedSelection__add_eager(name, result, fill_value)
-        
+        result = np.full_like(lastsel_flat, fill_value, dtype=bool)
+        true_indices = np.where(lastsel_flat)[0]
+        result[true_indices] = thissel_flat
+        self._PackedSelection__add_eager(name, result, fill_value)
+  
+class weightedSelection(sequentialSelection):
+    def __init__(self, perevtwgt, dtype="uint32"):
+        """An inherited class that represents a set of selections on a set of events with weights
+        Parameters
+        - ``perevtwgt`` : dask.array.Array that represents the weights of the events
+        """
+        super().__init__(dtype)
+        self._perevtwgt = perevtwgt
+     
     def cutflow(self, *names) -> weightedCutflow:
         for cut in names:
             if not isinstance(cut, str) or cut not in self._names:

@@ -3,7 +3,7 @@ import dask, logging
 import pandas as pd
 import awkward as ak
 from typing import Optional
-from src.utils.coffeautil import weightedSelection, PackedSelection 
+from src.utils.coffeautil import weightedSelection, PackedSelection, sequentialSelection
 from src.analysis.objutil import ObjectMasker, ObjectProcessor
 from functools import lru_cache
 
@@ -104,7 +104,10 @@ class BaseEventSelections:
         if self._with_wgt:
             self.objsel = weightedSelection(events['Generator_weight'])
         else:
-            self.objsel = PackedSelection()
+            if self._sequential:
+                self.objsel = sequentialSelection()
+            else:
+                self.objsel = PackedSelection()
 
     def _getcutflow(self) -> pd.DataFrame:
         """Calculate and store cutflow information."""
