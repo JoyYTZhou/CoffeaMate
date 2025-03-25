@@ -103,8 +103,10 @@ class sequentialSelection(PackedSelection):
 
         logging.debug(f"Starting sequential selection computation at {time.time()}")
         # Compute the selections if they are delayed
-        thissel = thissel.compute()
-        lastsel = lastsel.compute()
+        if isinstance(thissel, dask_awkward.Array):
+            thissel = thissel.compute()
+        if isinstance(lastsel, dask_awkward.Array):
+            lastsel = lastsel.compute()
         logging.debug(f"Finished sequential selection computation at {time.time()}")
 
         # Ensure inputs are flat arrays
