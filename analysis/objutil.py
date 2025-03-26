@@ -185,12 +185,14 @@ class ObjectProcessor:
         """Creates a four-vector representation from event data.
 
         This method constructs a four-vector (momentum vector with energy) from the event data
-        using pt, eta, phi, and mass components. It can optionally apply masking and sorting.
+        using pt, eta, phi, and mass components. It can handle both flat events and pre-zipped
+        object collections.
 
         Parameters
         ----------
         events : awkward.Array
             The input events containing the object properties (pt, eta, phi, mass).
+        Can be either flat events or pre-zipped object collections.
         objname : str, optional
             The prefix name of the object in the events (e.g., 'Electron', 'Muon').
             If None, assumes the properties are directly accessible.
@@ -212,16 +214,31 @@ class ObjectProcessor:
 
         Examples
         --------
-        >>> # Create four-vectors for all electrons, sorted by pt
+        >>> # For flat events structure
         >>> el_vecs = ObjectProcessor.fourvector(events, 'Electron')
 
-        >>> # Create four-vectors for masked muons, unsorted
-        >>> mu_vecs = ObjectProcessor.fourvector(events, 'Muon', mask=pt_mask, sort=False)
+        >>> # For pre-zipped object collections
+        >>> el_vecs = ObjectProcessor.fourvector(events.electron, sort=False)
         """
-        to_be_zipped = ObjectProcessor.get_namemap(events, objname)
-        object_ak = ak.zip(to_be_zipped) if mask is None else ak.zip(to_be_zipped)[mask]
+        vec_components = ['pt', 'eta', 'phi', 'mass']
+
+        # Handle pre-zipped object collections
+        if objname is None and all(comp in events.fields for comp in vec_components):
+            object_ak = ak.zip({comp: events[comp] for comp in vec_components})
+
+        # Handle flat events structure
+        else:
+            to_be_zipped = ObjectProcessor.get_namemap(events, objname)
+            object_ak = ak.zip(to_be_zipped)
+
+        # Apply mask if provided
+        if mask is not None:
+            object_ak = object_ak[mask]
+
+        # Sort if requested
         if sort:
             object_ak = object_ak[ak.argsort(object_ak[sortname], ascending=ascending, axis=axis)]
+
         return vec.Array(object_ak)
 
     @staticmethod
