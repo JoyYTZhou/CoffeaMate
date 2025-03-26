@@ -284,7 +284,6 @@ class ObjectProcessor:
         passing = zipped[dr_mask]
         if isinstance(passing, ak.Array):
             logging.debug(f"{len(passing)} objects passed dR selection.")
-            logging.debug(f"Shape of passing: {passing.shape}")
             index = min(5, len(passing))
             logging.debug(f"Example of passing: {passing[:index]}")
         return passing[:,0], passing[:,1]
