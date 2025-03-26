@@ -93,17 +93,21 @@ class sequentialSelection(PackedSelection):
             "by using dask_awkward.from_dask_array()"
             )
 
-        logging.debug(f"Starting sequential selection computation at {time.time()}")
+        start_time = time.time()
+        logging.debug(f"Starting sequential selection computation for {name}")
         # Compute the selections if they are delayed
         if isinstance(thissel, dask_awkward.Array):
             thissel = thissel.compute()
         if isinstance(lastsel, dask_awkward.Array):
             lastsel = lastsel.compute()
-        logging.debug(f"Finished sequential selection computation at {time.time()}")
+        end_time = time.time()
+        logging.debug(f"Sequential computation took {end_time - start_time} seconds")
 
         # Ensure inputs are flat arrays
         thissel_flat = coffea.util._ensure_flat(thissel, allow_missing=True)
         lastsel_flat = coffea.util._ensure_flat(lastsel, allow_missing=True)
+        logging.debug(f"The shape of thissel_flat is {thissel_flat.shape}")
+        logging.debug(f"The shape of lastsel_flat is {lastsel_flat.shape}")
 
         result = np.full_like(lastsel_flat, fill_value, dtype=bool)
         true_indices = np.where(lastsel_flat)[0]
