@@ -224,6 +224,9 @@ class PreselSelections(BaseEventSelections):
             - All previously collected objects in self.objcollect are filtered with the same mask
             - The input Object instance is updated with the filtered events
         """
+        if isinstance(events, ak.Array):
+            logging.debug(f"Applying selection mask to {len(events)} events!")
+        
         # Apply selection and update selection history
         if self._sequential and self.objsel.names:
             previous_mask = self.objsel.any(self.objsel.names[-1])
@@ -239,5 +242,9 @@ class PreselSelections(BaseEventSelections):
 
         # Filter events and update object
         filtered_events = events[mask]
+
+        if isinstance(events, ak.Array):
+            logging.debug(f"Selection {name} passed {len(filtered_events)} events!")
+
         obj.events = filtered_events
         return obj, filtered_events
