@@ -232,7 +232,7 @@ class PreselSelections(BaseEventSelections):
             previous_mask = self.objsel.any(self.objsel.names[-1])
             self.objsel.add_sequential(name, mask, previous_mask)
         else:
-            self.objsel.add(name, mask.compute())
+            self.objsel.add(name, mask)
 
         # Filter previously collected objects
         if self.objcollect:
@@ -243,7 +243,7 @@ class PreselSelections(BaseEventSelections):
         # Filter events and update object
         filtered_events = events[mask]
 
-        if isinstance(events, ak.Array):
+        if isinstance(filtered_events, ak.Array):
             logging.debug(f"Selection {name} passed {len(filtered_events)} events!")
 
         obj.events = filtered_events
