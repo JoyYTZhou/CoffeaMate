@@ -211,6 +211,8 @@ class ObjectProcessor:
         -------
         vector.Array
             A four-vector representation of the objects, potentially masked and sorted.
+        ak.Array
+            The sorting mask if sort=True, otherwise None
 
         Examples
         --------
@@ -237,9 +239,11 @@ class ObjectProcessor:
 
         # Sort if requested
         if sort:
-            object_ak = object_ak[ak.argsort(object_ak[sortname], ascending=ascending, axis=axis)]
-
-        return vec.Array(object_ak)
+            sort_mask = ak.argsort(object_ak[sortname], ascending=ascending, axis=axis)
+            object_ak = object_ak[sort_mask]
+            return vec.Array(object_ak), sort_mask
+        else:
+            return vec.Array(object_ak), None
 
     @staticmethod
     def set_zipped(events, objname, namemap) -> ak.Array:
@@ -301,11 +305,11 @@ class ObjectProcessor:
         >>> leading_obj = results['leading_objects']
         """
         # Get deltaR mask between leading and subleading objects
-        dr_mask = self.dRwSelf(events, dr_threshold, objmask, **kwargs)
+        dr_mask, sort_mask = self.dRwSelf(events, dr_threshold, objmask)
 
         dr_mask_events = ObjectMasker.maskredmask(dr_mask, opr.ge, 1)
         events = events[dr_mask_events]
-        objmask = objmask[dr_mask_events]
+        objmask = objmask[sort_mask][dr_mask]
 
         # Get sorted objects passing initial selection
         zipped = self.getzipped(events, mask=objmask)
@@ -346,6 +350,8 @@ class ObjectProcessor:
         -------
         awkward.Array
             Boolean mask indicating pairs of objects that pass the delta R threshold.
+        awkward.Array
+            Sorting mask if sort=True, otherwise None
 
         Examples
         --------
@@ -355,14 +361,14 @@ class ObjectProcessor:
         >>> # Get dR mask without sorting
         >>> dR_mask = obj.dRwSelf(events, 0.4, pt_mask, sort=False)
         """
-        obj_lvs = self.fourvector(events, self._name, mask, **kwargs)
+        obj_lvs, sort_mask = self.fourvector(events, self._name, mask, **kwargs)
         ld_lv, sd_lvs = obj_lvs[:, 0], obj_lvs[:, 1:]
         dR_mask = ObjectProcessor.dRoverlap(ld_lv, sd_lvs, threshold)
-        return dR_mask
+        return dR_mask, sort_mask
 
     def dRwOther(self, events, vec, threshold, **kwargs):
-        object_lv = self.fourvector(events, self._name, **kwargs)
-        return self.dRoverlap(vec, object_lv, threshold)
+        object_lv, sort_mask = self.fourvector(events, self._name, **kwargs)
+        return self.dRoverlap(vec, object_lv, threshold), sort_mask
     
     @staticmethod
     def object_to_df(zipped, prefix='') -> pd.DataFrame:
