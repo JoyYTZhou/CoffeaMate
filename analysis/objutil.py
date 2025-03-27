@@ -266,83 +266,59 @@ class ObjectProcessor:
             zipped = zipped[ObjectProcessor.sortmask(zipped[sort_by], **kwargs)]
         return zipped
 
-    def apply_dr_selections(self, events, objmask, dr_threshold=0.5):
-        """Apply delta R (ΔR) separation requirements between physics objects.
-        
-        The filtering happens at three levels:
-        1. Object-level: Initial filtering using the provided objmask
-        2. Event-level: Events are processed independently
-        3. Pair-level: ΔR calculated between leading object and each subleading object
+    def get_dr_selection_results(self, events, objmask, dr_threshold=0.5, **kwargs):
+        """Apply delta R (ΔR) separation requirements and return comprehensive results.
+            
         Parameters
         ----------
         events : awkward.Array
             Input events containing the physics objects
         objmask : awkward.Array
             Boolean mask for initial object selection (e.g. pT, eta cuts)
-            Shape should match the object collection in events
         dr_threshold : float, default=0.5
             Minimum required ΔR separation between objects
-            Objects closer than this threshold are removed
+        **kwargs : dict
+        Additional keyword arguments for fourvector creation and sorting
 
         Returns
         -------
-        tuple of awkward.Array
-            (leading_objects, subleading_objects) that pass the ΔR requirement
-            - leading_objects: Highest pT object from each event
-            - subleading_objects: Objects separated from leading object by ≥ dr_threshold
-
-        Notes
-        -----
-        - Objects are first sorted by pT before ΔR calculations
-        - ΔR = √(Δη² + Δφ²) where η is pseudorapidity and φ is azimuthal angle
-        - Leading object is always kept, subleading objects are filtered by ΔR
-        - If no objects pass selection, returns empty arrays
-
+        tuple
+            - event_mask : awkward.Array
+                Boolean mask indicating events that pass the selection
+            - filtered_events : awkward.Array
+                Events filtered by the selection mask
+            - leading_objects : awkward.Array
+                Leading object in each event
+            - subleading_objects : awkward.Array
+                Subleading object in each event
         Examples
         --------
-        >>> # Get well-separated muons
-        >>> lead_mu, sublead_mu = processor.apply_dr_selections(
+        >>> results = processor.get_dr_selection_results(
         ...     events, pt_mask, dr_threshold=0.4
         ... )
-            """
+        >>> passing_events = results['filtered_events']
+        >>> event_mask = results['event_mask']
+        >>> leading_obj = results['leading_objects']
+        """
+        # Get deltaR mask between leading and subleading objects
+        dr_mask = self.dRwSelf(events, dr_threshold, objmask, **kwargs)
+
+        dr_mask_events = ObjectMasker.maskredmask(dr_mask, opr.ge, 1)
+        events = events[dr_mask_events]
 
         # Get sorted objects passing initial selection
         zipped = self.getzipped(events, mask=objmask)
-        
+
+        new_dr = dr_mask[dr_mask_events]
+
         # Separate leading object (always kept)
         leading = zipped[:,0]
-        
-        # Get subleading objects that pass dR requirement
-        dr_mask = self.dRwSelf(events, dr_threshold, objmask)
-        
-        print(dr_mask) 
-        # # Create mask that keeps at least one subleading object if it exists
-        # # This ensures we don't lose event structure
-        # has_subleading = ak.num(zipped) > 1
-        
-        subleading = ak.zeros_like(zipped[:,1])  # Initialize empty subleading array
-        
-        # Only apply dR selection where we have subleading objects
-        # where_passing = has_subleading & dr_mask
-        subleading = ak.where(dr_mask, 
-                            zipped[:,1],  # Keep objects passing dR
-                            subleading)    # Empty for events with no passing objects
-        
-        return leading, subleading
 
-        
-            
-        # Apply selections and split into leading/subleading
-        passing = zipped[:,1:][dr_mask]
+        # Initialize empty subleading array
+        subleading = zipped[:,1:][new_dr]
 
-        if isinstance(passing, ak.Array):
-            logging.debug(f"{len(passing)} objects passed dR selection.")
-            index = min(5, len(passing))
-            logging.debug(f"Example of passing: {passing[:index]}")
-        
-        return zipped[:,0], passing[:,1]
+        return dr_mask_events, events, leading, subleading
 
-    
     def dRwSelf(self, events, threshold, mask, **kwargs) -> ak.Array:
         """Calculate delta R between the leading object and subleading objects in a collection.
 
