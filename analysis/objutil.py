@@ -305,6 +305,7 @@ class ObjectProcessor:
 
         dr_mask_events = ObjectMasker.maskredmask(dr_mask, opr.ge, 1)
         events = events[dr_mask_events]
+        objmask = objmask[dr_mask_events]
 
         # Get sorted objects passing initial selection
         zipped = self.getzipped(events, mask=objmask)
