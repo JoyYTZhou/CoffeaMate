@@ -219,7 +219,6 @@ class PreselSelections(BaseEventSelections):
                 key: val[mask] for key, val in self.objcollect.items()
             }
 
-    
     def selobjhelper(self, events: ak.Array, name: str, obj: ObjectMasker, mask: ak.Array) -> tuple[ObjectMasker, ak.Array]:
         """Apply selection mask to events and update object collections.
 

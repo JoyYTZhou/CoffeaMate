@@ -269,6 +269,26 @@ class ObjectProcessor:
         if sort:
             zipped = zipped[ObjectProcessor.sortmask(zipped[sort_by], **kwargs)]
         return zipped
+    
+    def apply_event_level_dr(self, events, objmask, dr_threshold):
+        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask)
+
+        dr_mask_events = ObjectMasker.maskredmask(dr_mask, opr.ge, 1)
+        events = events[dr_mask_events]
+        
+        return dr_mask_events, events
+    
+    def apply_obj_level_dr(self, events, objmask, dr_threshold):
+        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask)
+        zipped = self.getzipped(events, mask=objmask)
+
+        # Separate leading object (always kept)
+        leading = zipped[:,0]
+
+        # Initialize empty subleading array
+        subleading = zipped[:,1:][dr_mask][:,0]
+
+        return leading, subleading
 
     def get_dr_selection_results(self, events, objmask, dr_threshold=0.5, **kwargs):
         """Apply delta R (ΔR) separation requirements and return comprehensive results.
