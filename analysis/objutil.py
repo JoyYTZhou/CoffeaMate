@@ -309,7 +309,7 @@ class ObjectProcessor:
 
         dr_mask_events = ObjectMasker.maskredmask(dr_mask, opr.ge, 1)
         events = events[dr_mask_events]
-        objmask = objmask[sort_mask][dr_mask]
+        objmask = objmask[sort_mask][dr_mask_events]
 
         # Get sorted objects passing initial selection
         zipped = self.getzipped(events, mask=objmask)
@@ -320,7 +320,7 @@ class ObjectProcessor:
         leading = zipped[:,0]
 
         # Initialize empty subleading array
-        subleading = zipped[:,1:][new_dr]
+        subleading = zipped[:,1:][new_dr][:,0]
 
         return dr_mask_events, events, leading, subleading
 
