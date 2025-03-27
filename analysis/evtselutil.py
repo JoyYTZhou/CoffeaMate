@@ -195,6 +195,31 @@ class PreselSelections(BaseEventSelections):
         weights = ['Generator_weight', 'LHEReweightingWeight']
         self._saveAttributes(events, weights)
     
+    def handle_selection_masks(self, name: str, mask: ak.Array) -> None:
+        """Handle selection masks and update selection history.
+
+        Args:
+            name (str): Name of the selection being applied
+            mask (ak.Array): Boolean mask array for selection
+
+        This method:
+        1. Applies selection and updates selection history
+        2. Filters previously collected objects with the mask
+        """
+        # Apply selection and update selection history
+        if self._sequential and self.objsel.names:
+            previous_mask = self.objsel.any(self.objsel.names[-1])
+            self.objsel.add_sequential(name, mask, previous_mask)
+        else:
+            self.objsel.add(name, mask)
+
+        # Filter previously collected objects
+        if self.objcollect:
+            self.objcollect = {
+                key: val[mask] for key, val in self.objcollect.items()
+            }
+
+    
     def selobjhelper(self, events: ak.Array, name: str, obj: ObjectMasker, mask: ak.Array) -> tuple[ObjectMasker, ak.Array]:
         """Apply selection mask to events and update object collections.
 
@@ -227,19 +252,8 @@ class PreselSelections(BaseEventSelections):
         if isinstance(events, ak.Array):
             logging.debug(f"Applying selection mask to {len(events)} events!")
         
-        # Apply selection and update selection history
-        if self._sequential and self.objsel.names:
-            previous_mask = self.objsel.any(self.objsel.names[-1])
-            self.objsel.add_sequential(name, mask, previous_mask)
-        else:
-            self.objsel.add(name, mask)
-
-        # Filter previously collected objects
-        if self.objcollect:
-            self.objcollect = {
-                key: val[mask] for key, val in self.objcollect.items()
-            }
-
+        self.handle_selection_masks(name, mask)
+        
         # Filter events and update object
         filtered_events = events[mask]
 
