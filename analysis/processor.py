@@ -252,7 +252,7 @@ class Processor:
                 self.outdir,
                 self.transfer,
                 filepattern=output_pattern,
-                remove=True,
+                remove=False,
                 overwrite=True
             )
  
@@ -332,7 +332,7 @@ class PreselProcessor(Processor):
         worker_no = cpu_no
         logging.debug(f"Using {worker_no} workers")
 
-        output_pattern = "{self.dataset}_*output.csv"
+        output_pattern = f"{self.dataset}_*output.csv"
         rc = self._process_batch(self.dsdict, worker_no, process, output_pattern, readkwargs, writekwargs)
         return rc
     
