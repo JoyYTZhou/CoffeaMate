@@ -129,13 +129,66 @@ class Processor:
     def _write_events(self, passed, suffix, **kwargs) -> int:
         raise NotImplementedError("Processor._write_events() must be implemented in a subclass.")
     
-    def _process_batch(self, batch_dict, worker_no, process, readkwargs, writekwargs) -> tuple[int, int]:
+    def _process_event_selections(self, future_loaded, executor) -> dict:
+        """Process event selections for loaded files.
+        Args:
+            future_loaded: Dictionary of futures containing loaded events
+            executor: ThreadPoolExecutor instance
+        Returns:
+            Dictionary containing futures for passed events and their corresponding suffixes
+        """
+        future_passed = {}
+        for future in concurrent.futures.as_completed(future_loaded.values()):
+            filename = next(f for f, future in future_loaded.items() if future == future)
+            try:
+                events, suffix = future.result()
+                future_passed[suffix] = executor.submit(self.evtselclass(is_mc=self._ismc).callevtsel, events)
+            except Exception as e:
+                logging.exception(f"Error copying and loading {filename}: {e}")
+        return future_passed
+
+    def _collect_results(self, future_passed, executor, process, writekwargs) -> tuple[int, list]:
+        """Collect and write results from event selections.
+
+        Args:
+            future_passed: Dictionary of futures containing passed events
+            executor: ThreadPoolExecutor instance
+            process: psutil Process object for memory monitoring
+            writekwargs: Arguments for writing events
+
+        Returns:
+            Tuple of (return code, list of cutflow files)
+        """
+        rc = 0
+        future_cf, future_writes = [], []
+        cutflow_files = []
+        for future in concurrent.futures.as_completed(future_passed.values()):
+            suffix = next(s for s, f in future_passed.items() if f == future)
+            try:
+                log_memory(process, f"before computing/writing {suffix}")
+                passed, evtsel_state = future.result()
+                future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
+                future_writes.append(executor.submit(self._write_events, passed, suffix, **writekwargs))
+            except Exception as e:
+                logging.exception(f"Error processing file {suffix}: {e}")
+
+        for future in concurrent.futures.as_completed(future_cf + future_writes):
+            if future in future_cf:
+                cutflow_files.append(future.result())
+            else:
+                rc += future.result()
+            del future
+
+        return rc, cutflow_files
+    
+    def _process_batch(self, batch_dict, worker_no, process, output_pattern, readkwargs, writekwargs) -> tuple[int, int]:
         """Process a single batch of files.
 
         Args:
             batch_dict: Dictionary containing files to process
             worker_no: Number of workers to use
             process: psutil.Process object for memory monitoring
+            output_pattern: Pattern for output files
             readkwargs: Arguments for reading files
             writekwargs: Arguments for writing files
 
@@ -150,45 +203,20 @@ class Processor:
                     executor=executor,
                     uproot_args=readkwargs)
 
-                future_cf, future_writes, future_passed = [], [], {}
                 log_memory(process, "before processing")
 
-                for future in concurrent.futures.as_completed(future_loaded.values()):
-                    filename = next(f for f, future in future_loaded.items() if future == future)
-                    try:
-                        events, suffix = future.result()
-                        future_passed[suffix] = executor.submit(self.evtselclass(is_mc=self._ismc).callevtsel, events)
-                    except Exception as e:
-                        logging.exception(f"Error copying and loading {filename}: {e}")
+                # Process event selections
+                future_passed = self._process_event_selections(future_loaded, executor)
 
-                for future in concurrent.futures.as_completed(future_passed.values()):
-                    suffix = next(s for s, f in future_passed.items() if f == future)
-                    try:
-                        log_memory(process, f"before computing/writing {suffix}")
-                        passed, evtsel_state = future.result()
-                        future_cf.append(executor.submit(writeCF, evtsel_state, suffix, self.outdir, self.dataset))
-                        future_writes.append(executor.submit(self._write_events, passed, suffix, **writekwargs))
-                    except Exception as e:
-                        logging.exception(f"Error processing file {suffix}: {e}")
+                # Collect and write results
+                rc, cutflow_files = self._collect_results(future_passed, executor, process, writekwargs)
 
-                cutflow_files = []
-                for future in concurrent.futures.as_completed(future_cf + future_writes):
-                    if future in future_cf:
-                        cutflow_files.append(future.result())
-                    else:
-                        rc += future.result()
-                    del future
-
-                del future_cf, future_writes, future_passed, future_loaded
+                del future_loaded, future_passed
                 log_memory(process, "after computing + writing + garbage collection")
+                
+                self._transfer_and_cleanup(cutflow_files, output_pattern=output_pattern)
 
-                if self.transfer:
-                    for cutflow_file in cutflow_files:
-                        self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=cutflow_file, remove=True, overwrite=True)
-                    self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_*.root', remove=True, overwrite=True)
-
-                self.filehelper.close_open_files_delete(self.copydir, "*.root")
-
+            self.filehelper.close_open_files_delete(self.copydir, "*.root")
             release_mapped_memory()
             check_open_files()
             check_and_release_memory(process)
@@ -201,7 +229,31 @@ class Processor:
         new_worker_no = dynamic_worker_number(peak_mem, curr_mem, current_worker=worker_no)
 
         return rc, new_worker_no
-   
+
+    def _transfer_and_cleanup(self, cutflow_files, output_pattern):
+        """Transfer output files and clean up temporary files.
+
+        Args:
+            cutflow_files: List of cutflow file names to transfer
+            output_pattern: Pattern for output files to transfer
+        """
+        if self.transfer:
+            for cutflow_file in cutflow_files:
+                self.filehelper.transfer_files(
+                    self.outdir,
+                    self.transfer,
+                    filepattern=cutflow_file,
+                    remove=True,
+                    overwrite=True
+                )
+            self.filehelper.transfer_files(
+                self.outdir,
+                self.transfer,
+                filepattern=output_pattern,
+                remove=True,
+                overwrite=True
+            )
+ 
     def run(self, *args, **kwargs) -> int:
         raise NotImplementedError("Processor.run() must be implemented in a subclass.")
 
@@ -230,25 +282,6 @@ class Processor:
             if not remote_load: self.filehelper.remove_files(self.copydir)
         return rc
     
-    # def writeevts(self, passed, suffix, **kwargs) -> int:
-    #     """Write the events to a file, filename formated as {dataset}_{suffix}*."""
-    #     output_format = self.rtcfg.get("OUTPUT_FORMAT", None)
-    #     print(type(passed))
-    #     if isinstance(passed, dak.lib.core.Array):
-    #         if_parquet = (output_format == 'parquet')
-    #         rc = self.writedask(passed, suffix, parquet=if_parquet)
-    #     elif isinstance(passed, ak.Array):
-    #         rc = self.writeak(passed, suffix)
-    #     elif isinstance(passed, pd.DataFrame):
-    #         rc = self.writedf(passed, suffix)
-    #     else:
-    #         rc = self.writepickle(passed, suffix, **kwargs)
-
-    #     if self.transfer is not None:
-    #         self.filehelper.transfer_files(self.outdir, self.transfer, filepattern=f'{self.dataset}_{suffix}*', remove=True, overwrite=True)
-    #         print(f"Files transferred to: {self.transfer}" )
-    #     return rc
-
     def _write_df(self, passed: pd.DataFrame, suffix) -> int:
         """Writes a pandas DataFrame to a csv file.
         
@@ -297,7 +330,8 @@ class PreselProcessor(Processor):
         worker_no = cpu_no
         logging.debug(f"Using {worker_no} workers")
 
-        rc = self._process_batch(self.dsdict, worker_no, process, readkwargs, writekwargs)
+        output_pattern = "{self.dataset}_*output.csv"
+        rc = self._process_batch(self.dsdict, worker_no, process, output_pattern, readkwargs, writekwargs)
         return rc
     
 class SkimProcessor(Processor):
@@ -325,12 +359,12 @@ class SkimProcessor(Processor):
         worker_no = 1
 
         for batch_dict in batch_dicts:
-            batch_rc, worker_no = self._process_batch(batch_dict, worker_no, process, readkwargs, writekwargs)
+            output_pattern = f'{self.dataset}_*.root'
+            batch_rc, worker_no = self._process_batch(batch_dict, worker_no, process, output_pattern, readkwargs, writekwargs)
             rc += batch_rc
         return rc
 
     def _write_events(self, passed, suffix, **kwargs) -> int:
         with self._write_semaphore:
             return compute_and_write_skimmed(passed, self.outdir, self.dataset, suffix, **kwargs)
-    
     
