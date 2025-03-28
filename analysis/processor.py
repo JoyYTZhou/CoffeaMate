@@ -252,7 +252,7 @@ class Processor:
                 self.outdir,
                 self.transfer,
                 filepattern=output_pattern,
-                remove=False,
+                remove=True,
                 overwrite=True
             )
  
