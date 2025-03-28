@@ -122,6 +122,8 @@ class Processor:
         self.copydir = self.rtcfg.get("COPYDIR_PATH", "copydir")
         self.filehelper.checkpath(self.outdir)
         self.filehelper.checkpath(self.copydir)
+        if self.transfer is not None:
+            self.filehelper.checkpath(self.transfer)
     
     def _load_files(self, fileargs, executor, uproot_args={}) -> ak.Array:
         raise NotImplementedError("Processor._load_files() must be implemented in a subclass.")
