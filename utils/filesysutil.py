@@ -423,8 +423,10 @@ class XRootDHelper:
                 if overwrite: 
                     self.xrdfs_client.rm(dest_file)
                     self.call_xrdcp(src_file, dest_file)
+                    logging.debug("Overwriting file %s", dest_file)
             else:
                 self.call_xrdcp(src_file, dest_file)
+                logging.debug("Copying file %s", dest_file)
             # at some point needs to try copyprocess 
             # status, _ = self.xrdfs_client.copy(src_file, dest_file, force=True)
             # if not status.ok:
