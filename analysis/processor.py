@@ -305,7 +305,7 @@ class PreselProcessor(Processor):
     """Processor for preselections."""
     def __init__(self, rtcfg, dsdict, transferP=None, evtselclass=BaseEventSelections, proc_kwargs={}):
         super().__init__(rtcfg, dsdict, transferP, evtselclass, proc_kwargs)
-        self._delayed_open = self.rtcfg.get("DELAYED_OPEN", True)
+        self._delayed_open = self.rtcfg.get("DELAYED_OPEN", False)
         if self._delayed_open:
             logging.info("Using delayed open for files")
         else:

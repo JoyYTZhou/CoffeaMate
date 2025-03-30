@@ -6,6 +6,7 @@ import dask_awkward as dak
 from datetime import datetime
 from uproot.writing._dask_write import ak_to_root
 
+from src.utils.displayutil import create_rich_logger
 from src.utils.filesysutil import XRootDHelper, pjoin
 import logging
 from datetime import datetime
@@ -16,25 +17,18 @@ def setup_logging(console_level=logging.INFO, file_level=logging.DEBUG, log_to_f
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
 
-    # Create formatters
-    console_formatter = logging.Formatter('%(levelname)s: %(message)s')
-    file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    rich_handler = create_rich_logger()
+    rich_handler.setLevel(console_level)
+    root_logger.addHandler(rich_handler)
 
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(console_level)
-    console_handler.setFormatter(console_formatter)
-    root_logger.addHandler(console_handler)
-
-    # File handler if requested
     if log_to_file:
         log_file = f'debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+        file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(file_level)
         file_handler.setFormatter(file_formatter)
         root_logger.addHandler(file_handler)
-
-    # Set root logger to lowest level of any handler
+        
     root_logger.setLevel(min(console_level, file_level))
 
     # Configure library loggers
