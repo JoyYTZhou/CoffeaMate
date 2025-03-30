@@ -74,7 +74,12 @@ class RichArgumentParser(argparse.ArgumentParser):
             name = ", ".join(action.option_strings)
             default = str(action.default) if action.default is not None else "None"
 
-        arg_type = str(action.type).__name__ if action.type else "str"
+        # Modify type handling to be more robust
+        if action.type:
+            arg_type = action.type.__name__ if hasattr(action.type, '__name__') else str(action.type)
+        else:
+            arg_type = "str"
+
         help_text = action.help or ""
         if action.choices:
             help_text += f" Choices: {action.choices}"
