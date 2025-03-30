@@ -144,9 +144,14 @@ class Processor:
             filename = next(f for f, future in future_loaded.items() if future == future)
             try:
                 events, suffix = future.result()
+            except Exception as e:
+                logging.exception(f"Error loading file {filename}: {e}")
+                continue
+
+            try:
                 future_passed[suffix] = executor.submit(self.evtselclass(is_mc=self._ismc).callevtsel, events)
             except Exception as e:
-                logging.exception(f"Error copying and loading {filename}: {e}")
+                logging.exception("Error selecting events: %s", e)
         return future_passed
 
     def _collect_results(self, future_passed, executor, process, writekwargs) -> tuple[int, list]:

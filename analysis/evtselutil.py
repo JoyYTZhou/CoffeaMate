@@ -165,7 +165,6 @@ class SkimSelections(BaseEventSelections):
     
     def _getpassed(self, events):
         return events[self.cfno.maskscutflow[-1]]
-    
  
 class PreselSelections(BaseEventSelections):
     """Class for handling selections that produce n-tuples."""
