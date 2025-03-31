@@ -292,7 +292,6 @@ class PostProcessor():
         
         return scaled_df, combined
 
-
 class PostSkimProcessor(PostProcessor):
     def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
         super().__init__(ppcfg, luminosity, groups, years)
@@ -308,6 +307,9 @@ class PostSkimProcessor(PostProcessor):
             if os.path.exists(pjoin(query_dir, f"{year}.json")):
                 with open(pjoin(query_dir, f"{year}.json"), 'r') as f:
                     self.meta_dict[year] = json.load(f)
+            else:
+                self.years.remove(year)
+                logging.warning(f"Metadata file not found for {year}. Removing from processing.")
         
         create_table(self.meta_dict, "Available Metadata")
     

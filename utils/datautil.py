@@ -40,12 +40,15 @@ class CutflowProcessor:
                 return cutflow_events == 0
             else:
                 rootfiles = [rootfiles]
-        
+            
         try:
             total_events = 0
             corrupted_files = []
             
             for root_file in rootfiles:
+                if empty_kwd in root_file:
+                    logging.warning(f"Empty root file detected - {root_file}")
+                    return cutflow_events == 0 
                 try:
                     with uproot.open(root_file) as f:
                         total_events += f["Events"].num_entries
