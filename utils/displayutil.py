@@ -109,6 +109,24 @@ def create_status_console() -> Console:
     """Create a console for status updates"""
     return Console()
 
+def create_table(dictionary, title):
+    # Create a Rich console
+    console = Console()
+
+    # Create a table
+    table = Table(title=title)
+
+    # Add columns
+    table.add_column("Key", style="cyan")
+    table.add_column("Value", style="magenta")
+
+    # Add rows from the dictionary
+    for key, value in dictionary.items():
+        table.add_row(str(key), str(value))
+
+    # Print the table
+    console.print(table)
+
 if __name__ == "__main__":
     # Example of how to use the RichArgumentParser
     examples = [

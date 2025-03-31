@@ -5,6 +5,7 @@ from itertools import chain
 from src.utils.filesysutil import FileSysHelper, pjoin, pbase, pdir
 from src.utils.datautil import CutflowProcessor, DataSetUtil, DatasetIterator
 from src.utils.rootutil import RootFileHandler
+from src.utils.displayutil import create_table
 
 class PostProcessor():
     """Class for loading and hadding data from skims/predefined selections produced directly by Processor.
@@ -83,9 +84,13 @@ class PostProcessor():
     def _init_metadata(self):
         """Load metadata for each year."""
         self.meta_dict = {}
+        query_dir = pjoin(self.cfg['DATA_DIR'], 'weightedMC' if self.cfg['IS_MC'] else 'availableData')
         for year in self.years:
-            with open(pjoin(self.cfg['METADATA'], f"{year}.json"), 'r') as f:
+            if os.path.exists(pjoin(query_dir, f"{year}.json")):
+                with open(pjoin(query_dir, f"{year}.json"), 'r') as f:
                     self.meta_dict[year] = json.load(f)
+        
+        create_table(self.meta_dict, "Available Metadata")
 
     def _init_groups(self, groups):
         """Initialize processing groups.
@@ -291,6 +296,20 @@ class PostProcessor():
 class PostSkimProcessor(PostProcessor):
     def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
         super().__init__(ppcfg, luminosity, groups, years)
+    
+    def _init_metadata(self):
+        """Load metadata for each year."""
+        self.meta_dict = {}
+        if self.cfg['IS_MC']:
+            query_dir = pjoin(self.cfg['DATA_DIR'], 'availableMC')
+        else:
+            query_dir = pjoin(self.cfg['DATA_DIR'], 'availableData')
+        for year in self.years:
+            if os.path.exists(pjoin(query_dir, f"{year}.json")):
+                with open(pjoin(query_dir, f"{year}.json"), 'r') as f:
+                    self.meta_dict[year] = json.load(f)
+        
+        create_table(self.meta_dict, "Available Metadata")
     
     def check_and_clean(self):
         self.__check_roots()
