@@ -41,14 +41,7 @@ class PostProcessor():
 
         self._init_groups(groups)
 
-        self.dataset_iter = DatasetIterator(
-            years=years,
-            groups_func=self.groups,
-            meta_dict=self.meta_dict,
-            input_root_dir=self.inputdir,
-            temp_root_dir=self.tempdir,
-            transfer_root=self.transferP
-        )
+        self._init_iter()
 
     def _init_paths(self):
         """Initialize and validate input/output paths."""
@@ -90,8 +83,6 @@ class PostProcessor():
                 with open(pjoin(query_dir, f"{year}.json"), 'r') as f:
                     self.meta_dict[year] = json.load(f)
         
-        create_table(self.meta_dict, "Available Metadata")
-
     def _init_groups(self, groups):
         """Initialize processing groups.
 
@@ -104,6 +95,17 @@ class PostProcessor():
             self.groups = lambda year: [group for group in groups
                                       if FileSysHelper.checkpath(pjoin(self.inputdir, year, group), createdir=False, raiseError=False)]
 
+    def _init_iter(self):
+        """Initialize the dataset iterator for processing."""
+        self.dataset_iter = DatasetIterator(
+            years=self.years,
+            groups_func=self.groups,
+            meta_dict=self.meta_dict,
+            input_root_dir=self.inputdir,
+            temp_root_dir=self.tempdir,
+            transfer_root=self.transferP
+        ) 
+        
     def __del__(self):
         FileSysHelper.remove_emptydir(self.tempdir)
     
@@ -111,6 +113,7 @@ class PostProcessor():
         for year in self.years:
             with open(pjoin(pdir(self.cfg['METADATA']), 'weightedMC', f"{year}.json"), 'r') as f:
                 self.meta_dict[year] = json.load(f)
+        self._init_iter()
     
     def hadd_results(self, *args, **kwargs):
         """Hadd the results of the post processing. The method is to be implemented in the child class."""
@@ -123,22 +126,6 @@ class PostProcessor():
     def __call__(self, checkargs, haddargs):
         self.check_and_clean(*checkargs)
         self.hadd_results(*haddargs)
-
-    # def __call__(self, output_type=None, outputdir=None):
-    #     """Hadd the root/csv files of the datasets and save to the output directory."""
-    #     if output_type is None:
-    #         output_type = self.cfg.get("OUTTYPE", 'root')
-    #     if outputdir is None:
-    #         outputdir = self.tempdir if not self._will_trsf else self.transferP
-        
-    #     FileSysHelper.checkpath(outputdir)
-
-    #     self.hadd_cfs()
-    #     if output_type == 'root': 
-    #         self.hadd_roots()
-    #         self.update_wgt_info(outputdir)
-    #     elif output_type == 'csv': self.hadd_csvouts()
-    #     else: raise TypeError("Invalid output type. Please choose either 'root' or 'csv'.")
         
     def get_yield(self):
         """Get the yield for the resolved cutflow tables. Save to LOCALOUTPUT."""
@@ -310,8 +297,6 @@ class PostSkimProcessor(PostProcessor):
             else:
                 self.years.remove(year)
                 logging.warning(f"Metadata file not found for {year}. Removing from processing.")
-        
-        create_table(self.meta_dict, "Available Metadata")
     
     def check_and_clean(self):
         self.__check_roots()
@@ -326,7 +311,8 @@ class PostSkimProcessor(PostProcessor):
     def hadd_results(self):
         self.__hadd_roots()
         self.__hadd_cutflows()
-        self.__get_total_nwgt_events()
+        if self.cfg['IS_MC']:
+            self.__get_total_nwgt_events()
     
     def __clean_roots(self):
         """Delete the corrupted files in the filelist."""
