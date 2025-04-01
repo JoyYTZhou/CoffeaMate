@@ -115,6 +115,14 @@ class RootFileHandler:
 
         return compression
 
+    @staticmethod
+    def print_total_wgt(file_path, tree_name='Events', branch_name='Generator_weight') -> float:
+        """Print the total weight of the given branch in the given tree."""
+        total_weight = uproot.open(file_path)[tree_name][branch_name].sum()
+        print(f"Total weight for {branch_name} in {tree_name}: {total_weight}")
+
+        return total_weight
+
     # @staticmethod
     # def write_obj(writable, filelist, objnames, extra=[]) -> None:
     #     """Writes the selected, concated objects to root files.
