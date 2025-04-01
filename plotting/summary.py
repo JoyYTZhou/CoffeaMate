@@ -137,11 +137,12 @@ class PostProcessor():
         for year, combined in combined_dict.items():
             self.present_yield(combined, signals, pjoin(self.tempdir, year), regroup_dict)
             logging.info(f"Yield results are outputted in {pjoin(self.tempdir, year)}")
-            print_dataframe_rich(combined, title=f"Yield for {year}", show_index=True)
+            print_dataframe_rich(combined, title=f"Yield for {year}")
+        FileSysHelper.checkpath(pjoin(self.tempdir, 'allYears'))
         _, combined_all = self.combine_merge_cf_results(resolved_dict, combined_dict, pjoin(self.tempdir, 'allYears'))
         self.present_yield(combined_all, signals, pjoin(self.tempdir, 'allYears'), regroup_dict)
         logging.info(f"Yield results are outputted in {pjoin(self.tempdir, 'allYears')}")
-        print_dataframe_rich(combined_all, title="Yield for all years", show_index=True)
+        print_dataframe_rich(combined_all, title="Yield for all years")
     
     def update_wgt_info(self, outputdir) -> None:
         """Output the weight information based on per-year per-dataset xsec to a json file."""
@@ -242,12 +243,12 @@ class PostProcessor():
         tuple[pd.DataFrame, pd.DataFrame]
             (weights resolved by channels, Combined weights)
         """
-        # Combine weighted cutflows across years
-        combined_wgt_resolved = pd.concat(resolved_wgted.values(), axis=1)
+        # Add weighted cutflows across years
+        combined_wgt_resolved = sum(resolved_wgted.values())
         combined_wgt_resolved.to_csv(pjoin(outputdir, "CombinedResolvedWgtOnly.csv"))
 
-        # Combine weights across years
-        combined_total_wgt = pd.concat(combined_wgted.values(), axis=1)
+        # Add weights across years
+        combined_total_wgt = sum(combined_wgted.values())
         combined_total_wgt.to_csv(pjoin(outputdir, "CombinedWeights.csv"))
 
         # Calculate combined efficiencies
