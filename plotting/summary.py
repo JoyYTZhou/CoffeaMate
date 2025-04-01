@@ -111,7 +111,7 @@ class PostProcessor():
     
     def __update_meta(self):
         for year in self.years:
-            with open(pjoin(pdir(self.cfg['DATA_DIR']), 'weightedMC', f"{year}.json"), 'r') as f:
+            with open(pjoin(self.cfg['DATA_DIR'], 'weightedMC', f"{year}.json"), 'r') as f:
                 self.meta_dict[year] = json.load(f)
         self._init_iter()
     
@@ -312,6 +312,7 @@ class PostSkimProcessor(PostProcessor):
         self.__hadd_roots()
         self.__hadd_cutflows()
         if self.cfg['IS_MC']:
+            logging.debug("Reporting total number of weighted events.")
             self.__get_total_nwgt_events()
     
     def __clean_roots(self):
@@ -439,6 +440,8 @@ class PostSkimProcessor(PostProcessor):
                 logging.debug(f"nwgt for {dsname} is {nwgt}")
                 return nwgt
             else:
+                logging.warning(f"{dsname} not found!")
+                logging.debug(resolved_df)
                 return None
         
         root_dtdir = self.tempdir if not self._will_trsf else self.transferP
@@ -458,8 +461,8 @@ class PostSkimProcessor(PostProcessor):
                 new_meta_dict[year][group][dsname] = self.meta_dict[year][group][dsname].copy()
             
             datadir = pjoin(root_dtdir, year, group)
-
-            nwgt = get_nwgt_per_group(dsname, datadir)
+            shortname = new_meta_dict[year][group][dsname]['shortname'] 
+            nwgt = get_nwgt_per_group(shortname, datadir)
             if nwgt is not None:
                 new_meta_dict[year][group][dsname]['nwgt'] = nwgt
 
