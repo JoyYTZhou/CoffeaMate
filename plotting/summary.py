@@ -3,7 +3,7 @@ import pandas as pd
 from itertools import chain
 
 from src.utils.filesysutil import FileSysHelper, pjoin, pbase, pdir
-from src.utils.datautil import CutflowProcessor, DataSetUtil, DatasetIterator
+from src.utils.datautil import CutflowProcessor, DataSetUtil, DatasetIterator, DataLoader
 from src.utils.rootutil import RootFileHandler
 from src.utils.displayutil import create_table, print_dataframe_rich
 
@@ -346,85 +346,63 @@ class PostPreselProcessor(PostProcessor):
     def hadd_results(self, *args, **kwargs):
         self._hadd_cutflows()
         self._hadd_csvouts()
-    
+
     def _hadd_csvouts(self):
-        """Hadd csv output files of datasets into one consolidated csv file for each year and group
+        """Hadd csv output files of datasets into one consolidated csv file for each year and group."""
+        def process_csv(dsname, dtdir, outdir):
+            """Process CSV files for a single dataset.
 
-        This method does the following:
-        1. For each year and group, find all output CSV files for each dataset
-        2. Concatenate these files vertically
-        3. Add metadata columns: dataset, year, and group
-        4. Save consolidated CSV files per group
-        5. Optionally transfer files to another directory
-        """
-        def process_csv(year, group, dsname, dtdir):
-            """Process CSV files for a single dataset
+                Args:
+                dsname: Dataset name
+                dtdir: Input directory containing dataset files
+                outdir: Output directory for processed files
 
-            Args:
-                year (str): Processing year
-                group (str): Physics process group
-                dsname (str): Dataset name
-                dtdir (str): Directory containing dataset files
-
-            Returns:
-                pd.DataFrame or None: Consolidated dataframe with added metadata
+                Returns:
+                pd.DataFrame or None: Consolidated dataframe with metadata columns
             """
-            out_files = FileSysHelper.glob_files(dtdir, f'{dsname}*output*csv')
-            if not out_files:
-                logging.info(f"No output files found in {dtdir} for {dsname}")
-                return None
-
-            logging.debug(f"Found {len(out_files)} output files for {dsname}")
-
             try:
-                dataframes = [pd.read_csv(f, index_col=0) for f in out_files]
-                total_df = pd.concat(dataframes, axis=0)
-                total_df['dataset'] = dsname
-                total_df['year'] = year
-                total_df['group'] = group
-                return total_df
+            # Load and concatenate CSV files
+                dfs = DataLoader.load_csvs(
+                    dirname=dtdir,
+                    filepattern=f'{dsname}*output*csv',
+                    func=lambda dfs: pd.concat(dfs, axis=0) if dfs else None
+                )
+
+                if dfs is not None:
+                    return dfs
+                else:
+                    logging.info(f"No output files found for {dsname}")
+                    return None
+
             except Exception as e:
                 logging.error(f"Error processing CSV files for {dsname}: {e}")
                 return None
 
-        # Process each year
-        for year in self.years:
-            logging.info(f"Processing CSV outputs for year {year}")
-            group_dfs = []
+    # Process datasets using DatasetIterator
+        results = self.dataset_iter.process_datasets(process_csv)
 
-        # Process each group in the year
-            for group in self.groups(year):
-                logging.info(f"Processing group {group}")
-                group_dataframes = []
+        # Consolidate results by group
+        for year, grouped in results.items():
+            for group, nested in grouped.items():
+                # Filter out None results and combine remaining dataframes
+                valid_dfs = {k: v for k, v in nested.items() if v is not None}
+                if valid_dfs:
+                    # Add metadata columns
+                    for dsname, df in valid_dfs.items():
+                        df['dataset'] = dsname
+                        df['year'] = year
+                        df['group'] = group
 
-            # Set input and output directories
-                dtdir = pjoin(self.inputdir, year, group)
-                outdir = pjoin(self.tempdir, year, group)
-                FileSysHelper.checkpath(outdir, createdir=True)
+                    # Combine all dataframes for this group
+                    group_df = pd.concat(valid_dfs.values(), axis=0)
 
-            # Process each dataset in the group
-            for dsname in self.meta_dict[year][group].keys():
-                logging.debug(f"Processing dataset {dsname}")
-                df = process_csv(year, group, dsname, dtdir)
-                if df is not None:
-                    group_dataframes.append(df)
-            
-            # Consolidate group dataframes
-            if group_dataframes:
-                group_total_df = pd.concat(group_dataframes, axis=0)
-                output_path = pjoin(outdir, f'{group}_output.csv')
-                group_total_df.to_csv(output_path)
-                logging.info(f"Saved consolidated output for {group} at {output_path}")
-                group_dfs.append(group_total_df)
-            else:
-                logging.warning(f"No dataframes found for group {group}")
-
-            # Optional file transfer
-            if self._will_trsf:
-                transferP = pjoin(self.transferP, year, group)
-                FileSysHelper.checkpath(transferP, createdir=True)
-                FileSysHelper.transfer_files(outdir, transferP, filepattern='*csv', remove=True, overwrite=True)
-                logging.info(f"Transferred files for {group} to {transferP}")
+                    # Save consolidated output
+                    outdir = pjoin(self.tempdir, year, group)
+                    FileSysHelper.checkpath(outdir, createdir=True)
+                    group_df.to_csv(pjoin(outdir, f'{group}_output.csv'))
+                    logging.info(f"Saved consolidated output for {group} year {year}")
+                else:
+                    logging.warning(f"No valid dataframes found for group {group} year {year}")
 
 class PostSkimProcessor(PostProcessor):
     def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
