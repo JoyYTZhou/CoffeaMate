@@ -148,13 +148,13 @@ class JobLoader():
         self.helper.checkpath(self.jobpath, createdir=True)
         self.out_endpattern = out_endpattern
 
-    def writejobs(self, batch_size=10, is_mc=False) -> None:
+    def writejobs(self, batch_size=10) -> None:
         """Write job parameters to json file"""
         datafile = glob.glob(pjoin(self.inpath, f'{self.kwd}*json.gz'))
         for file in datafile:
-            self.prepjobs_from_dict(file, batch_size=batch_size, is_mc=is_mc)
+            self.prepjobs_from_dict(file, batch_size=batch_size)
     
-    def prepjobs_from_dict(self, inputdatap, batch_size=5, is_mc=False) -> bool:
+    def prepjobs_from_dict(self, inputdatap, batch_size=5) -> bool:
         """Prepare job files from a group dictionary containing datasets and the files. Job files are created in the jobpath,
         with name format: {groupname}_{year}_{shortname}_job_{j}.json"""
         console = Console()
@@ -180,7 +180,6 @@ class JobLoader():
             if need_process:
                 for j, sliced in enumerate(div_dict(dsdata['files'], batch_size)):
                     baby_job = {'metadata': dsdata['metadata'], 'files': sliced}
-                    baby_job['metadata']['is_mc'] = is_mc
                     finame = pjoin(self.jobpath, f'{grp_name}_{yr}_{shortname}_job_{j}.json')
                     with open(finame, 'w') as fp:
                         json.dump(baby_job, fp)
