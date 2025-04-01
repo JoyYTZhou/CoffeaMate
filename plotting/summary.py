@@ -348,10 +348,12 @@ class PostPreselProcessor(PostProcessor):
         self._hadd_csvouts()
     
     def _hadd_csvouts(self):
-        """Hadd csv output files of datasets into one csv file"""
-        all_dfs = []
-        def process_csv(year, group, dsname, dtdir, outdir):
+        """Hadd csv output files of datasets into one csv file for each year and group"""
+        def process_csv(year, group, dsname, dtdir):
             out_files = FileSysHelper.glob_files(dtdir, f'{dsname}*output*csv')
+            if not out_files:
+                logging.debug(f"No output files found in {dtdir} for {dsname}")
+                return None
             dataframes = [pd.read_csv(f, index_col=0) for f in out_files]
             total_df = pd.concat(dataframes, axis=0)
             total_df['dataset'] = dsname
@@ -359,19 +361,30 @@ class PostPreselProcessor(PostProcessor):
             total_df['group'] = group
             return total_df
 
-        for year, group, dsname, _ in self.dataset_iter.iterate_datasets(False):
-            logging.debug(f"Processing {year}, {group}, {dsname}")
-            dtdir = pjoin(self.inputdir, year, group)
-            outdir = pjoin(self.tempdir, year, group)
-            FileSysHelper.checkpath(outdir, createdir=True)
-            all_dfs.append(process_csv(dsname, dtdir, outdir))
+        for year in self.years:
+            group_dfs = []
+            for group in self.groups(year):
+                group_dataframes = []
+                dtdir = pjoin(self.inputdir, year, group)
+                outdir = pjoin(self.tempdir, year, group)
+                FileSysHelper.checkpath(outdir, createdir=True)
+
+                for dsname, _ in self.meta_dict[year][group].items():
+                    logging.debug(f"Processing {year}, {group}, {dsname}")
+                    df = process_csv(year, group, dsname, dtdir)
+                    if df is not None:
+                        group_dataframes.append(df)
             
-        all_dfs = pd.concat(all_dfs, axis=0)
-        all_dfs.to_csv(pjoin(self.tempdir, 'all_output.csv'))
-        if self._will_trsf:
-            transferP = f"{self.transferP}/all_output.csv"
-            FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
-        
+            if group_dataframes:
+                group_total_df = pd.concat(group_dataframes, axis=0)
+                group_total_df.to_csv(pjoin(outdir, f'{group}_output.csv'))
+                group_dfs.append(group_total_df)
+
+            if self._will_trsf:
+                transferP = pjoin(self.transferP, year, group)
+                FileSysHelper.checkpath(transferP, createdir=True)
+                FileSysHelper.transfer_files(outdir, transferP, filepattern='*csv', remove=True, overwrite=True)
+
 class PostSkimProcessor(PostProcessor):
     def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
         super().__init__(ppcfg, luminosity, groups, years)
