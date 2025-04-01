@@ -316,8 +316,9 @@ class PostSkimProcessor(PostProcessor):
     
     def __clean_roots(self):
         """Delete the corrupted files in the filelist."""
-        if os.path.exists('all_corrupted.json'):
-            with open('all_corrupted.json', 'r') as f:
+        filename = f'{self.cfg['DIRNAME']}_corrupted.json'
+        if os.path.exists(filename):
+            with open(filename, 'r') as f:
                 all_corrupted = json.load(f)
             self.__delete_corrupted(all_corrupted)
     
@@ -336,9 +337,10 @@ class PostSkimProcessor(PostProcessor):
                 corrupted[year][group] = results
         if corrupted:
             logging.warning(f"Corrupted files found: {corrupted}")
-            with open('all_corrupted.json', 'w') as f:
+            filename = f'{self.cfg['DIRNAME']}_corrupted.json'
+            with open(filename, 'w') as f:
                 json.dump(corrupted, f)
-            logging.error(f"Saved corrupted files to all_corrupted.json")
+            logging.error(f"Saved corrupted files to {filename}")
         
         return corrupted
 
