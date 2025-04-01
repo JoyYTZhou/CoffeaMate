@@ -148,7 +148,7 @@ class CutflowProcessor:
         # Apply weights to each process
         weighted_df = cutflow_df.copy()
         for process, weight in final_weights.items():
-            cols = weighted_df.filter(like=process).columns
+            cols = weighted_df.filter(like=process).filter(like='wgt').columns
             weighted_df[cols] = weighted_df[cols] * weight
             
         if save and outpath:

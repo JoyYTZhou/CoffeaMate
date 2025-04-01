@@ -134,6 +134,8 @@ class PostProcessor():
         signals = ['HH', 'ZH', 'ZZ']
         inputdir = self.transferP if self.transferP is not None else self.inputdir
         resolved_dict, combined_dict = self.merge_cf(inputdir=inputdir, outputdir=self.tempdir)
+        logging.debug(resolved_dict)
+        logging.debug(combined_dict)
         for year, combined in combined_dict.items():
             self.present_yield(combined, signals, pjoin(self.tempdir, year), regroup_dict)
             logging.info(f"Yield results are outputted in {pjoin(self.tempdir, year)}")
@@ -415,6 +417,7 @@ class PostSkimProcessor(PostProcessor):
             query_dir = pjoin(self.cfg['DATA_DIR'], 'availableMC')
         else:
             query_dir = pjoin(self.cfg['DATA_DIR'], 'availableData')
+        logging.debug(f"Using metadata json file {query_dir}")
         for year in self.years:
             if os.path.exists(pjoin(query_dir, f"{year}.json")):
                 with open(pjoin(query_dir, f"{year}.json"), 'r') as f:
@@ -434,8 +437,8 @@ class PostSkimProcessor(PostProcessor):
         self.__clean_roots()
     
     def hadd_results(self):
-        self.__hadd_roots()
-        self._hadd_cutflows()
+        # self.__hadd_roots()
+        # self._hadd_cutflows()
         if self.cfg['IS_MC']:
             logging.debug("Reporting total number of weighted events.")
             self.__get_total_nwgt_events()
