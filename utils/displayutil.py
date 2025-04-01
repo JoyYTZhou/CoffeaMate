@@ -128,18 +128,20 @@ def create_table(dictionary, title):
     # Print the table
     console.print(table)
 
-# Create a table from the DataFrame
 def print_dataframe_rich(df, title):
     console = Console()
     table = Table(title=title)
     
-    # Add columns
+    # Add index column first
+    table.add_column("Index", style="bold cyan")
+
+    # Add remaining columns
     for column in df.columns:
         table.add_column(str(column))
     
-    # Add rows
+    # Add rows with index
     for index, row in df.iterrows():
-        table.add_row(*[str(value) for value in row])
+        table.add_row(str(index), *[str(value) for value in row])
     
     # Print the table
     console.print(table)
