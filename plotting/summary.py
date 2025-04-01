@@ -320,8 +320,6 @@ class PostProcessor():
         combined.name = group
         
         logger_level = logging.getLogger().getEffectiveLevel()
-        if logger_level == logging.DEBUG:
-            print_dataframe_rich(scaled_df, title=f"Scaled Cutflow (by lumi * xsec) for {group}")
         
         return scaled_df, combined
     
