@@ -8,6 +8,7 @@ from rich.progress import track
 from rich.markdown import Markdown
 import argparse
 from typing import List, Dict, Optional, Union
+import pandas as pd
 
 class RichArgumentParser(argparse.ArgumentParser):
     """Custom argument parser that uses rich for help display"""
@@ -142,26 +143,53 @@ def print_dataframe_rich(df, title):
     
     # Print the table
     console.print(table)
+
+def visualize_csv(file_path, title=None, max_rows=None):
+    """
+    Visualize a CSV file using rich table formatting
     
-if __name__ == "__main__":
-    # Example of how to use the RichArgumentParser
+    Args:
+        file_path (str): Path to the CSV file
+        title (str, optional): Title for the table. Defaults to filename
+        max_rows (int, optional): Limit number of rows displayed
+    """
+    # Read the CSV file
+    df = pd.read_csv(file_path)
+    
+    # Limit rows if specified
+    if max_rows is not None:
+        df = df.head(max_rows)
+    
+    # Use filename as default title if not provided
+    if title is None:
+        title = f"CSV: {file_path}"
+    
+    # Print the dataframe using rich table
+    print_dataframe_rich(df, title)
+
+def main():
     examples = [
         {
-            "cmd": "python script.py input_file --output result.txt",
-            "desc": "Basic usage"
+            "cmd": "python -m src.utils.displayutil data.csv",
+            "desc": "Basic usage - display entire CSV"
         },
         {
-            "cmd": "python script.py input_file --verbose --format json",
-            "desc": "Advanced usage with options"
+            "cmd": "python -m src.utils.displayutil data.csv --title 'My Data' --max-rows 10",
+            "desc": "Display first 10 rows with custom title"
         }
     ]
     
     parser = RichArgumentParser(
-        description="Example Script",
+        description="CSV File Visualizer - Display CSV files in a rich, formatted table",
         examples=examples
     )
-    parser.add_argument("input_file", help="Input file to process")
-    parser.add_argument("--output", help="Output file path")
-    parser.add_argument("--verbose", action="store_true", help="Increase output verbosity")
     
-    parser.print_help()
+    parser.add_argument("file", help="Path to the CSV file to visualize")
+    parser.add_argument("--title", help="Custom title for the table", default=None)
+    parser.add_argument("--max-rows", type=int, help="Limit number of rows displayed", default=None)
+    
+    args = parser.parse_args()
+    visualize_csv(args.file, args.title, args.max_rows)
+
+if __name__ == "__main__":
+    main()
