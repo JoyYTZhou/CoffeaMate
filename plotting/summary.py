@@ -142,7 +142,6 @@ class PostProcessor():
         self.present_yield(combined_all, signals, pjoin(self.tempdir, 'allYears'), regroup_dict)
         logging.info(f"Yield results are outputted in {pjoin(self.tempdir, 'allYears')}")
         print_dataframe_rich(combined_all, title="Yield for all years", show_index=True)
-        
     
     def update_wgt_info(self, outputdir) -> None:
         """Output the weight information based on per-year per-dataset xsec to a json file."""
@@ -315,7 +314,63 @@ class PostProcessor():
         combined.name = group
         
         return scaled_df, combined
+    
+    def _hadd_cutflows(self):
+        """Hadd cutflow table output from processor. Output a total cutflow for the group with all the sub datasets."""
+        def process_cf(dsname, dtdir, outdir):
+            logging.info(f"Dealing with {dsname} cutflow hadding now ...............................")
+            try:
+                df = CutflowProcessor.merge_cutflows(inputdir=dtdir, dataset_name=dsname, save=True, outpath=pjoin(outdir, f"{dsname}_cutflow.csv"))
+                return df
+            except Exception as e:
+                logging.error(f"Error combining cutflow tables for {dsname}: {e}")
+                return None
+        
+        results = self.dataset_iter.process_datasets(process_cf)
+        
+        for year, grouped in results.items():
+            for group, nested in grouped.items():
+                valid_dfs = {k: v for k, v in nested.items() if v is not None}
+                if valid_dfs:
+                    total_df = pd.concat(valid_dfs.values(), axis=1)
+                    total_df.to_csv(pjoin(self.tempdir, f"{group}_{year}_cf.csv"))
+                    if self._will_trsf:
+                        transferP = f"{self.transferP}/{year}/{group}"
+                        FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
 
+class PostPreselProcessor(PostProcessor):
+    def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
+        super().__init__(ppcfg, luminosity, groups, years)
+    
+    def hadd_results(self, *args, **kwargs):
+        self._hadd_cutflows()
+        self._hadd_csvouts()
+    
+    def _hadd_csvouts(self):
+        """Hadd csv output files of datasets into one csv file"""
+        all_dfs = []
+        def process_csv(year, group, dsname, dtdir, outdir):
+            out_files = FileSysHelper.glob_files(dtdir, f'{dsname}*output*csv')
+            dataframes = [pd.read_csv(f, index_col=0) for f in out_files]
+            total_df = pd.concat(dataframes, axis=0)
+            total_df['dataset'] = dsname
+            total_df['year'] = year
+            total_df['group'] = group
+            return total_df
+
+        for year, group, dsname, _ in self.dataset_iter.iterate_datasets(False):
+            logging.debug(f"Processing {year}, {group}, {dsname}")
+            dtdir = pjoin(self.inputdir, year, group)
+            outdir = pjoin(self.tempdir, year, group)
+            FileSysHelper.checkpath(outdir, createdir=True)
+            all_dfs.append(process_csv(dsname, dtdir, outdir))
+            
+        all_dfs = pd.concat(all_dfs, axis=0)
+        all_dfs.to_csv(pjoin(self.tempdir, 'all_output.csv'))
+        if self._will_trsf:
+            transferP = f"{self.transferP}/all_output.csv"
+            FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
+        
 class PostSkimProcessor(PostProcessor):
     def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
         super().__init__(ppcfg, luminosity, groups, years)
@@ -347,7 +402,7 @@ class PostSkimProcessor(PostProcessor):
     
     def hadd_results(self):
         self.__hadd_roots()
-        self.__hadd_cutflows()
+        self._hadd_cutflows()
         if self.cfg['IS_MC']:
             logging.debug("Reporting total number of weighted events.")
             self.__get_total_nwgt_events()
@@ -407,29 +462,6 @@ class PostSkimProcessor(PostProcessor):
         if corrupted:
             with open('all_corrupted.txt', 'w') as f:
                 f.write('\n'.join(corrupted))
-
-    def __hadd_cutflows(self):
-        """Hadd cutflow table output from processor. Output a total cutflow for the group with all the sub datasets."""
-        def process_cf(dsname, dtdir, outdir):
-            print(f"Dealing with {dsname} cutflow hadding now ...............................")
-            try:
-                df = CutflowProcessor.merge_cutflows(inputdir=dtdir, dataset_name=dsname, save=True, outpath=pjoin(outdir, f"{dsname}_cutflow.csv"))
-                return df
-            except Exception as e:
-                logging.error(f"Error combining cutflow tables for {dsname}: {e}")
-                return None
-        
-        results = self.dataset_iter.process_datasets(process_cf)
-        
-        for year, grouped in results.items():
-            for group, nested in grouped.items():
-                valid_dfs = {k: v for k, v in nested.items() if v is not None}
-                if valid_dfs:
-                    total_df = pd.concat(valid_dfs.values(), axis=1)
-                    total_df.to_csv(pjoin(self.tempdir, f"{group}_{year}_cf.csv"))
-                    if self._will_trsf:
-                        transferP = f"{self.transferP}/{year}/{group}"
-                        FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
 
     def __delete_corrupted(self, results_dict):
         """Delete the corrupted files in the filelist."""
