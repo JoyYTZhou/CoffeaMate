@@ -128,9 +128,9 @@ def create_table(dictionary, title):
     console.print(table)
 
 # Create a table from the DataFrame
-def print_dataframe_rich(df):
+def print_dataframe_rich(df, title):
     console = Console()
-    table = Table(title="DataFrame View")
+    table = Table(title=title)
     
     # Add columns
     for column in df.columns:

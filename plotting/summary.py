@@ -137,11 +137,11 @@ class PostProcessor():
         for year, combined in combined_dict.items():
             self.present_yield(combined, signals, pjoin(self.tempdir, year), regroup_dict)
             logging.info(f"Yield results are outputted in {pjoin(self.tempdir, year)}")
-            print_dataframe_rich(combined, title=f"Yield for {year}", show_index=True)
+            print_dataframe_rich(combined, title=f"Yield for {year}")
         _, combined_all = self.combine_merge_cf_results(resolved_dict, combined_dict, pjoin(self.tempdir, 'allYears'))
         self.present_yield(combined_all, signals, pjoin(self.tempdir, 'allYears'), regroup_dict)
         logging.info(f"Yield results are outputted in {pjoin(self.tempdir, 'allYears')}")
-        print_dataframe_rich(combined_all, title="Yield for all years", show_index=True)
+        print_dataframe_rich(combined_all, title="Yield for all years")
         
     
     def update_wgt_info(self, outputdir) -> None:
