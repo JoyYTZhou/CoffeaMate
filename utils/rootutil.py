@@ -151,3 +151,17 @@ class RootFileHandler:
     #         else:
     #             writable['extra'] = {branchname: ak.concatenate(arrlist[branchname]) for branchname in arrlist.keys()}
 
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python rootutil.py <root_file> [tree_name]")
+        sys.exit(1)
+
+    root_file = sys.argv[1]
+    tree_name = sys.argv[2] if len(sys.argv) > 2 else "Events"
+
+    try:
+        RootFileHandler.print_total_wgt(root_file, tree_name)
+        print("Processing completed successfully.")
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        sys.exit(1)
