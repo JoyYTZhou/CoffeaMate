@@ -5,7 +5,7 @@ from itertools import chain
 from src.utils.filesysutil import FileSysHelper, pjoin, pbase, pdir
 from src.utils.datautil import CutflowProcessor, DataSetUtil, DatasetIterator
 from src.utils.rootutil import RootFileHandler
-from src.utils.displayutil import create_table
+from src.utils.displayutil import create_table, print_dataframe_rich
 
 class PostProcessor():
     """Class for loading and hadding data from skims/predefined selections produced directly by Processor.
@@ -133,10 +133,16 @@ class PostProcessor():
         regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ'], 'HH': ['ggF']}
         signals = ['HH', 'ZH', 'ZZ']
         inputdir = self.transferP if self.transferP is not None else self.inputdir
-        _, combined_dict = self.merge_cf(inputdir=inputdir, outputdir=self.tempdir)
+        resolved_dict, combined_dict = self.merge_cf(inputdir=inputdir, outputdir=self.tempdir)
         for year, combined in combined_dict.items():
             self.present_yield(combined, signals, pjoin(self.tempdir, year), regroup_dict)
             logging.info(f"Yield results are outputted in {pjoin(self.tempdir, year)}")
+            print_dataframe_rich(combined, title=f"Yield for {year}", show_index=True)
+        _, combined_all = self.combine_merge_cf_results(resolved_dict, combined_dict, pjoin(self.tempdir, 'allYears'))
+        self.present_yield(combined_all, signals, pjoin(self.tempdir, 'allYears'), regroup_dict)
+        logging.info(f"Yield results are outputted in {pjoin(self.tempdir, 'allYears')}")
+        print_dataframe_rich(combined_all, title="Yield for all years", show_index=True)
+        
     
     def update_wgt_info(self, outputdir) -> None:
         """Output the weight information based on per-year per-dataset xsec to a json file."""
@@ -220,6 +226,37 @@ class PostProcessor():
         
         return resolved_wgted, combined_wgted 
     
+    def combine_merge_cf_results(self, resolved_wgted, combined_wgted, outputdir):
+        """Combine merge_cf results across all years.
+
+        Parameters
+        ----------
+        resolved_wgted : dict
+            Weighted cutflows per year from merge_cf
+        combined_wgted : dict
+            Combined weights per year from merge_cf
+        outputdir : str
+            Output directory for combined results
+
+        Returns
+        -------
+        tuple[pd.DataFrame, pd.DataFrame]
+            (weights resolved by channels, Combined weights)
+        """
+        # Combine weighted cutflows across years
+        combined_wgt_resolved = pd.concat(resolved_wgted.values(), axis=1)
+        combined_wgt_resolved.to_csv(pjoin(outputdir, "CombinedResolvedWgtOnly.csv"))
+
+        # Combine weights across years
+        combined_total_wgt = pd.concat(combined_wgted.values(), axis=1)
+        combined_total_wgt.to_csv(pjoin(outputdir, "CombinedWeights.csv"))
+
+        # Calculate combined efficiencies
+        combined_eff = CutflowProcessor.calculate_efficiency(combined_wgt_resolved)
+        combined_eff.filter(like='eff', axis=1).to_csv(pjoin(outputdir, "CombinedResolvedEffOnly.csv"))
+
+        return combined_wgt_resolved, combined_total_wgt
+
     @staticmethod
     def present_yield(wgt_resolved, signals, outputdir, regroup_dict=None) -> pd.DataFrame:
         """Present the yield dataframe with grouped datasets. Regroup if necessary.

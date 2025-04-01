@@ -127,6 +127,22 @@ def create_table(dictionary, title):
     # Print the table
     console.print(table)
 
+# Create a table from the DataFrame
+def print_dataframe_rich(df):
+    console = Console()
+    table = Table(title="DataFrame View")
+    
+    # Add columns
+    for column in df.columns:
+        table.add_column(str(column))
+    
+    # Add rows
+    for index, row in df.iterrows():
+        table.add_row(*[str(value) for value in row])
+    
+    # Print the table
+    console.print(table)
+    
 if __name__ == "__main__":
     # Example of how to use the RichArgumentParser
     examples = [
