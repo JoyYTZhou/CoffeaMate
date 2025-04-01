@@ -172,7 +172,7 @@ class CutflowProcessor:
         Returns
         -------
         tuple[pd.DataFrame, pd.Series]
-            (Scaled cutflow dataframe, Combined group weights)
+            (Scaled cutflow dataframe, Total number of weighted events)
         """
         # Calculate physics weights
         physics_weights = {

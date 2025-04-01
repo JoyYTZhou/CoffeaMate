@@ -134,12 +134,11 @@ class PostProcessor():
         signals = ['HH', 'ZH', 'ZZ']
         inputdir = self.transferP if self.transferP is not None else self.inputdir
         resolved_dict, combined_dict = self.merge_cf(inputdir=inputdir, outputdir=self.tempdir)
-        logging.debug(resolved_dict)
-        logging.debug(combined_dict)
         for year, combined in combined_dict.items():
             self.present_yield(combined, signals, pjoin(self.tempdir, year), regroup_dict)
             logging.info(f"Yield results are outputted in {pjoin(self.tempdir, year)}")
             print_dataframe_rich(combined, title=f"Yield for {year}")
+
         FileSysHelper.checkpath(pjoin(self.tempdir, 'allYears'))
         _, combined_all = self.combine_merge_cf_results(resolved_dict, combined_dict, pjoin(self.tempdir, 'allYears'))
         self.present_yield(combined_all, signals, pjoin(self.tempdir, 'allYears'), regroup_dict)
@@ -209,12 +208,16 @@ class PostProcessor():
 
             # Combine results
             resolved_all = pd.concat(resolved_list, axis=1)
+            if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
+                print_dataframe_rich(resolved_all, title=f"Resolved Cutflow for {year}")
             resolved_all.to_csv(pjoin(year_outdir, "allDatasetCutflow.csv"))
             
             # Extract weighted events
             wgt_resolved = resolved_all.filter(like='wgt', axis=1)
             wgt_resolved.columns = wgt_resolved.columns.str.replace('_wgt$', '', regex=True)
             wgt_resolved.to_csv(pjoin(year_outdir, "ResolvedWgtOnly.csv"))
+            if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
+                print_dataframe_rich(wgt_resolved, title=f"Resolved Weighted Cutflow for {year}")
             
             # Calculate efficiencies
             eff_df = CutflowProcessor.calculate_efficiency(wgt_resolved)
@@ -315,6 +318,10 @@ class PostProcessor():
         
         # Set group name for combined weights
         combined.name = group
+        
+        logger_level = logging.getLogger().getEffectiveLevel()
+        if logger_level == logging.DEBUG:
+            print_dataframe_rich(scaled_df, title=f"Scaled Cutflow (by lumi * xsec) for {group}")
         
         return scaled_df, combined
     
