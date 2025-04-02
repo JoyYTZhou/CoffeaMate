@@ -149,6 +149,9 @@ class weightedSelection(sequentialSelection):
             if self._perevtwgt is not None:
                 wgtevcutflow = [np.sum(self._perevtwgt)]
                 logging.debug(f"Initial weight: {wgtevcutflow[0]}")
+                logging.debug(f"Initial weight cutflow {wgtevcutflow}")
+                logging.debug(f"Data type of arrays is {type(self._perevtwgt)}")
+                logging.debug(f"Data type of initial weight is {type(wgtevcutflow[0])}")
                 wgtevcutflow.extend([np.sum(ak.to_numpy(maskwgt), initial=0) for maskwgt in maskwgtcutflow])
                 logging.debug("Weight cutflow: %s", wgtevcutflow)
             else:
