@@ -1,4 +1,5 @@
 import uproot, logging, subprocess, re, sys
+import numpy as np
 import awkward as ak
 from src.utils.filesysutil import FileSysHelper
 from rich import print as rprint
@@ -120,10 +121,14 @@ class RootFileHandler:
     @staticmethod
     def print_total_wgt(file_path, tree_name='Events', branch_name='Generator_weight') -> float:
         """Print the total weight of the given branch in the given tree."""
-        total_weight = ak.sum(uproot.open(file_path)[tree_name][branch_name].array())
-        rprint(f"Total weight for {branch_name} in {tree_name}: [cyan]{total_weight}[/cyan]")
+        weights = uproot.open(file_path)[tree_name][branch_name].array()
+        total_weight = ak.sum(weights)
+        total_length = len(weights)
+        rprint(f"Total weight (ak.sum) for {branch_name} in {tree_name}: [cyan]{total_weight}[/cyan]")
+        rprint(f"Total weight (np.sum) for {branch_name} in {tree_name}: [cyan]{np.sum(weights)}[/cyan]") 
+        rprint(f"Total # Events for {branch_name} in {tree_name}: [cyan]{total_length}[/cyan]")
 
-        return total_weight
+        return total_weight, total_length
 
     # @staticmethod
     # def write_obj(writable, filelist, objnames, extra=[]) -> None:

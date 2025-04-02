@@ -130,21 +130,41 @@ def create_table(dictionary, title):
 
 def print_dataframe_rich(df, title):
     console = Console()
-    table = Table(title=title)
+    table = Table(
+        title=f"[bold yellow]{title}[/bold yellow]",
+        show_header=True,
+        header_style="bold magenta",
+        border_style="blue"
+    )
     
     # Add index column first
-    table.add_column("Index", style="bold cyan")
+    table.add_column("Index", style="bold cyan", justify="right")
 
-    # Add remaining columns
-    for column in df.columns:
-        table.add_column(str(column))
+    # Add remaining columns with different styles
+    # Extended color palette for better distinction between columns
+    colors = ["green", "magenta", "red", "blue", "yellow", "cyan", "purple",
+             "bright_green", "bright_red", "bright_blue", "bright_magenta"]
+
+    for idx, column in enumerate(df.columns):
+        color = colors[idx % len(colors)]  # Cycle through colors if more columns than colors
+        table.add_column(
+            f"[bold {color}]{str(column)}[/bold {color}]",
+            style=color,
+            justify="center"
+        )
     
-    # Add rows with index
+    # Add rows without any dim styling
     for index, row in df.iterrows():
-        table.add_row(str(index), *[str(value) for value in row])
-    
-    # Print the table
-    console.print(table)
+        row_values = [str(value) for value in row]
+        table.add_row(str(index), *row_values)
+
+    # Print the table with a surrounding panel
+    panel = Panel.fit(
+        table,
+        border_style="bold blue",
+        padding=(1, 2)
+    )
+    console.print(panel)
 
 def visualize_csv(file_path, title=None, max_rows=None):
     """
