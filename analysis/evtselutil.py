@@ -50,7 +50,7 @@ class BaseEventSelections:
 
     def __del__(self):
         """Cleanup method called when the instance is being destroyed."""
-        print(f"Deleting instance of {self.__class__.__name__}")
+        logging.debug(f"Deleting instance of {self.__class__.__name__}")
 
     def __enter__(self):
         """Context manager entry point."""

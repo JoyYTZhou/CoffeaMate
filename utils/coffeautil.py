@@ -117,6 +117,7 @@ class sequentialSelection(PackedSelection):
 class weightedSelection(sequentialSelection):
     def __init__(self, perevtwgt, dtype="uint32"):
         """An inherited class that represents a set of selections on a set of events with weights
+
         Parameters
         - ``perevtwgt`` : dask.array.Array that represents the weights of the events
         """
@@ -134,18 +135,22 @@ class weightedSelection(sequentialSelection):
             mask1 = self.any(cut)
             mask2 = self.all(*(names[: i + 1]))
             maskwgt = self._perevtwgt[mask2]
+
             masksonecut.append(mask1)
             maskscutflow.append(mask2)
             maskwgtcutflow.append(maskwgt)
 
         if not self.delayed_mode:
+            logging.debug(f"Using eager mode for cutflow computation")
             nevonecut = [len(self._data)]
             nevcutflow = [len(self._data)]
             nevonecut.extend(np.sum(masksonecut, axis=1, initial=0))
             nevcutflow.extend(np.sum(maskscutflow, axis=1, initial=0))
             if self._perevtwgt is not None:
                 wgtevcutflow = [np.sum(self._perevtwgt)]
+                logging.debug(f"Initial weight: {wgtevcutflow[0]}")
                 wgtevcutflow.extend([np.sum(ak.to_numpy(maskwgt), initial=0) for maskwgt in maskwgtcutflow])
+                logging.debug("Weight cutflow: %s", wgtevcutflow)
             else:
                 wgtevcutflow = None
 
