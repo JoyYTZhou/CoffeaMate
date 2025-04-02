@@ -1,4 +1,5 @@
 import uproot, logging, subprocess, re, sys
+import awkward as ak
 from src.utils.filesysutil import FileSysHelper
 
 class RootFileHandler:
@@ -118,7 +119,7 @@ class RootFileHandler:
     @staticmethod
     def print_total_wgt(file_path, tree_name='Events', branch_name='Generator_weight') -> float:
         """Print the total weight of the given branch in the given tree."""
-        total_weight = uproot.open(file_path)[tree_name][branch_name].sum()
+        total_weight = ak.sum(uproot.open(file_path)[tree_name][branch_name].array())
         print(f"Total weight for {branch_name} in {tree_name}: {total_weight}")
 
         return total_weight
@@ -161,7 +162,6 @@ if __name__ == "__main__":
 
     try:
         RootFileHandler.print_total_wgt(root_file, tree_name)
-        print("Processing completed successfully.")
     except Exception as e:
         print(f"Error: {str(e)}")
         sys.exit(1)
