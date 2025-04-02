@@ -1,4 +1,4 @@
-import uproot, logging, subprocess, re
+import uproot, logging, subprocess, re, sys
 from src.utils.filesysutil import FileSysHelper
 
 class RootFileHandler:
