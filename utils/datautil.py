@@ -699,6 +699,8 @@ class DataSetUtil:
                 else:  # missing
                     results["missing_files"].append(result_info)
         
+        logging.warning(f"Total of {len(results['missing_files'])} missing files in {root_dir}")
+        
         return results
     
     @staticmethod
