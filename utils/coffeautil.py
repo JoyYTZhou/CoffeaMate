@@ -147,7 +147,7 @@ class weightedSelection(sequentialSelection):
             nevonecut.extend(np.sum(masksonecut, axis=1, initial=0))
             nevcutflow.extend(np.sum(maskscutflow, axis=1, initial=0))
             if self._perevtwgt is not None:
-                initial_weight = np.sum(self._perevtwgt, dtype=np.float64)
+                initial_weight = np.sum(ak.to_numpy(self._perevtwgt), dtype=np.float64)
                 wgtevcutflow = [initial_weight]
                 logging.debug(f"Initial weight: {initial_weight}")
                 logging.debug(f"Initial weight in list: {wgtevcutflow[0]}")
