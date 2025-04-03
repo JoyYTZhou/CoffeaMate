@@ -20,6 +20,14 @@ runcom = subprocess.run
 class CutflowProcessor:
     """Processes and manipulates cutflow tables."""
     @staticmethod
+    def check_wgt_exist(df: pd.DataFrame) -> bool:
+        """Check if weighted cutflow column exists."""
+        if df.filter(like='wgt').empty:
+            logging.warning("No weighted cutflow column found.")
+            return False
+        return True
+        
+    @staticmethod
     def check_events_match(df, col_name, rootfiles, empty_kwd='empty') -> bool:
         """Validates if events count in cutflow matches root files.
         
@@ -530,7 +538,7 @@ class DataSetUtil:
         """Extract UUIDs from dataset JSON files.
         
         Parameters
-        - json_path: path to the JSON.GZ file containing dataset information
+        - json_path: path to the JSON.GZ file containing dataset information directly collected by datacollect.py
         
         Returns
         - dict: Nested dictionary containing dataset information and UUIDs
@@ -557,6 +565,8 @@ class DataSetUtil:
             # Get metadata
             if 'metadata' in dataset_info and 'shortname' in dataset_info['metadata']:
                 shortname = dataset_info['metadata']['shortname']
+            else:
+                logging.error("Missing metadata or shortname in dataset_info.")
             
             # Get UUIDs from files
             if 'files' in dataset_info:
@@ -565,16 +575,17 @@ class DataSetUtil:
                         uuids.append(file_info['uuid'])
             result[shortname] = uuids
         
-        return result
+        return result, dataset_info['metadata']
 
     @staticmethod
-    def _validate_single_pair(uuid_info, root_dir, csv_dir):
+    def _validate_single_pair(uuid_info, root_dir, csv_dir, is_mc):
         """Helper function to validate a single UUID pair.
         
         Parameters
         - uuid_info: tuple of (shortname, uuid)
         - root_dir: directory containing root files
         - csv_dir: directory containing cutflow CSV files
+        - is_mc: boolean indicating if the dataset is MC (would contain weight column if so)
         
         Returns
         - dict: Validation result for this UUID
@@ -604,6 +615,14 @@ class DataSetUtil:
         # Validate event counts
         try:
             df = pd.read_csv(csv_files[0], index_col=0)
+            if is_mc: 
+                if not CutflowProcessor.check_wgt_exist(df):
+                    return ("mismatched", {
+                        "shortname": shortname,
+                        "root": root_files,
+                        "csv": csv_files[0],
+                        "uuid": uuid,
+                    })
             events_match = CutflowProcessor.check_events_match(
                 df=df,
                 col_name='raw',
@@ -644,7 +663,8 @@ class DataSetUtil:
         - dict: Dictionary with validation results
         """
         # Get dataset information
-        dataset_info = DataSetUtil.extract_uuids(json_path)
+        dataset_info, meta_data = DataSetUtil.extract_uuids(json_path)
+        is_mc = meta_data['is_mc']
         
         # Prepare list of work items
         work_items = [
@@ -667,7 +687,8 @@ class DataSetUtil:
         with mp.Pool(n_workers) as pool:
             validate_func = partial(DataSetUtil._validate_single_pair, 
                                  root_dir=root_dir, 
-                                 csv_dir=csv_dir)
+                                 csv_dir=csv_dir,
+                                 is_mc=is_mc)
             
             # Process all pairs and collect results
             for result_type, result_info in pool.imap_unordered(validate_func, work_items):
