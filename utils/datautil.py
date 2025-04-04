@@ -11,6 +11,7 @@ import logging
 import multiprocessing as mp
 from functools import partial
 from src.utils.filesysutil import pjoin, FileSysHelper
+from src.utils.displayutil import create_table
 
 parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 datadir = pjoin(parent_directory, 'data', 'preprocessed')
