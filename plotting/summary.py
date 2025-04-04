@@ -74,6 +74,8 @@ class PostProcessor():
         if self._will_trsf:
             for year in self.years:
                 FileSysHelper.checkpath(pjoin(self.transferP, year), createdir=True, raiseError=False)
+        
+        logging.debug(f"Processing years: {self.years}")
 
         logging.debug(f"Processing years: {self.years}")
 
