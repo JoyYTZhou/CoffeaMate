@@ -9,7 +9,6 @@ from rich.markdown import Markdown
 import argparse
 from typing import List, Dict, Optional, Union
 import pandas as pd
-from datetime import datetime
 
 class RichArgumentParser(argparse.ArgumentParser):
     """Custom argument parser that uses rich for help display"""
@@ -98,30 +97,6 @@ class RichArgumentParser(argparse.ArgumentParser):
                 examples_md += f"**{example.get('desc', 'Example')}:**\n"
                 examples_md += f"```bash\n{example['cmd']}\n```\n\n"
             self.console.print(Markdown(examples_md))
-
-def print_format_directory_structure(dir_structure) -> None:
-    """
-    Format a directory structure dictionary into a readable string and print it
-    
-    Args:
-        dir_structure: Dictionary with structure {year: {groupname: {"lastUpdated": timestamp, "size": Megabytes}}}
-    
-    """
-    output = []
-    
-    for year in sorted(dir_structure.keys()):
-        output.append(f"\n{year}:")
-        for group, details in sorted(dir_structure[year].items()):
-            # Convert timestamp to human readable format
-            last_updated = datetime.fromtimestamp(details["lastUpdated"]).strftime("%Y-%m-%d %H:%M:%S")
-            # Format size to 2 decimal places
-            size = f"{details['size']:.2f}"
-            
-            output.append(f"  └── {group}")
-            output.append(f"      ├── Last Updated: {last_updated}")
-            output.append(f"      └── Size: {size} MB")
-    
-    print("\n".join(output))
 
 def create_rich_logger() -> RichHandler:
     """Create a Rich logger handler with standard configuration"""
