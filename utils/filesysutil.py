@@ -1,4 +1,4 @@
-import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch, psutil, logging, time, gc, mmap
+import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch, psutil, logging, time, gc, mmap, sys
 from XRootD import client
 from pathlib import Path
 
@@ -259,6 +259,60 @@ class FileSysHelper:
                     logging.debug(f"File {dest_file} exists. Skipping.")
 
     @staticmethod
+    def query_directory_structure(base_dir, prefix=PREFIX):
+        """Query a directory and return a nested dictionary of its structure.
+
+        Returns a dictionary with structure:
+        {year: {groupname: {"lastUpdated": timestamp, "size": bytes}}}
+        """
+        if is_remote(base_dir):
+            xrdhelper = XRootDHelper(prefix)
+            clean_base = strip_xrd_prefix(base_dir)
+            status, years = xrdhelper.xrdfs_client.dirlist(clean_base)
+            if not status.ok:
+                raise Exception(f"Failed to list directory {base_dir}: {status.message}")
+
+            result = {}
+            for year in years.dirlist:
+                year_path = f"{clean_base}/{year.name}"
+                status, groups = xrdhelper.xrdfs_client.dirlist(year_path)
+                if not status.ok:
+                    continue
+
+                result[year.name] = {}
+                for group in groups.dirlist:
+                    group_path = f"{year_path}/{group.name}"
+                    status, stat_info = xrdhelper.xrdfs_client.stat(group_path)
+                    if not status.ok:
+                        continue
+
+                    result[year.name][group.name] = {
+                        "lastUpdated": stat_info.modtime,
+                        "size": stat_info.size
+                    }
+            return result
+        else:
+            result = {}
+            for year in os.listdir(base_dir):
+                year_path = pjoin(base_dir, year)
+                if not os.path.isdir(year_path):
+                    continue
+
+                result[year] = {}
+                for group in os.listdir(year_path):
+                    group_path = pjoin(year_path, group)
+                    if not os.path.isdir(group_path):
+                        continue
+
+                    result[year][group] = {
+                        "lastUpdated": os.path.getmtime(group_path),
+                        "size": sum(os.path.getsize(pjoin(dirpath, f))
+                                for dirpath, _, filenames in os.walk(group_path)
+                                for f in filenames)
+                    }
+            return result
+ 
+    @staticmethod
     def get_file_size(filepath, prefix=PREFIX) -> int:
         """Get the size of a file in bytes. Works for both local and remote files.
         
@@ -385,6 +439,7 @@ class XRootDHelper:
             status, _ = self.xrdfs_client.rm(pjoin(dirname, file))
             if not status.ok:
                 raise Exception(f"Failed to remove {file}: {status.message}")
+ 
 
     @staticmethod 
     def call_xrdcp(src_file, dest_file, prefix=PREFIX):
@@ -473,3 +528,8 @@ def display_top(snapshot, key_type='lineno', limit=10):
         print("%s other: %.1f KiB" % (len(other), size / 1024))
     total = sum(stat.size for stat in top_stats)
     print("Total allocated size: %.1f KiB" % (total / 1024))
+
+if __name__ == "__main__":
+    file_helper = FileSysHelper()
+    arg = sys.argv[1]
+    print(file_helper.query_directory_structure(arg, full_path=False))
