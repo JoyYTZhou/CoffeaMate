@@ -1,4 +1,5 @@
 import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch, psutil, logging, time, gc, mmap, sys
+from datetime import datetime
 from XRootD import client
 from pathlib import Path
 from displayutil import display_directory_stats
@@ -531,6 +532,31 @@ def display_top(snapshot, key_type='lineno', limit=10):
         print("%s other: %.1f KiB" % (len(other), size / 1024))
     total = sum(stat.size for stat in top_stats)
     print("Total allocated size: %.1f KiB" % (total / 1024))
+
+def print_format_directory_structure(dir_structure) -> None:
+    """
+    Format a directory structure dictionary into a readable string and print it
+    
+    Args:
+        dir_structure: Dictionary with structure {year: {groupname: {"lastUpdated": timestamp, "size": Megabytes}}}
+    
+    """
+    output = []
+    
+    for year in sorted(dir_structure.keys()):
+        output.append(f"\n{year}:")
+        for group, details in sorted(dir_structure[year].items()):
+            # Convert timestamp to human readable format
+            last_updated = datetime.fromtimestamp(details["lastUpdated"]).strftime("%Y-%m-%d %H:%M:%S")
+            # Format size to 2 decimal places
+            size = f"{details['size']:.2f}"
+            
+            output.append(f"  └── {group}")
+            output.append(f"      ├── Last Updated: {last_updated}")
+            output.append(f"      └── Size: {size} MB")
+    
+    print("\n".join(output))
+
 
 if __name__ == "__main__":
     file_helper = FileSysHelper()
