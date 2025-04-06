@@ -8,6 +8,7 @@ from rich.progress import track
 from rich.markdown import Markdown
 import argparse
 from typing import List, Dict, Optional, Union
+from datetime import datetime
 import pandas as pd
 
 class RichArgumentParser(argparse.ArgumentParser):
@@ -122,24 +123,25 @@ def display_directory_stats(dir_stats: dict):
     main_table = Table(title="Directory Statistics", show_header=True, header_style="bold magenta")
     main_table.add_column("Year", style="cyan")
     main_table.add_column("Group Details")
-    
-    for year, groups in sorted(dir_stats.items()):
-        # Create nested table for groups
-        group_table = Table(show_header=True, header_style="bold blue", show_edge=False, padding=(0, 2))
-        group_table.add_column("Group", style="green")
-        group_table.add_column("Last Updated", style="yellow")
-        group_table.add_column("Size (MB)", justify="right", style="red")
+    # Create a single flat table
+    table = Table(title="Directory Statistics", show_header=True, header_style="bold magenta")
+    table.add_column("Year", style="cyan")
+    table.add_column("Group", style="green")
+    table.add_column("Last Updated", style="yellow")
+    table.add_column("Size (MB)", justify="right", style="red")
         
+    # Add all data in sorted order
+    for year, groups in sorted(dir_stats.items()):
         for group_name, stats in sorted(groups.items()):
-            group_table.add_row(
+            last_updated = datetime.fromtimestamp(stats["lastUpdated"]).strftime("%Y-%m-%d %H:%M:%S")
+            table.add_row(
+                str(year),
                 group_name,
-                stats["lastUpdated"].strftime("%Y-%m-%d %H:%M"),
+                last_updated,
                 f"{stats['size']:.2f}"
             )
         
-        main_table.add_row(str(year), group_table)
-    
-    console.print(main_table)
+    console.print(table)
     
 def create_table(dictionary, title):
     # Create a Rich console
