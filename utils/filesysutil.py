@@ -532,4 +532,4 @@ def display_top(snapshot, key_type='lineno', limit=10):
 if __name__ == "__main__":
     file_helper = FileSysHelper()
     arg = sys.argv[1]
-    print(file_helper.query_directory_structure(arg, full_path=False))
+    print(file_helper.query_directory_structure(arg))
