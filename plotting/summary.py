@@ -1,4 +1,5 @@
-import logging, json, re, os
+import logging, json, os
+from datetime import datetime
 import pandas as pd
 from itertools import chain
 
@@ -76,11 +77,15 @@ class PostProcessor():
         
         logging.debug(f"Processing years: {self.years}")
 
+        logging.debug(f"Processing years: {self.years}")
+
     def _init_metadata(self):
         """Load metadata for each year."""
         self.meta_dict = {}
         query_dir = pjoin(self.cfg['DATA_DIR'], 'weightedMC' if self.cfg['IS_MC'] else 'availableData')
+        logging.debug(f"Getting metadata from {query_dir}")
         for year in self.years:
+            logging.debug(f"Getting metadata for {year}.")
             if os.path.exists(pjoin(query_dir, f"{year}.json")):
                 with open(pjoin(query_dir, f"{year}.json"), 'r') as f:
                     self.meta_dict[year] = json.load(f)
@@ -425,13 +430,18 @@ class PostSkimProcessor(PostProcessor):
         else:
             query_dir = pjoin(self.cfg['DATA_DIR'], 'availableData')
         logging.debug(f"Using metadata json file {query_dir}")
+        years_to_process = []
         for year in self.years:
             if os.path.exists(pjoin(query_dir, f"{year}.json")):
+                logging.debug(f"Loading metadata for {year}")
                 with open(pjoin(query_dir, f"{year}.json"), 'r') as f:
                     self.meta_dict[year] = json.load(f)
+                years_to_process.append(year)
             else:
-                self.years.remove(year)
                 logging.warning(f"Metadata file not found for {year}. Removing from processing.")
+
+        self.years = years_to_process
+        logging.info(f"the following years are loaded: {self.meta_dict.keys()}")
     
     def check_and_clean(self):
         self.__check_roots()
@@ -444,8 +454,8 @@ class PostSkimProcessor(PostProcessor):
         self.__clean_roots()
     
     def hadd_results(self):
-        # self.__hadd_roots()
-        # self._hadd_cutflows()
+        self.__hadd_roots()
+        self._hadd_cutflows()
         if self.cfg['IS_MC']:
             logging.debug("Reporting total number of weighted events.")
             self.__get_total_nwgt_events()
@@ -475,7 +485,7 @@ class PostSkimProcessor(PostProcessor):
                 corrupted[year][group] = results
         if corrupted:
             logging.warning(f"Corrupted files found: {corrupted}")
-            timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f"{self.cfg['DIRNAME']}_corrupted_{timestamp}.json"
             with open(filename, 'w') as f:
                 json.dump(corrupted, f)
@@ -543,7 +553,6 @@ class PostSkimProcessor(PostProcessor):
             if os.path.exists(meta_file):
                 with open(meta_file, 'r') as f:
                     new_meta_dict[year] = json.load(f)
-                DataSetUtil.print_json_as_rich_table(new_meta_dict[year])
             else:
                 new_meta_dict[year] = {}
                 logging.debug(f"Metadata file not found for {year}. Creating new metadata table.")
