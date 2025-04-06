@@ -263,7 +263,7 @@ class FileSysHelper:
         """Query a directory and return a nested dictionary of its structure.
 
         Returns a dictionary with structure:
-        {year: {groupname: {"lastUpdated": timestamp, "size": bytes}}}
+        {year: {groupname: {"lastUpdated": timestamp, "size": Megabytes}}}
         """
         if is_remote(base_dir):
             xrdhelper = XRootDHelper(prefix)
@@ -286,9 +286,11 @@ class FileSysHelper:
                     if not status.ok:
                         continue
 
+                    size = stat_info.size/1024/1024 # Convert to MB
+
                     result[year.name][group.name] = {
                         "lastUpdated": stat_info.modtime,
-                        "size": stat_info.size
+                        "size": size
                     }
             return result
         else:
