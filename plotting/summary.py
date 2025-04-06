@@ -457,6 +457,8 @@ class PostSkimProcessor(PostProcessor):
             with open(filename, 'r') as f:
                 all_corrupted = json.load(f)
             self.__delete_corrupted(all_corrupted)
+            os.remove(filename)
+            logging.info(f"Deleted corrupted files list {filename}")
     
     def __check_roots(self) -> dict:
         """Check if the root files are corrupted by checking if the required keys are present. Save the corrupted files (full path with xrdfs prefix) to a text file.

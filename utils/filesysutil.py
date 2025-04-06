@@ -221,6 +221,9 @@ class FileSysHelper:
             xrdhelper = XRootDHelper(prefix)
             for file in filelist:
                 file = strip_xrd_prefix(file)
+                if not xrdhelper.check_path(file, createdir=False, raiseError=False):
+                    logging.warning(f"File {file} does not exist. Skipping.")
+                    continue
                 status, _ = xrdhelper.xrdfs_client.rm(file)
                 if not status.ok:
                     raise Exception(f"Failed to remove {file}: {status.message}")
@@ -355,7 +358,7 @@ class XRootDHelper:
         return stat_info.size
     
     def check_path(self, dirname, createdir=True, raiseError=False) -> bool:
-        """Check if a directory exists. If not will create one.
+        """Check if a directory/file exists. If not will create directory of the same name (DO NOT USE FOR FILES).
         
         Return 
         - True if the path exists, False otherwise"""
