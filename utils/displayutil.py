@@ -110,6 +110,37 @@ def create_status_console() -> Console:
     """Create a console for status updates"""
     return Console()
 
+def display_directory_stats(dir_stats: dict):
+    """Display directory statistics using Rich tables.
+    
+    Args:
+        dir_stats (dict): Dictionary with structure {year: {groupname: {"lastUpdated": timestamp, "size": Megabytes}}}
+    """
+    console = Console()
+    
+    # Create main table
+    main_table = Table(title="Directory Statistics", show_header=True, header_style="bold magenta")
+    main_table.add_column("Year", style="cyan")
+    main_table.add_column("Group Details")
+    
+    for year, groups in sorted(dir_stats.items()):
+        # Create nested table for groups
+        group_table = Table(show_header=True, header_style="bold blue", show_edge=False, padding=(0, 2))
+        group_table.add_column("Group", style="green")
+        group_table.add_column("Last Updated", style="yellow")
+        group_table.add_column("Size (MB)", justify="right", style="red")
+        
+        for group_name, stats in sorted(groups.items()):
+            group_table.add_row(
+                group_name,
+                stats["lastUpdated"].strftime("%Y-%m-%d %H:%M"),
+                f"{stats['size']:.2f}"
+            )
+        
+        main_table.add_row(str(year), group_table)
+    
+    console.print(main_table)
+    
 def create_table(dictionary, title):
     # Create a Rich console
     console = Console()

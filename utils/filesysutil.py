@@ -1,6 +1,7 @@
 import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch, psutil, logging, time, gc, mmap, sys
 from XRootD import client
 from pathlib import Path
+from displayutil import display_directory_stats
 
 runcom = subprocess.run
 pjoin = os.path.join
@@ -534,4 +535,4 @@ def display_top(snapshot, key_type='lineno', limit=10):
 if __name__ == "__main__":
     file_helper = FileSysHelper()
     arg = sys.argv[1]
-    print(file_helper.query_directory_structure(arg, full_path=False))
+    display_directory_stats(file_helper.query_directory_structure(arg))
