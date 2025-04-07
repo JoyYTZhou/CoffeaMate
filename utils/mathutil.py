@@ -3,7 +3,7 @@ import numpy as np
 import os
 import pandas as pd
 from scipy.stats import pearsonr
-from src.analysis.objutil import Object
+from src.analysis.objutil import ObjectMasker, ObjectProcessor
 
 pjoin = os.path.join
 
@@ -29,7 +29,7 @@ class MathUtil:
         - df: DataFrame
         - obj_name: Object name
         """
-        fv = Object.fourvector(df, obj_name, sort=False)
+        fv, _ = ObjectProcessor.fourvector(df, obj_name, sort=False)
         df[f'{obj_name}_px'] = fv.px
         df[f'{obj_name}_py'] = fv.py
         df[f'{obj_name}_pz'] = fv.pz
@@ -44,8 +44,8 @@ class MathUtil:
         - objy: Object 2 name
         - inv_m_name: Name of the invariant mass column
         """
-        fvx = Object.fourvector(df, objx, sort=False)
-        fvy = Object.fourvector(df, objy, sort=False)
+        fvx, _ = ObjectProcessor.fourvector(df, objx, sort=False)
+        fvy, _ = ObjectProcessor.fourvector(df, objy, sort=False)
         df[inv_m_name] = (fvx+fvy).mass
     
     @staticmethod
@@ -58,16 +58,16 @@ class MathUtil:
         - objy: Object 2 name
         - dR_name: Name of the delta R column
         """
-        fvx = Object.fourvector(df, objx, sort=False)
-        fvy = Object.fourvector(df, objy, sort=False)
+        fvx, _ = ObjectProcessor.fourvector(df, objx, sort=False)
+        fvy, _ = ObjectProcessor.fourvector(df, objy, sort=False)
         df[dR_name] = fvx.deltaR(fvy)
     
     @staticmethod
     def add_system_4vec(df, objx:'str', objy:'str', sys_name:'str') -> None:
         """Add system fourvector column to the dataframe.
         """
-        fvx = Object.fourvector(df, objx, sort=False)
-        fvy = Object.fourvector(df, objy, sort=False)
+        fvx, _ = ObjectProcessor.fourvector(df, objx, sort=False)
+        fvy, _ = ObjectProcessor.fourvector(df, objy, sort=False)
         inv_sys = fvx + fvy
         df[f'{sys_name}_pt'] = inv_sys.pt
         df[f'{sys_name}_eta'] = inv_sys.eta

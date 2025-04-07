@@ -1,13 +1,15 @@
 import mplhep as hep
 import numpy as np
 import pandas as pd
-import json
+import json, logging
 from matplotlib.ticker import ScalarFormatter
 
-from src.utils.datautil import arr_handler, iterwgt, load_csvs
-from src.analysis.objutil import Object
+from src.utils.datautil import DataLoader, iterwgt, arr_handler
+from src.analysis.objutil import ObjectMasker, ObjectProcessor
 from src.utils.filesysutil import FileSysHelper, pjoin, pdir, pbase
 from src.utils.plotutil import HistogramHelper, PlotStyle
+
+luminosity = {"2022PreEE": 41.5/2 * 1000, "2022PostEE": 41.5 * 1000/2, "2023Summer": 32.7 * 1000}
 
 class CSVPlotter:
     """Simplified plotter for CSV data"""
@@ -84,49 +86,50 @@ class CSVPlotter:
             self.__save_cutflow(cf_df, cf_dict, selname, postp_output, group)
             
             if cf_dict:
-                list_of_df.extend([df for df in self.data_dict.get(group, {}).values() if df is not None])
+                df = self.data_dict.get(group, None)
+                if df is not None: list_of_df.append(df)
 
         return pd.concat(list_of_df, axis=0).reset_index().drop('index', axis=1)
     
     def __process_group(self, group, load_dir, postp_output, per_evt_wgt, extraprocess, selname, signals, sig_factor, luminosity):
         """Process a single group of datasets."""
         cf_dict = {}
-        cf_df = load_csvs(load_dir, f'{group}*cf.csv')[0]
+        cf_df = DataLoader.load_csvs(load_dir, f'{group}*cf.csv')[0]
         self.data_dict[group] = {}
+
+        df = self.__process_group_out(
+            group, load_dir, postp_output, per_evt_wgt,
+            extraprocess, signals, sig_factor, luminosity
+        )
+
+        if df is not None:
+            self.data_dict[group] = df
         
-        for ds in self.meta_dict[group].keys():
-            df = self.__process_dataset(
-                group, ds, load_dir, postp_output,
-                per_evt_wgt, extraprocess, signals,
-                sig_factor, luminosity
-            )
-            
-            dsname = self.meta_dict[group][ds]['shortname']
-            if df is not None:
-                self.data_dict[group][dsname] = df
-                self.__addextcf(cf_dict, df, dsname, per_evt_wgt)
-            else:
+        for ds, meta in self.meta_dict[group].items():
+            dsname = meta['shortname']
+            if df[df.dataset == dsname].empty:
                 cf_dict[f'{dsname}_raw'] = 0
                 cf_dict[f'{dsname}_wgt'] = 0
+                continue
+            self.__addextcf(cf_dict, df[df.dataset==dsname], dsname, per_evt_wgt)
                 
         return cf_dict, cf_df
     
-    def __process_dataset(self, group, ds, load_dir, postp_output, per_evt_wgt, extraprocess, signals, sig_factor, luminosity):
+    def __process_group_out(self, group, load_dir, postp_output, per_evt_wgt, extraprocess, signals, sig_factor, luminosity):
         """Process a single dataset."""
-        rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor, luminosity)
-        dsname = self.meta_dict[group][ds]['shortname']
-        
-        def add_wgt(dfs, rwfac, ds, group):
+        def add_wgt(dfs):
             df = dfs[0]
             if df.empty:
                 return None
-            df['weight'] = df[per_evt_wgt] * rwfac
-            df['dataset'] = ds
-            df['group'] = group
+            for ds, meta in self.meta_dict[group].items():
+                dsname = meta['shortname']
+                rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor, luminosity)
+                df.loc[df.dataset == dsname, 'weight'] = df.loc[df.dataset == dsname, per_evt_wgt] * rwfac
             return extraprocess(df) if extraprocess else df
-        
+
         FileSysHelper.checkpath(f'{postp_output}/{group}')
-        return load_csvs(load_dir, f'{dsname}*out*', func=add_wgt, rwfac=rwfac, ds=dsname, group=group)
+
+        return DataLoader.load_csvs(load_dir, f'{group}*out*', func=add_wgt)
     
     def __save_cutflow(self, cf_df, cf_dict, selname, postp_output, group):
         """Save the cutflow dataframe to a CSV file."""
@@ -502,5 +505,5 @@ class ObjectPlotter():
         - `sort_what`: the attribute to be sorted
         - `kwargs`: additional arguments for sorting
         """
-        mask = Object.sortmask(data[sort_by], **kwargs)
+        mask = ObjectProcessor.sortmask(data[sort_by], **kwargs)
         return arr_handler(data[sort_what])[mask]

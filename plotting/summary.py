@@ -8,6 +8,8 @@ from src.utils.datautil import CutflowProcessor, DataSetUtil, DatasetIterator, D
 from src.utils.rootutil import RootFileHandler
 from src.utils.displayutil import create_table, print_dataframe_rich
 
+luminosity = {"2022PreEE": 41.5/2 * 1000, "2022PostEE": 41.5 * 1000/2, "2023Summer": 32.7 * 1000}
+
 class PostProcessor():
     """Class for loading and hadding data from skims/predefined selections produced directly by Processor.
     
@@ -134,13 +136,13 @@ class PostProcessor():
         self.check_and_clean(*checkargs)
         self.hadd_results(*haddargs)
         
-    def get_yield(self):
+    def get_yield(self, extra_kwd=''):
         """Get the yield for the resolved cutflow tables. Save to LOCALOUTPUT."""
         self.__update_meta()
         regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ'], 'HH': ['ggF']}
         signals = ['HH', 'ZH', 'ZZ']
         inputdir = self.transferP if self.transferP is not None else self.inputdir
-        resolved_dict, combined_dict = self.merge_cf(inputdir=inputdir, outputdir=self.tempdir)
+        resolved_dict, combined_dict = self.merge_cf(inputdir=inputdir, outputdir=self.tempdir, extra_kwd=extra_kwd)
         for year, combined in combined_dict.items():
             self.present_yield(combined, signals, pjoin(self.tempdir, year), regroup_dict)
             logging.info(f"Yield results are outputted in {pjoin(self.tempdir, year)}")
@@ -354,7 +356,7 @@ class PostProcessor():
                         FileSysHelper.transfer_files(self.tempdir, transferP, filepattern='*csv', remove=True, overwrite=True)
 
 class PostPreselProcessor(PostProcessor):
-    def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
+    def __init__(self, ppcfg, luminosity=luminosity, groups=None, years=None) -> None:
         super().__init__(ppcfg, luminosity, groups, years)
     
     def hadd_results(self, *args, **kwargs):
