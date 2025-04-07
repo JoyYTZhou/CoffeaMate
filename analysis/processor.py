@@ -107,7 +107,7 @@ class Processor:
         self.rtcfg = rtcfg
         self.dsdict = dsdict
         self.dataset = dsdict['metadata']['shortname']
-        self._ismc = dsdict['metadata']['is_mc']
+        self._ismc = dsdict['metadata'].get('is_mc', False)
         self.evtselclass = evtselclass
         self.transfer = transferP
         self.filehelper = FileSysHelper()

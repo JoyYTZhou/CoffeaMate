@@ -665,7 +665,7 @@ class DataSetUtil:
         """
         # Get dataset information
         dataset_info, meta_data = DataSetUtil.extract_uuids(json_path)
-        is_mc = meta_data['is_mc']
+        is_mc = meta_data.get('is_mc', False)
         
         # Prepare list of work items
         work_items = [

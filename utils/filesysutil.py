@@ -2,7 +2,7 @@ import os, glob, shutil, tracemalloc, linecache, subprocess, fnmatch, psutil, lo
 from datetime import datetime
 from XRootD import client
 from pathlib import Path
-from displayutil import display_directory_stats
+from src.utils.displayutil import display_directory_stats
 
 runcom = subprocess.run
 pjoin = os.path.join
