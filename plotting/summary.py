@@ -122,6 +122,7 @@ class PostProcessor():
         for year in self.years:
             with open(pjoin(self.cfg['DATA_DIR'], 'weightedMC', f"{year}.json"), 'r') as f:
                 self.meta_dict[year] = json.load(f)
+        logging.info(f"Using metadata from {pjoin(self.cfg['DATA_DIR'], 'weightedMC', f'{year}.json')}")
         self._init_iter()
     
     def hadd_results(self, *args, **kwargs):
