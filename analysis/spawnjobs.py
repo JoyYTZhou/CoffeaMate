@@ -183,11 +183,11 @@ class JobLoader():
                     finame = pjoin(self.jobpath, f'{grp_name}_{yr}_{shortname}_job_{j}.json')
                     with open(finame, 'w') as fp:
                         json.dump(baby_job, fp)
-                job_files.append(os.path.basename(finame))
+                    job_files.append(os.path.basename(finame))
                 table.add_row(
                     ds,
                     "[green]Needs Processing[/green]",
-                    "\n".join(job_files)
+                    job_files[-1]
                 )
             else:
                 table.add_row(

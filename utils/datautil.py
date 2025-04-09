@@ -545,9 +545,10 @@ class DatasetIterator:
 
             if self.transfer_root:
                 transfer_dir = f"{self.transfer_root}/{year}/{group}"
+                FileSysHelper.remove_files(transfer_dir, "*.root")
+                FileSysHelper.remove_files(transfer_dir, '*.csv')
                 FileSysHelper.transfer_files(output_dir, transfer_dir,
                                           remove=True, overwrite=True)
-
         return results
 
 class DataSetUtil:
