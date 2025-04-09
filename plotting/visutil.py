@@ -57,8 +57,9 @@ class CSVPlotter:
         flat_wgt = 1/self.meta_dict[group][ds]['nwgt'] * multiply * self.meta_dict[group][ds]['xsection'] * luminosity
         return flat_wgt
     
-    def process_datasets(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
+    def process_datasets(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight_values', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
         """Reweight the datasets to the desired xsection * luminosity by adding a column `weight` and save the processed dataframes to csv files.
+        This also saves the added cutflows (not weighted by xsection * luminosity) to a csv file.
         
         Parameters
         - `datasource`: the directory of the group subdirectories containing different csv output files.
@@ -97,26 +98,26 @@ class CSVPlotter:
         cf_df = DataLoader.load_csvs(load_dir, f'{group}*cf.csv')[0]
         self.data_dict[group] = {}
 
-        df = self.__process_group_out(
+        output_df = self.__process_group_out(
             group, load_dir, postp_output, per_evt_wgt,
             extraprocess, signals, sig_factor, luminosity
         )
 
-        if df is not None:
-            self.data_dict[group] = df
+        if output_df is not None:
+            self.data_dict[group] = output_df
         
         for ds, meta in self.meta_dict[group].items():
             dsname = meta['shortname']
-            if df[df.dataset == dsname].empty:
+            if output_df[output_df.dataset == dsname].empty:
                 cf_dict[f'{dsname}_raw'] = 0
                 cf_dict[f'{dsname}_wgt'] = 0
                 continue
-            self.__addextcf(cf_dict, df[df.dataset==dsname], dsname, per_evt_wgt)
+            self.__addextcf(cf_dict, output_df[output_df.dataset==dsname], dsname, per_evt_wgt)
                 
         return cf_dict, cf_df
     
     def __process_group_out(self, group, load_dir, postp_output, per_evt_wgt, extraprocess, signals, sig_factor, luminosity):
-        """Process a single dataset."""
+        """Process the output files of a group and add the weights (by xsec * lumi) to the dataframe."""
         def add_wgt(dfs):
             df = dfs[0]
             if df.empty:

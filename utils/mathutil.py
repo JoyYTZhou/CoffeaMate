@@ -104,6 +104,24 @@ class ABCDUtil:
         total_stats = pd.concat([Raw_stats, Weighted_stats], axis=1)
         total_stats.columns = ['Raw', 'Weighted']
         print(total_stats)
+    
+    @staticmethod
+    def split_dataframe(df_ori, condition_func):
+        """
+        Generic function to split a dataframe based on a condition
+        
+        Args:
+            df_ori: Original dataframe
+            condition_func: Function that takes df_ori and returns a boolean mask
+            
+        Returns:
+            tuple: (negative_condition_df, positive_condition_df)
+        """
+        df = df_ori.copy()
+        condition = condition_func(df)
+        negative = df[~condition]
+        positive = df[condition]
+        return negative, positive
         
     @staticmethod
     def ABCD_closure(N_A, N_B, N_C, N_D) -> pd.DataFrame:
