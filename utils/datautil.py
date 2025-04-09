@@ -320,70 +320,22 @@ class DataLoader:
     @staticmethod
     def load_csvs(dirname, filepattern, func=None, *args, **kwargs) -> pd.DataFrame:
         """Load csv files matching a pattern into a list of DataFrames. Post process if func is provided.
-
+        
         Parameters
-        ----------
-        dirname : str
-            Directory name to search for files
-        filepattern : str
-            Pattern to match the file names
-        func : callable, optional
-            Function to apply to the list of DataFrames. Must return a Pandas object.
-        *args, **kwargs
-            Additional arguments to pass to the function
-
-        Returns
-        -------
-        pd.DataFrame
-            Single DataFrame if func is provided, otherwise list of DataFrames
-
-        Notes
-        -----
-        - Handles empty DataFrame concatenation when func is pd.concat
-        - Returns empty DataFrame with appropriate columns if no valid files found
-        - Logs warnings for empty files or processing issues
+        - `dirname`: directory name to search for
+        - `startpattern`: pattern to match the file names
+        - `func`: function to apply to the list of DataFrames. Must return an Pandas object.
+        - `*args`, `**kwargs`: additional arguments to pass to the function
         """
-        # Get matching files
         file_names = FileSysHelper.glob_files(dirname, filepattern=filepattern)
-
-        if not file_names:
-            logging.warning(f"No files found matching pattern '{filepattern}' in {dirname}")
-            return pd.DataFrame()
-
-        # Load all CSV files
-        dfs = []
-        for fname in file_names:
-            try:
-                df = pd.read_csv(fname, *args, **kwargs)
-                if not df.empty:
-                    dfs.append(df)
-                else:
-                    logging.warning(f"Empty DataFrame loaded from {fname}")
-            except Exception as e:
-                logging.error(f"Error loading {fname}: {str(e)}")
-                continue
-
-        # Handle empty case
+        dfs = [pd.read_csv(file_name, index_col=0, header=0) for file_name in file_names] 
         if not dfs:
-            logging.warning("No valid DataFrames loaded")
-            return pd.DataFrame()
-
-        # Apply processing function if provided
+            print(f"No files found with filepattern {filepattern} in {dirname}, please double check if your output files match the input filepattern to glob.")
         if func is None:
             return dfs
         else:
-            try:
-                # Special handling for pd.concat
-                if func is pd.concat:
-                    if len(dfs) == 1:
-                        return dfs[0]
-                    return func(dfs, **kwargs)
-                # General case
-                return func(dfs, *args, **kwargs)
-            except Exception as e:
-                logging.error(f"Error applying {func.__name__}: {str(e)}")
-                return pd.DataFrame()
-
+            return func(dfs, *args, **kwargs)
+    
     @staticmethod
     def load_fields(file, branch_names=None, tree_name='Events', lib='ak') -> tuple[ak.Array, list]:
         """Load specific fields if any. Otherwise load all. If the file is a list, concatenate the data from all files.
