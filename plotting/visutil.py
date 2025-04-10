@@ -105,10 +105,17 @@ class CSVPlotter:
 
         if output_df is not None:
             self.data_dict[group] = output_df
+        else:
+            logging.warning(f"No output files found for group {group}.")
+            return cf_dict, cf_df
         
-        for ds, meta in self.meta_dict[group].items():
+        for _, meta in self.meta_dict[group].items():
             dsname = meta['shortname']
-            if output_df[output_df.dataset == dsname].empty:
+            if output_df.empty:
+                cf_dict[f'{dsname}_raw'] = 0
+                cf_dict[f'{dsname}_wgt'] = 0 
+                continue
+            elif output_df[output_df['dataset'] == dsname].empty:
                 cf_dict[f'{dsname}_raw'] = 0
                 cf_dict[f'{dsname}_wgt'] = 0
                 continue
