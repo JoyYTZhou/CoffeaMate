@@ -58,7 +58,9 @@ class CSVPlotter:
         return flat_wgt
     
     def process_datasets(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight_values', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
+    def process_datasets(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight_values', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
         """Reweight the datasets to the desired xsection * luminosity by adding a column `weight` and save the processed dataframes to csv files.
+        This also saves the added cutflows (not weighted by xsection * luminosity) to a csv file.
         This also saves the added cutflows (not weighted by xsection * luminosity) to a csv file.
         
         Parameters
