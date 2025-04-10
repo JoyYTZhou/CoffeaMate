@@ -470,6 +470,7 @@ class XRootDHelper:
             raise ValueError("Source path should be a local directory. Why are you transferring from one EOS to another?")
         else:
             files = glob.glob(pjoin(srcpath, filepattern))
+            logging.info(f"Found {len(files)} files matching {filepattern} in {srcpath}")
         
         if not is_remote(destpath):
             raise ValueError("Destination path should be a remote directory. Use FileSysHelper for local transfers.")
@@ -485,15 +486,13 @@ class XRootDHelper:
                 if overwrite: 
                     self.xrdfs_client.rm(dest_file)
                     self.call_xrdcp(src_file, dest_file)
-                    logging.debug("Overwriting file %s", dest_file)
+                    logging.debug(f"Overwriting file {dest_file}")
             else:
                 self.call_xrdcp(src_file, dest_file)
-                logging.debug("Copying file %s", dest_file)
-            # at some point needs to try copyprocess 
-            # status, _ = self.xrdfs_client.copy(src_file, dest_file, force=True)
-            # if not status.ok:
+                logging.debug(f"Copying file {dest_file}")
             if remove:
                 os.remove(src_file)
+                logging.debug(f"Removing file {src_file}")
             else:
                 continue
 

@@ -294,9 +294,17 @@ class Processor:
         
         Parameters:
         - `passed`: DataFrame to write
-        - `suffix`: index to append to filename"""
-        outname = pjoin(self.outdir, f'{self.dataset}_{suffix}_output.csv')
+        - `suffix`: index to append to filename
+
+        If the DataFrame is empty, appends 'empty' to the filename.
+        Returns 0 on success."""
+        is_empty = passed.empty
+        if is_empty: filename = f'{self.dataset}_{suffix}_output_empty.csv'
+        else: filename = f'{self.dataset}_{suffix}_output.csv'
+        outname = pjoin(self.outdir, filename)
         passed.to_csv(outname)
+        if is_empty:
+            logging.debug(f"Writing empty DataFrame to {outname}")
         return 0
 
     def _write_pkl(self, passed, suffix):

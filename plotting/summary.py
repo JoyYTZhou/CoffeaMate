@@ -1,5 +1,6 @@
 import logging, json, os
 from datetime import datetime
+import numpy as np
 import pandas as pd
 from itertools import chain
 
@@ -138,7 +139,8 @@ class PostProcessor():
         self.hadd_results(*haddargs)
         
     def get_yield(self, extra_kwd=''):
-        """Get the yield for the resolved cutflow tables. Save to LOCALOUTPUT."""
+        """Get the yield for the resolved cutflow tables. All the weights incorporate xsec * lumi.
+        Save to LOCALOUTPUT."""
         self.__update_meta()
         regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ'], 'HH': ['ggF']}
         signals = ['HH', 'ZH', 'ZZ']
@@ -176,7 +178,7 @@ class PostProcessor():
     #     self.__iterate_meta(process_csv)
                         
     def merge_cf(self, inputdir, outputdir, extra_kwd=''):
-        """Merges and weights all cutflow tables across years and groups.
+        """Merges and weights all cutflow tables across years and groups. All the weights incorporate xsec * lumi.
         
         Creates three output files per year:
         - allDatasetCutflow.csv: Raw and weighted events for all datasets
@@ -290,7 +292,7 @@ class PostProcessor():
 
     @staticmethod
     def process_group_cutflow(group, meta_dict, inputdir, luminosity, extra_kwd=''):
-        """Process cutflow tables for a physics group with appropriate scaling.
+        """Process cutflow tables for a physics group with appropriate scaling (lumi * xsec)
         
         Parameters
         ----------
@@ -311,13 +313,19 @@ class PostProcessor():
             (Scaled cutflow dataframe, Combined group weights)
         """
         # Load cutflow
+        # First read the CSV without forcing dtypes
         cutflow_df = pd.read_csv(
             FileSysHelper.glob_files(
                 pjoin(inputdir, group), 
-                f'{group}*{extra_kwd}*cf.csv'
+                f'{group}*{extra_kwd}*cf.csv',
             )[0],
-            index_col=0
+            index_col=0,
+            header=0
         )
+
+        # Convert numeric columns to float64, leaving non-numeric columns as is
+        numeric_columns = cutflow_df.select_dtypes(include=['int64', 'float64']).columns
+        cutflow_df[numeric_columns] = cutflow_df[numeric_columns].astype(np.float64)
         
         # Apply physics scaling
         scaled_df, combined = CutflowProcessor.apply_physics_scale(
@@ -328,8 +336,6 @@ class PostProcessor():
         
         # Set group name for combined weights
         combined.name = group
-        
-        logger_level = logging.getLogger().getEffectiveLevel()
         
         return scaled_df, combined
     
