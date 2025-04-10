@@ -427,6 +427,8 @@ class PostPreselProcessor(PostProcessor):
                 else:
                     logging.warning(f"No valid dataframes found for group {group} year {year}")
 
+    def check_results(self):
+        pass
 class PostSkimProcessor(PostProcessor):
     def __init__(self, ppcfg, luminosity, groups=None, years=None) -> None:
         super().__init__(ppcfg, luminosity, groups, years)
