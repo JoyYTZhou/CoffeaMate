@@ -326,15 +326,26 @@ class DataLoader:
         - `startpattern`: pattern to match the file names
         - `func`: function to apply to the list of DataFrames. Must return an Pandas object.
         - `*args`, `**kwargs`: additional arguments to pass to the function
+        
+        Return
+        - `dfs`: list of DataFrames if func is None
         """
         file_names = FileSysHelper.glob_files(dirname, filepattern=filepattern)
+        if file_names == []:
+            logging.warning(f"No files found with filepattern {filepattern} in {dirname}, please double check if your output files match the input filepattern to glob.")
+            return None
         dfs = [pd.read_csv(file_name, index_col=0, header=0) for file_name in file_names] 
         if not dfs:
-            print(f"No files found with filepattern {filepattern} in {dirname}, please double check if your output files match the input filepattern to glob.")
+            logging.warning(f"No files found with filepattern {filepattern} in {dirname}, please double check if your output files match the input filepattern to glob.")
         if func is None:
             return dfs
         else:
-            return func(dfs, *args, **kwargs)
+            try: 
+                value = func(dfs, *args, **kwargs)
+                return value
+            except Exception as e:
+                logging.exception(f"Error applying function to DataFrames: {str(e)}")
+                return None
     
     @staticmethod
     def load_fields(file, branch_names=None, tree_name='Events', lib='ak') -> tuple[ak.Array, list]:

@@ -4,6 +4,8 @@ import numpy as np
 import seaborn as sns
 import mplhep as hep
 import matplotlib as mpl
+from typing import List, Tuple, Optional, Union, Any
+
 import logging
 
 class PlotStyle:
@@ -84,12 +86,37 @@ class PlotStyle:
 class HistogramHelper:
     """Handles histogram operations"""
     @staticmethod
-    def make_histogram(data, bins, range, weights=None, density=False):
-        """Create histogram with proper overflow handling"""
+    def make_histogram(data: Union[np.ndarray, pd.Series], bins, range, weights=None, density=False):
+        """Create histogram with proper overflow handling.
+
+        Parameters:
+        data (Union[np.ndarray, pd.Series]): Input data to histogram
+        bins: Number of bins or array of bin edges
+        range: Tuple of (min, max) range for the histogram
+        weights: Optional weights for each data point
+        density: If True, normalize histogram to form a probability density
+
+        Returns:
+        tuple: (histogram counts/density, bin edges)
+        """
+        # Convert bins to edges if number provided
         if isinstance(bins, int):
             bins = np.linspace(*range, bins+1)
-            data = np.clip(data, bins[0], bins[-1])
-        return np.histogram(data, bins=bins, weights=weights, density=density)
+
+        # Create mask for data within range
+        in_range = (data >= bins[0]) & (data <= bins[-1])
+
+        # Clip data and weights together
+        clipped_data = data[in_range]
+        clipped_weights = weights[in_range] if weights is not None else None
+
+        # Create histogram with clipped data and weights
+        return np.histogram(
+            clipped_data,
+            bins=bins,
+            weights=clipped_weights,
+            density=density
+        )
 
     @staticmethod
     def calc_ratio_and_errors(num, den, num_err, den_err):
@@ -153,6 +180,35 @@ class HistogramHelper:
         )
         return density_hist, density_err
     
+    @staticmethod
+    def average_histogram(histograms: List[np.ndarray]) -> np.ndarray:
+        """Calculate the bin-wise average of multiple histograms.
+
+        Parameters:
+        histograms (List[np.ndarray]): List of histograms with the same shape and binning
+
+        Returns:
+        np.ndarray: Average histogram with the same shape as input histograms
+
+        Raises:
+        ValueError: If the input list is empty or histograms have different shapes
+        """
+        if not histograms:
+            raise ValueError("Input list of histograms is empty")
+
+        # Check that all histograms have the same shape
+        first_shape = histograms[0].shape
+        if not all(hist.shape == first_shape for hist in histograms):
+            raise ValueError("All histograms must have the same shape")
+
+        # Convert list to numpy array for efficient computation
+        hist_array = np.array(histograms)
+
+        # Calculate mean along first axis (across histograms)
+        average = np.mean(hist_array, axis=0)
+
+        return average
+
     @staticmethod
     def _prepare_data(df, Y, Y_range):
         """Prepare and filter data based on range."""

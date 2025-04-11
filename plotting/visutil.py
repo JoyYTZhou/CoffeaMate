@@ -8,6 +8,7 @@ from src.utils.datautil import DataLoader, iterwgt, arr_handler
 from src.analysis.objutil import ObjectMasker, ObjectProcessor
 from src.utils.filesysutil import FileSysHelper, pjoin, pdir, pbase
 from src.utils.plotutil import HistogramHelper, PlotStyle
+from typing import List, Tuple, Union
 
 luminosity = {"2022PreEE": 41.5/2 * 1000, "2022PostEE": 41.5 * 1000/2, "2023Summer": 32.7 * 1000}
 
@@ -95,7 +96,11 @@ class CSVPlotter:
     def __process_group(self, group, load_dir, postp_output, per_evt_wgt, extraprocess, selname, signals, sig_factor, luminosity):
         """Process a single group of datasets."""
         cf_dict = {}
+        logging.info(f"Processing group {group} in {load_dir}")
         cf_df = DataLoader.load_csvs(load_dir, f'{group}*cf.csv')[0]
+        if cf_df is None:
+            logging.warning(f"Error occurred while loading cutflow.")
+            return
         self.data_dict[group] = {}
 
         output_df = self.__process_group_out(
@@ -214,6 +219,66 @@ class CSVPlotter:
         """Order the list of lists based on the order."""
         return [list_of_obj[i] for i in order]
 
+
+    @staticmethod
+    def plot_with_average(list_of_evts: List[pd.DataFrame], attr: str, bins: Union[int, np.ndarray],
+        range: Tuple[float, float], labels: List[str], xlabel: str, outdir: str,
+                        title: str = '',
+                        hist_ylabel: str = 'Normalized',
+                        ratio_ylabel: str = 'Ratio to Average',
+                        save_suffix: str = '') -> None:
+        """Plot multiple histograms with their average and ratio panels."""
+        if len(list_of_evts) < 2:
+            raise ValueError("Need at least 2 DataFrames to compare")
+        if not all('weight' in df.columns for df in list_of_evts):
+            raise ValueError("All DataFrames must have 'weight' column")
+
+        styles = [{'histtype': 'step', 'alpha': 1.0, 'linewidth': 1.5}] * len(list_of_evts)
+        styles.append({'histtype': 'step', 'alpha': 1.0, 'linewidth': 2, 'linestyle': '--'})
+
+        fig, axs, ax2s = PlotStyle.create_ratio_figure(
+            title=title,
+            x_label=xlabel,
+            top_ylabel=hist_ylabel,
+            bottom_ylabel=ratio_ylabel
+        )
+
+        hist_list = []
+        wgt_list = []
+
+        for df in list_of_evts:
+            counts, edges = HistogramHelper.make_histogram(
+                data=df[attr],
+                bins=bins,
+                range=range,
+                weights=df['weight']
+            )
+            hist_list.append(counts)
+            wgt_list.append(df['weight'].sum())
+
+        # Calculate and add average histogram
+        avg_hist = HistogramHelper.average_histogram(hist_list)
+        hist_list.append(avg_hist)
+        wgt_list.append(np.mean(wgt_list))
+        labels.append('Average')
+
+        ObjectPlotter.plot_hist_with_err(
+            ax=axs[0],
+            ax2=ax2s[0],
+            hist_list=hist_list,
+            wgt_list=wgt_list,
+            bins=edges,
+            label=labels,
+            xrange=range,
+            styles=styles,
+        )
+
+        fig.savefig(
+            pjoin(outdir, f'{attr}{save_suffix}.png'),
+            dpi=400,
+            bbox_inches='tight'
+    )
+
     @staticmethod
     def plot_shape(list_of_evts: list[pd.DataFrame], labels: list, attridict: dict, 
                 ratio_ylabel: str, outdir: str, hist_ylabel: str = 'Normalized', 
@@ -252,9 +317,9 @@ class CSVPlotter:
             raise ValueError("All DataFrames must have 'weight' column")
 
         styles = [
-            {'histtype': 'fill', 'alpha': 0.4, 'linewidth': 1.5},
-            {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1},
-            {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1}
+            {'histtype': 'fill', 'alpha': 0.4, 'linewidth': 1.3},
+            {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1.5},
+            {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1.5}
         ]
 
         for attr, options in attridict.items():
@@ -269,16 +334,12 @@ class CSVPlotter:
             wgt_list = []
             for df in list_of_evts:
                 counts, edges = HistogramHelper.make_histogram(
-                    data=df[attr],
-                    bins=options['hist']['bins'],
-                    range=options['hist']['range'],
-                    weights=df['weight']
+                    data=df[attr], bins=options['hist']['bins'], range=options['hist']['range'], weights=df['weight']
                 )
                 hist_list.append(counts)
                 wgt_list.append(df['weight'].sum())
             
-            ObjectPlotter.plot_hist_with_err(
-                ax=axs[0],
+            ObjectPlotter.plot_hist_with_err(ax=axs[0],
                 ax2=ax2s[0],
                 hist_list=hist_list,
                 wgt_list=wgt_list,
@@ -384,7 +445,6 @@ class CSVPlotter:
                 bbox_inches='tight',
                 pad_inches=0.1
             )
-    
         
 class ObjectPlotter():
     @staticmethod
