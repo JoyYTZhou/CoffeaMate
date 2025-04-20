@@ -219,72 +219,11 @@ class CSVPlotter:
         """Order the list of lists based on the order."""
         return [list_of_obj[i] for i in order]
 
-
     @staticmethod
-    def plot_with_average(list_of_evts: List[pd.DataFrame], attr: str, bins: Union[int, np.ndarray],
-        range: Tuple[float, float], labels: List[str], xlabel: str, outdir: str,
-                        title: str = '',
-                        hist_ylabel: str = 'Normalized',
-                        ratio_ylabel: str = 'Ratio to Average',
-                        save_suffix: str = '') -> None:
-        """Plot multiple histograms with their average and ratio panels."""
-        if len(list_of_evts) < 2:
-            raise ValueError("Need at least 2 DataFrames to compare")
-        if not all('weight' in df.columns for df in list_of_evts):
-            raise ValueError("All DataFrames must have 'weight' column")
-
-        styles = [{'histtype': 'step', 'alpha': 1.0, 'linewidth': 1.5}] * len(list_of_evts)
-        styles.append({'histtype': 'step', 'alpha': 1.0, 'linewidth': 2, 'linestyle': '--'})
-
-        fig, axs, ax2s = PlotStyle.create_ratio_figure(
-            title=title,
-            x_label=xlabel,
-            top_ylabel=hist_ylabel,
-            bottom_ylabel=ratio_ylabel
-        )
-
-        hist_list = []
-        wgt_list = []
-
-        for df in list_of_evts:
-            counts, edges = HistogramHelper.make_histogram(
-                data=df[attr],
-                bins=bins,
-                range=range,
-                weights=df['weight']
-            )
-            hist_list.append(counts)
-            wgt_list.append(df['weight'].sum())
-
-        # Calculate and add average histogram
-        avg_hist = HistogramHelper.average_histogram(hist_list)
-        hist_list.append(avg_hist)
-        wgt_list.append(np.mean(wgt_list))
-        labels.append('Average')
-
-        ObjectPlotter.plot_hist_with_err(
-            ax=axs[0],
-            ax2=ax2s[0],
-            hist_list=hist_list,
-            wgt_list=wgt_list,
-            bins=edges,
-            label=labels,
-            xrange=range,
-            styles=styles,
-        )
-
-        fig.savefig(
-            pjoin(outdir, f'{attr}{save_suffix}.png'),
-            dpi=400,
-            bbox_inches='tight'
-    )
-
-    @staticmethod
-    def plot_shape(list_of_evts: list[pd.DataFrame], labels: list, attridict: dict, 
+    def plot_with_average(list_of_evts: list[pd.DataFrame], labels: list, attridict: dict,
                 ratio_ylabel: str, outdir: str, hist_ylabel: str = 'Normalized', 
                 title: str = '', save_suffix: str = '') -> None:
-        """Compare normalized shapes of distributions with ratio panels.
-        
+        """Compare distributions with their average and ratio panels.
         Parameters
         ----------
         list_of_evts : list[pd.DataFrame]
@@ -316,6 +255,89 @@ class CSVPlotter:
         if not all('weight' in df.columns for df in list_of_evts):
             raise ValueError("All DataFrames must have 'weight' column")
 
+        # Define styles for regular histograms and average line
+        styles = [{'histtype': 'step', 'alpha': 1.0, 'linewidth': 1.5}] * len(list_of_evts)
+        styles.append({'histtype': 'step', 'alpha': 1.0, 'linewidth': 2, 'linestyle': '--'})
+        for attr, options in attridict.items():
+            fig, axs, ax2s = PlotStyle.create_ratio_figure(
+                title=title,
+                x_label=options['plot'].get('xlabel', ''),
+                top_ylabel=hist_ylabel,
+                bottom_ylabel=ratio_ylabel
+            )
+            
+            hist_list = []
+            wgt_list = []
+
+            # Calculate histograms for each dataset
+            for df in list_of_evts:
+                counts, edges = HistogramHelper.make_histogram(
+                    data=df[attr],
+                    bins=options['hist']['bins'],
+                    range=options['hist']['range'],
+                    weights=df['weight']
+                )
+                hist_list.append(counts)
+                wgt_list.append(df['weight'].sum())
+            
+            # Add average histogram
+            avg_hist = HistogramHelper.average_histogram(hist_list)
+            hist_list.append(avg_hist)
+            wgt_list.append(np.mean(wgt_list))
+            plot_labels = labels + ['Average']
+            ObjectPlotter.plot_hist_with_err(
+                ax=axs[0],
+                ax2=ax2s[0],
+                hist_list=hist_list,
+                wgt_list=wgt_list,
+                bins=edges,
+                label=plot_labels,
+                xrange=options['hist']['range'],
+                styles=styles,
+            )
+
+            fig.savefig(
+                pjoin(outdir, f'{attr}{save_suffix}.png'),
+                dpi=400,
+                bbox_inches='tight'
+            )
+
+    @staticmethod
+    def plot_shape(list_of_evts: list[pd.DataFrame], labels: list, attridict: dict,
+                   ratio_ylabel: str, outdir: str, hist_ylabel: str = 'Normalized',
+                   title: str = '', save_suffix: str = '') -> None:
+        """Compare normalized shapes of distributions with ratio panels.
+
+        Parameters
+        ----------
+        list_of_evts : list[pd.DataFrame]
+            List of DataFrames to compare
+        labels : list
+            Labels for each DataFrame in the comparison
+        attridict : dict
+            Dictionary of attributes to plot with their options
+            Format: {
+                'attribute_name': {
+                    'hist': {'bins': int, 'range': tuple},
+                    'plot': {'xlabel': str, ...}
+                }
+            }
+        ratio_ylabel : str
+            Label for ratio panel y-axis
+        outdir : str
+            Directory to save plots
+        hist_ylabel : str, optional
+            Label for histogram y-axis
+        title : str, optional
+            Plot title
+        save_suffix : str, optional
+            Suffix for saved files
+        """
+        if len(list_of_evts) < 2:
+            raise ValueError("Need at least 2 DataFrames to compare")
+        if not all('weight' in df.columns for df in list_of_evts):
+            raise ValueError("All DataFrames must have 'weight' column")
+
         styles = [
             {'histtype': 'fill', 'alpha': 0.4, 'linewidth': 1.3},
             {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1.5},
@@ -329,17 +351,20 @@ class CSVPlotter:
                 top_ylabel=hist_ylabel,
                 bottom_ylabel=ratio_ylabel
             )
-            
-            hist_list = []
-            wgt_list = []
+
+            hist_list, wgt_list = [], []
             for df in list_of_evts:
                 counts, edges = HistogramHelper.make_histogram(
-                    data=df[attr], bins=options['hist']['bins'], range=options['hist']['range'], weights=df['weight']
+                    data=df[attr],
+                    bins=options['hist']['bins'],
+                    range=options['hist']['range'],
+                    weights=df['weight']
                 )
                 hist_list.append(counts)
                 wgt_list.append(df['weight'].sum())
-            
-            ObjectPlotter.plot_hist_with_err(ax=axs[0],
+
+            ObjectPlotter.plot_hist_with_err(
+                ax=axs[0],
                 ax2=ax2s[0],
                 hist_list=hist_list,
                 wgt_list=wgt_list,

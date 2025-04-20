@@ -169,10 +169,23 @@ class ABCDUtil:
                 'Events': [count_A, count_B, count_C, count_D]
             }
         else:
+            weighted_events = [
+            int(dfA[weight].sum()),
+            int(dfB[weight].sum()),
+            int(dfC[weight].sum()),
+            int(dfD[weight].sum())
+            ]
+            uncertainties = [
+                np.sqrt((dfA[weight] ** 2).sum()),
+                np.sqrt((dfB[weight] ** 2).sum()),
+                np.sqrt((dfC[weight] ** 2).sum()),
+                np.sqrt((dfD[weight] ** 2).sum())
+            ]
             table = {
                 'Region': ['Region A', 'Region B', 'Region C', 'Region D'],
                 'Events (Raw)': [count_A, count_B, count_C, count_D],
-                'Events (Weighted)': [int(dfA[weight].sum()), int(dfB[weight].sum()), int(dfC[weight].sum()), int(dfD[weight].sum())]
+                'Events (Weighted)': weighted_events,
+                'Stat. Uncertainty': uncertainties
             }
         return pd.DataFrame(table).set_index('Region')
     
