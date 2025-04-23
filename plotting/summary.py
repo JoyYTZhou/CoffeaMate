@@ -569,7 +569,10 @@ class PostSkimProcessor(PostProcessor):
         def get_nwgt_per_group(dsname, dtdir):
             resolved_df = pd.read_csv(FileSysHelper.glob_files(dtdir, f'*cf.csv')[0], index_col=0)
             if not resolved_df.filter(like=dsname).empty:
-                nwgt = resolved_df.filter(like=dsname).filter(like='wgt').iloc[0,0]
+                try: 
+                    nwgt = resolved_df.filter(like=dsname).filter(like='wgt').iloc[0,0]
+                except:
+                    logging.exception(f"Error finding weight columns for {dsname}")
                 logging.debug(f"nwgt for {dsname} is {nwgt}")
                 return nwgt
             else:
