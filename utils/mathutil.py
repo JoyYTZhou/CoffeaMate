@@ -3,7 +3,7 @@ import numpy as np
 import os
 import pandas as pd
 from scipy.stats import pearsonr
-from src.analysis.objutil import ObjectMasker, ObjectProcessor
+from src.analysis.objutil import ObjectProcessor
 
 pjoin = os.path.join
 
@@ -104,6 +104,18 @@ class ABCDUtil:
         total_stats = pd.concat([Raw_stats, Weighted_stats], axis=1)
         total_stats.columns = ['Raw', 'Weighted']
         print(total_stats)
+    
+    def shape_reweight(self):
+        """Derive Signal Region Prediction by average of two estimates
+        A = C * B / D
+        A' = B * C / D
+        A_prediction = (A + A') / 2"""
+        rwgt_C = self.dfC.copy()
+        rwgt_C['weight'] *= self.dfB['weight'].sum() / self.dfD['weight'].sum() / 2
+        rwgt_B = self.dfB.copy()
+        rwgt_B['weight'] *= self.dfC['weight'].sum() / self.dfD['weight'].sum() / 2
+        avg_A = pd.concat([rwgt_C, rwgt_B], axis=0)
+        return avg_A
     
     @staticmethod
     def split_dataframe(df_ori, condition_func):

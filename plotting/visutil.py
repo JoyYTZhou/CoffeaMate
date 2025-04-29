@@ -5,12 +5,13 @@ import json, logging
 from matplotlib.ticker import ScalarFormatter
 
 from src.utils.datautil import DataLoader, iterwgt, arr_handler
-from src.analysis.objutil import ObjectMasker, ObjectProcessor
+from src.analysis.objutil import ObjectProcessor
 from src.utils.filesysutil import FileSysHelper, pjoin, pdir, pbase
 from src.utils.plotutil import HistogramHelper, PlotStyle
 from typing import List, Tuple, Union
 
 luminosity = {"2022PreEE": 41.5/2 * 1000, "2022PostEE": 41.5 * 1000/2, "2023Summer": 32.7 * 1000}
+
 
 class CSVPlotter:
     """Simplified plotter for CSV data"""
@@ -218,92 +219,9 @@ class CSVPlotter:
     def order_list(list_of_obj, order) -> list:
         """Order the list of lists based on the order."""
         return [list_of_obj[i] for i in order]
-
+    
     @staticmethod
-    def plot_with_average(list_of_evts: list[pd.DataFrame], labels: list, attridict: dict,
-                ratio_ylabel: str, outdir: str, hist_ylabel: str = 'Normalized', 
-                title: str = '', save_suffix: str = '') -> None:
-        """Compare distributions with their average and ratio panels.
-        Parameters
-        ----------
-        list_of_evts : list[pd.DataFrame]
-            List of DataFrames to compare
-        labels : list
-            Labels for each DataFrame in the comparison
-        attridict : dict
-            Dictionary of attributes to plot with their options
-            Format: {
-                'attribute_name': {
-                    'hist': {'bins': int, 'range': tuple},
-                    'plot': {'xlabel': str, ...}
-                }
-            }
-        ratio_ylabel : str
-            Label for ratio panel y-axis
-        outdir : str
-            Directory to save plots
-        hist_ylabel : str, optional
-            Label for histogram y-axis
-        title : str, optional
-            Plot title
-        save_suffix : str, optional
-            Suffix for saved files
-        """
-        # Input validation
-        if len(list_of_evts) < 2:
-            raise ValueError("Need at least 2 DataFrames to compare")
-        if not all('weight' in df.columns for df in list_of_evts):
-            raise ValueError("All DataFrames must have 'weight' column")
-
-        # Define styles for regular histograms and average line
-        styles = [{'histtype': 'step', 'alpha': 1.0, 'linewidth': 1.5}] * len(list_of_evts)
-        styles.append({'histtype': 'step', 'alpha': 1.0, 'linewidth': 2, 'linestyle': '--'})
-        for attr, options in attridict.items():
-            fig, axs, ax2s = PlotStyle.create_ratio_figure(
-                title=title,
-                x_label=options['plot'].get('xlabel', ''),
-                top_ylabel=hist_ylabel,
-                bottom_ylabel=ratio_ylabel
-            )
-            
-            hist_list = []
-            wgt_list = []
-
-            # Calculate histograms for each dataset
-            for df in list_of_evts:
-                counts, edges = HistogramHelper.make_histogram(
-                    data=df[attr],
-                    bins=options['hist']['bins'],
-                    range=options['hist']['range'],
-                    weights=df['weight']
-                )
-                hist_list.append(counts)
-                wgt_list.append(df['weight'].sum())
-            
-            # Add average histogram
-            avg_hist = HistogramHelper.average_histogram(hist_list)
-            hist_list.append(avg_hist)
-            wgt_list.append(np.mean(wgt_list))
-            plot_labels = labels + ['Average']
-            ObjectPlotter.plot_hist_with_err(
-                ax=axs[0],
-                ax2=ax2s[0],
-                hist_list=hist_list,
-                wgt_list=wgt_list,
-                bins=edges,
-                label=plot_labels,
-                xrange=options['hist']['range'],
-                styles=styles,
-            )
-
-            fig.savefig(
-                pjoin(outdir, f'{attr}{save_suffix}.png'),
-                dpi=400,
-                bbox_inches='tight'
-            )
-
-    @staticmethod
-    def plot_shape(list_of_evts: list[pd.DataFrame], labels: list, attridict: dict,
+    def plot_shape(attridict, list_of_evts: list[pd.DataFrame], labels: list,
                    ratio_ylabel: str, outdir: str, hist_ylabel: str = 'Normalized',
                    title: str = '', save_suffix: str = '') -> None:
         """Compare normalized shapes of distributions with ratio panels.
@@ -354,31 +272,15 @@ class CSVPlotter:
 
             hist_list, wgt_list = [], []
             for df in list_of_evts:
-                counts, edges = HistogramHelper.make_histogram(
-                    data=df[attr],
-                    bins=options['hist']['bins'],
-                    range=options['hist']['range'],
-                    weights=df['weight']
-                )
+                counts, edges = HistogramHelper.make_histogram(data=df[attr], bins=options['hist']['bins'], range=options['hist']['range'], weights=df['weight'])
                 hist_list.append(counts)
                 wgt_list.append(df['weight'].sum())
 
-            ObjectPlotter.plot_hist_with_err(
-                ax=axs[0],
-                ax2=ax2s[0],
-                hist_list=hist_list,
-                wgt_list=wgt_list,
-                bins=edges,
-                label=labels,
-                xrange=options['hist']['range'],
-                styles=styles,
-            )
+            ObjectPlotter.plot_hist_with_err(ax=axs[0],
+                ax2=ax2s[0], hist_list=hist_list, wgt_list=wgt_list,
+                bins=edges, label=labels, xrange=options['hist']['range'], styles=styles)
 
-            fig.savefig(
-                pjoin(outdir, f'{attr}{save_suffix}.png'),
-                dpi=400,
-                bbox_inches='tight'
-            )
+            fig.savefig(pjoin(outdir, f'{attr}{save_suffix}.png'), dpi=400, bbox_inches='tight')
 
     def plot_SvBHist(self, ax, evts, att, attoptions, **kwargs) -> list:
         """Plot the signal and background histograms."""
@@ -389,30 +291,7 @@ class CSVPlotter:
         order = kwargs.pop('order', CSVPlotter.get_order(b_hists))
         b_hists, blabels = CSVPlotter.order_list(b_hists, order), CSVPlotter.order_list(blabels, order)
         
-        if self.sig_group is not None:
-            # Get signal histograms
-            s_hists, bins, x_range, slabels, _ = self.get_hist(
-                evts, att, attoptions, self.sig_group, **kwargs
-            )
-            ObjectPlotter.plotSigVBkg(
-                ax=ax,
-                sig_hists=s_hists,
-                bkg_hists=b_hists,
-                bin_edges=bins,
-                sig_label=slabels,
-                bkg_label=blabels,
-                xrange=x_range,
-                **kwargs
-            )
-        else:
-            ObjectPlotter.plot_var(
-                ax=ax,
-                hist=b_hists,
-                bin_edges=bins,
-                label=blabels,
-                xrange=x_range,
-                **kwargs
-            )
+        ObjectPlotter.plotSigVBkg(ax, *self.get_hist(evts, att, attoptions, self.sig_group, **kwargs), bkg_hists=b_hists, bkg_label=blabels, **kwargs) if self.sig_group else ObjectPlotter.plot_var(ax, b_hists, bins, blabels, x_range, **kwargs)
 
         return order
     
@@ -427,12 +306,7 @@ class CSVPlotter:
             PlotStyle.setup_axis(axes, xlabel=xlabel, title=title)  # Added title parameter here
             self.plot_SvBHist(axes, evts, att, options, **kwargs)
             
-            fig.savefig(
-                pjoin(self.outdir, f'{att}{save_name}.png'),
-                dpi=300,
-                bbox_inches='tight',
-                pad_inches=0.1
-            )
+            fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'), dpi=300, bbox_inches='tight', pad_inches=0.1)
 
     def plot_fourRegions(self, regionA, regionB, regionC, regionD, attridict, bgroup, sgroup, title='', save_name='', lumi=220, **kwargs):
         """Plot the signal and background histograms for the four regions."""
@@ -455,21 +329,9 @@ class CSVPlotter:
             order = None
             for idx, region in enumerate(regions):
                 ax = axes.flat[idx]
-                order = self.plot_SvBHist(
-                    ax=ax,
-                    evts=region,
-                    att=att,
-                    attoptions=options,
-                    order=order,
-                    **kwargs
-                )
+                order = self.plot_SvBHist(ax, region, att, options, order=order, **kwargs)
             
-            fig.savefig(
-                pjoin(self.outdir, f'{att}{save_name}.png'),
-                dpi=300,
-                bbox_inches='tight',
-                pad_inches=0.1
-            )
+            fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'), dpi=300, bbox_inches='tight', pad_inches=0.1)
         
 class ObjectPlotter():
     @staticmethod
