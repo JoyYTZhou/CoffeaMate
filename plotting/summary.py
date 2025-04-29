@@ -571,10 +571,11 @@ class PostSkimProcessor(PostProcessor):
             if not resolved_df.filter(like=dsname).empty:
                 try: 
                     nwgt = resolved_df.filter(like=dsname).filter(like='wgt').iloc[0,0]
+                    logging.debug(f"nwgt for {dsname} is {nwgt}")
+                    return nwgt
                 except:
                     logging.exception(f"Error finding weight columns for {dsname}")
-                logging.debug(f"nwgt for {dsname} is {nwgt}")
-                return nwgt
+                    return None
             else:
                 logging.warning(f"{dsname} not found!")
                 logging.debug(resolved_df)
