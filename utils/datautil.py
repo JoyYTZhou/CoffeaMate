@@ -185,7 +185,7 @@ class CutflowProcessor:
         """
         # Calculate physics weights
         physics_weights = {
-            dsinfo['shortname']: (1/dsinfo['nwgt']) * dsinfo['xsection']
+            dsinfo['shortname']: (1/dsinfo['nwgt']) * dsinfo.get('xsection', 1)
             for dsname, dsinfo in metadata.items()
         }
         
@@ -687,10 +687,8 @@ class DataSetUtil:
         # Process in parallel
         with mp.Pool(n_workers) as pool:
             validate_func = partial(DataSetUtil._validate_single_pair, 
-                                 root_dir=root_dir, 
-                                 csv_dir=csv_dir,
-                                 is_mc=is_mc)
-            
+                                 root_dir=root_dir, csv_dir=csv_dir, is_mc=is_mc)
+                                 
             # Process all pairs and collect results
             for result_type, result_info in pool.imap_unordered(validate_func, work_items):
                 if result_type == "valid":

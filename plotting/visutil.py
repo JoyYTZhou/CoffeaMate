@@ -54,7 +54,9 @@ class CSVPlotter:
             print(f"Multiplying by {factor}")
         else:
             multiply = 1
-        flat_wgt = 1/self.meta_dict[group][ds]['nwgt'] * multiply * self.meta_dict[group][ds]['xsection'] * luminosity
+        xsection = self.meta_dict[group][ds].get('xsection', 1)
+        nwgt = self.meta_dict[group][ds]['nwgt']
+        flat_wgt = 1/nwgt * multiply * xsection * luminosity
         return flat_wgt
     
     def process_datasets(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight_values', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:

@@ -9,7 +9,9 @@ from src.utils.datautil import CutflowProcessor, DataSetUtil, DatasetIterator, D
 from src.utils.rootutil import RootFileHandler
 from src.utils.displayutil import create_table, print_dataframe_rich
 
-luminosity = {"2022PreEE": 41.5/2 * 1000, "2022PostEE": 41.5 * 1000/2, "2023Summer": 32.7 * 1000}
+luminosity = {"2022PreEE": (5.0104+2.9700) * 1000, "2022PostEE": (5.8070+17.7819+3.0828) * 1000, "2023Summer": 32.7 * 1000}
+regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ', 'WWZ'], 'HH': ['ggF']}
+signals = ['HH', 'ZH', 'ZZ']
 
 class PostProcessor():
     """Class for loading and hadding data from skims/predefined selections produced directly by Processor.
@@ -80,12 +82,10 @@ class PostProcessor():
         
         logging.debug(f"Processing years: {self.years}")
 
-        logging.debug(f"Processing years: {self.years}")
-
     def _init_metadata(self):
         """Load metadata for each year."""
         self.meta_dict = {}
-        query_dir = pjoin(self.cfg['DATA_DIR'], 'weightedMC' if self.cfg['IS_MC'] else 'availableData')
+        query_dir = pjoin(self.cfg['DATA_DIR'], 'weightedMC')
         logging.debug(f"Getting metadata from {query_dir}")
         for year in self.years:
             logging.debug(f"Getting metadata for {year}.")
@@ -142,8 +142,7 @@ class PostProcessor():
         """Get the yield for the resolved cutflow tables. All the weights incorporate xsec * lumi.
         Save to LOCALOUTPUT."""
         self.__update_meta()
-        regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ'], 'HH': ['ggF']}
-        signals = ['HH', 'ZH', 'ZZ']
+
         inputdir = self.transferP if self.transferP is not None else self.inputdir
         resolved_dict, combined_dict = self.merge_cf(inputdir=inputdir, outputdir=self.tempdir, extra_kwd=extra_kwd)
         for year, combined in combined_dict.items():
@@ -190,10 +189,11 @@ class PostProcessor():
         tuple[dict, dict]
             (Weighted cutflows per year, Combined weights per year)
         """
-        resolved_wgted = {}
-        combined_wgted = {}
+        resolved_wgted, combined_wgted = {}, {}
 
         self.__update_meta()
+
+        wgted = self.cfg.get("IS_MC", True)
 
         for year in self.years:
             # Setup output directory
@@ -209,10 +209,7 @@ class PostProcessor():
                     continue
                     
                 resolved, combined = self.process_group_cutflow(
-                    group,
-                    self.meta_dict[year],
-                    pjoin(inputdir, year),
-                    self.lumi[year],
+                    group, self.meta_dict[year], pjoin(inputdir, year), self.lumi[year],
                     extra_kwd
                 )
                 resolved_list.append(resolved)
@@ -225,12 +222,15 @@ class PostProcessor():
             resolved_all.to_csv(pjoin(year_outdir, "allDatasetCutflow.csv"))
             
             # Extract weighted events
-            wgt_resolved = resolved_all.filter(like='wgt', axis=1)
-            wgt_resolved.columns = wgt_resolved.columns.str.replace('_wgt$', '', regex=True)
+            if wgted:
+                wgt_resolved = resolved_all.filter(like='wgt', axis=1)
+                wgt_resolved.columns = wgt_resolved.columns.str.replace('_wgt$', '', regex=True)
+            else:
+                wgt_resolved = resolved_all
             wgt_resolved.to_csv(pjoin(year_outdir, "ResolvedWgtOnly.csv"))
             if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
                 print_dataframe_rich(wgt_resolved, title=f"Resolved Weighted Cutflow for {year}")
-            
+        
             # Calculate efficiencies
             eff_df = CutflowProcessor.calculate_efficiency(wgt_resolved)
             eff_df.filter(like='eff', axis=1).to_csv(
@@ -329,9 +329,7 @@ class PostProcessor():
         
         # Apply physics scaling
         scaled_df, combined = CutflowProcessor.apply_physics_scale(
-            cutflow_df,
-            meta_dict[group],
-            luminosity
+            cutflow_df, meta_dict[group], luminosity
         )
         
         # Set group name for combined weights
@@ -401,7 +399,7 @@ class PostPreselProcessor(PostProcessor):
                 logging.error(f"Error processing CSV files for {dsname}: {e}")
                 return None
 
-    # Process datasets using DatasetIterator
+        # Process datasets using DatasetIterator
         results = self.dataset_iter.process_datasets(process_csv)
 
         # Consolidate results by group
@@ -438,6 +436,7 @@ class PostSkimProcessor(PostProcessor):
             query_dir = pjoin(self.cfg['DATA_DIR'], 'availableMC')
         else:
             query_dir = pjoin(self.cfg['DATA_DIR'], 'availableData')
+            self.lumi = {year: 1 for year in self.years}
         logging.debug(f"Using metadata json file {query_dir}")
         years_to_process = []
         for year in self.years:
@@ -463,11 +462,10 @@ class PostSkimProcessor(PostProcessor):
         self.__clean_roots()
     
     def hadd_results(self):
-        self.__hadd_roots()
-        self._hadd_cutflows()
-        if self.cfg['IS_MC']:
-            logging.debug("Reporting total number of weighted events.")
-            self.__get_total_nwgt_events()
+        # self.__hadd_roots()
+        # self._hadd_cutflows()
+        logging.debug("Reporting total number of events.")
+        self.__get_total_nwgt_events()
     
     def __clean_roots(self):
         """Delete the corrupted files in the filelist."""
@@ -566,16 +564,28 @@ class PostSkimProcessor(PostProcessor):
                 new_meta_dict[year] = {}
                 logging.debug(f"Metadata file not found for {year}. Creating new metadata table.")
 
-        def get_nwgt_per_group(dsname, dtdir):
-            resolved_df = pd.read_csv(FileSysHelper.glob_files(dtdir, f'*cf.csv')[0], index_col=0)
+        def get_nwgt_per_group(dsname, dtdir, is_mc):
+            filename = FileSysHelper.glob_files(dtdir, f'*cf.csv')[0]
+            logging.debug(f"Loading cutflow file {filename}")
+            resolved_df = pd.read_csv(filename, index_col=0)
+            logging.debug(f"Resolved cutflow for {dsname}:\n{resolved_df}")
             if not resolved_df.filter(like=dsname).empty:
-                try: 
-                    nwgt = resolved_df.filter(like=dsname).filter(like='wgt').iloc[0,0]
-                    logging.debug(f"nwgt for {dsname} is {nwgt}")
-                    return nwgt
-                except:
-                    logging.exception(f"Error finding weight columns for {dsname}")
-                    return None
+                if is_mc:
+                    try: 
+                        nwgt = resolved_df.filter(like=dsname).filter(like='wgt').iloc[0,0]
+                        logging.debug(f"nwgt for {dsname} is {nwgt}")
+                        return nwgt
+                    except:
+                        logging.exception(f"Error finding weight columns for {dsname}")
+                        return None
+                else:
+                    try:
+                        nwgt = resolved_df.filter(like=dsname).iloc[0,0]
+                        logging.debug(f"Number of events for {dsname} is {nwgt}")
+                        return nwgt
+                    except:
+                        logging.exception(f"Error finding valid columns for {dsname}")
+                        return None
             else:
                 logging.warning(f"{dsname} not found!")
                 logging.debug(resolved_df)
@@ -599,7 +609,7 @@ class PostSkimProcessor(PostProcessor):
             
             datadir = pjoin(root_dtdir, year, group)
             shortname = new_meta_dict[year][group][dsname]['shortname'] 
-            nwgt = get_nwgt_per_group(shortname, datadir)
+            nwgt = get_nwgt_per_group(shortname, datadir, self.cfg['IS_MC'])
             if nwgt is not None:
                 new_meta_dict[year][group][dsname]['nwgt'] = nwgt
 
