@@ -752,7 +752,6 @@ def iterwgt(func):
                 func(instance, process, ds, *args, **kwargs)
     return wrapper
 
-
 def arr_handler(dfarr, allow_delayed=True) -> ak.Array:
     """Handle different types of data arrays to convert them to awkward arrays."""
     if isinstance(dfarr, pd.core.series.Series):

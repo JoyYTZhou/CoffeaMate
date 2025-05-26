@@ -126,11 +126,8 @@ class BaseEventSelections:
     def _setevtsel(self, events):
         raise NotImplementedError("Method must be implemented in derived class!")
     
-    def getObjMasker(self, events, name, **kwargs) -> ObjectMasker:
-        return ObjectMasker(events, name, self.objselcfg[name], self.mapcfg[name], **kwargs)
-    
-    def getObjProc(self, name) -> ObjectProcessor:
-        return ObjectProcessor(name, self.mapcfg[name])
+    def getObjProc(self, events, name, **kwargs) -> ObjectProcessor:
+        return ObjectProcessor(events, name, self.objselcfg[name], self.mapcfg[name], **kwargs)
 
     @lru_cache(maxsize=32)
     def cf_to_df(self) -> pd.DataFrame:
@@ -193,70 +190,35 @@ class PreselSelections(BaseEventSelections):
         """Save weights to the collected objects."""
         weights = ['Generator_weight', 'LHEReweightingWeight']
         self._saveAttributes(events, weights)
-    
-    def handle_selection_masks(self, name: str, mask: ak.Array) -> None:
-        """Handle selection masks and update selection history.
+
+    def apply_selection_mask(self, events: ak.Array, name: str, obj: ObjectProcessor, mask: ak.Array) -> tuple[ObjectMasker, ak.Array]:
+        """Apply selection mask, update selection history, filter objcollect, and update object.
 
         Args:
+            events (ak.Array): Input events to be filtered
             name (str): Name of the selection being applied
-            mask (ak.Array): Boolean mask array for selection
+            obj (ObjectProc): Object instance to be updated
+            mask (ak.Array): Boolean mask array with same length as events
 
-        This method:
-        1. Applies selection and updates selection history
-        2. Filters previously collected objects with the mask
+        Returns:
+            tuple[ObjectMasker, ak.Array]: Updated (Object instance, filtered events)
         """
-        # Apply selection and update selection history
+        # Update selection history and filter objcollect
         if self._sequential and self.objsel.names:
             previous_mask = self.objsel.any(self.objsel.names[-1])
             self.objsel.add_sequential(name, mask, previous_mask)
         else:
             self.objsel.add(name, mask)
 
-        # Filter previously collected objects
         if self.objcollect:
             self.objcollect = {
                 key: val[mask] for key, val in self.objcollect.items()
             }
 
-    def selobjhelper(self, events: ak.Array, name: str, obj: ObjectMasker, mask: ak.Array) -> tuple[ObjectMasker, ak.Array]:
-        """Apply selection mask to events and update object collections.
-
-        This function handles both event-level and object-level selections by:
-        1. Applying a selection mask to the events
-        2. Updating the selection history in objsel
-        3. Filtering previously collected objects with the same mask
-        4. Updating the Object instance with filtered events
-
-        Args:
-            events (ak.Array): Input events to be filtered
-            name (str): Name of the selection being applied
-            obj (Object): Object instance to be updated
-            mask (ak.Array): Boolean mask array with same length as events
-
-        Returns:
-            tuple[Object, ak.Array]: Updated (Object instance, filtered events)
-
-        Examples:
-            >>> events = ak.Array(...)
-            >>> obj = Object(...)
-            >>> mask = events.pt > 30
-            >>> obj, filtered_events = selobjhelper(events, "pt_cut", obj, mask)
-
-        Notes:
-            - For sequential selections, the mask is combined with the previous selection
-            - All previously collected objects in self.objcollect are filtered with the same mask
-            - The input Object instance is updated with the filtered events
-        """
-        if isinstance(events, ak.Array):
-            logging.debug(f"Applying selection mask to {len(events)} events!")
-        
-        self.handle_selection_masks(name, mask)
-        
         # Filter events and update object
         filtered_events = events[mask]
-
+        obj.events = filtered_events
         if isinstance(filtered_events, ak.Array):
             logging.debug(f"Selection {name} passed {len(filtered_events)} events!")
-
-        obj.events = filtered_events
         return obj, filtered_events
+  
