@@ -266,15 +266,8 @@ def parallel_process_files(fileargs, executor, copydir=None, delayed_open=True, 
     if copydir is None:
         remote_load = True
     future_to_file = {
-        filename: executor.submit(
-            process_file,
-            filename,
-            fileinfo,
-            copydir,
-            delayed_open,
-            uproot_args,
-            remote_read=remote_load
-        ) for filename, fileinfo in fileargs['files'].items()
+        filename: executor.submit(process_file, filename, fileinfo, copydir, delayed_open, uproot_args, remote_read=remote_load)
+        for filename, fileinfo in fileargs['files'].items()
     }
     return future_to_file
 
