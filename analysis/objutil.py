@@ -259,7 +259,7 @@ class ObjectMasker(ObjectSelMixin):
         """Reduces per-object mask to event-level selections."""
         return op(ak.sum(mask, axis=1), count)
 
-class ObjectProcessor(ObjectSelMixin, ObjectMasker):
+class ObjectProcessor(ObjectMasker):
     """Processes physics objects in events, applying selections and delta R requirements."""
     def getzipped(self, events, mask=None, sort=True, sort_by='pt', **kwargs) -> ak.Array:
         """Get zipped object with optional masking and sorting.
@@ -280,22 +280,18 @@ class ObjectProcessor(ObjectSelMixin, ObjectMasker):
             zipped = zipped[self.sortmask(zipped[sort_by], **kwargs)]
         return zipped
     
-    def apply_event_level_dr(self, events, objmask, dr_threshold):
-        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask)
-
+    def event_level_dr_mask(self, events, objmask, dr_threshold, sortname='pt') -> ak.Array:
+        """Compute delta R (ΔR) mask for event-level selections (dim = (#events))."""
+        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask, sortname=sortname)
         dr_mask_events = self.maskredmask(dr_mask, opr.ge, 1)
-        events = events[dr_mask_events]
         
-        return dr_mask_events, events
+        return dr_mask_events
     
-    def apply_obj_level_dr(self, events, objmask, dr_threshold):
-        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask)
-        zipped = self.getzipped(events, mask=objmask)
+    def apply_obj_level_dr(self, events, objmask, dr_threshold, sortname='pt'):
+        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask, sortname=sortname)
+        zipped = self.getzipped(events, mask=objmask, sort_by=sortname)
 
-        # Separate leading object (always kept)
         leading = zipped[:,0]
-
-        # Initialize empty subleading array
         subleading = zipped[:,1:][dr_mask][:,0]
 
         return leading, subleading

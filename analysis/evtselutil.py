@@ -4,9 +4,27 @@ import pandas as pd
 import awkward as ak
 from typing import Optional
 from src.utils.coffeautil import weightedSelection, PackedSelection, sequentialSelection
-from src.analysis.objutil import ObjectMasker, ObjectProcessor
+from src.analysis.objutil import ObjectProcessor
 from functools import lru_cache
 
+class CommonObjSelMixin():
+    def apply_dr_selections(self, events, objname, drcut, obj_base_cond, sortname='pt', selection_name='dR'):
+        """Apply delta R selections to objects in the event data.
+        Returns:
+            obj_proc: ObjectProcessor instance for the selected object
+            events: Filtered events after applying delta R selections
+            ld_obj: Leading object after applying delta R
+            sd_obj: Subleading object after applying delta R"""
+        obj_proc = self.getObjProc(events, objname)
+        obj_mask = obj_proc.create_combined_mask(obj_base_cond)
+        dR_mask = obj_proc.event_level_dr_mask(events, obj_mask, drcut)
+        obj_proc, events = self.apply_selection_mask(events, selection_name, obj_proc, dR_mask)
+
+        obj_mask = obj_proc.create_combined_mask(obj_base_cond)
+        ld_obj, sd_obj = obj_proc.apply_obj_level_dr(events, obj_mask, drcut, sortname=sortname)
+        
+        return obj_proc, events, ld_obj, sd_obj
+        
 class BaseEventSelections:
     """Base class for handling event selections in particle physics analysis.
 
@@ -163,7 +181,7 @@ class SkimSelections(BaseEventSelections):
     def _getpassed(self, events):
         return events[self.cfno.maskscutflow[-1]]
  
-class PreselSelections(BaseEventSelections):
+class PreselSelections(CommonObjSelMixin, BaseEventSelections):
     """Class for handling selections that produce n-tuples."""
     def _getpassed(self, events):
         return self.objcollect_to_df()
@@ -191,7 +209,7 @@ class PreselSelections(BaseEventSelections):
         weights = ['Generator_weight', 'LHEReweightingWeight']
         self._saveAttributes(events, weights)
 
-    def apply_selection_mask(self, events: ak.Array, name: str, obj: ObjectProcessor, mask: ak.Array) -> tuple[ObjectMasker, ak.Array]:
+    def apply_selection_mask(self, events: ak.Array, name: str, obj: ObjectProcessor, mask: ak.Array) -> tuple[ObjectProcessor, ak.Array]:
         """Apply selection mask, update selection history, filter objcollect, and update object.
 
         Args:
@@ -201,7 +219,7 @@ class PreselSelections(BaseEventSelections):
             mask (ak.Array): Boolean mask array with same length as events
 
         Returns:
-            tuple[ObjectMasker, ak.Array]: Updated (Object instance, filtered events)
+            tuple[ObjectProcessor, ak.Array]: Updated (Object instance, filtered events)
         """
         # Update selection history and filter objcollect
         if self._sequential and self.objsel.names:

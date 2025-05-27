@@ -5,7 +5,7 @@ import json, logging
 from matplotlib.ticker import ScalarFormatter
 
 from src.utils.datautil import DataLoader, iterwgt, arr_handler
-from src.analysis.objutil import ObjectMasker, ObjectProcessor
+from src.analysis.objutil import ObjectProcessor
 from src.utils.filesysutil import FileSysHelper, pjoin, pdir, pbase
 from src.utils.plotutil import HistogramHelper, PlotStyle
 

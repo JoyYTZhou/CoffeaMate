@@ -3,7 +3,7 @@ import numpy as np
 import os
 import pandas as pd
 from scipy.stats import pearsonr
-from src.analysis.objutil import ObjectMasker, ObjectProcessor
+from src.analysis.objutil import ObjectProcessor
 
 pjoin = os.path.join
 
