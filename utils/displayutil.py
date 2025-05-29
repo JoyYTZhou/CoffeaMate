@@ -3,7 +3,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.logging import RichHandler
-from rich.traceback import install
 from rich.progress import track
 from rich.markdown import Markdown
 import argparse
@@ -103,7 +102,7 @@ def create_rich_logger() -> RichHandler:
     """Create a Rich logger handler with standard configuration"""
     return RichHandler(
         rich_tracebacks=True,
-        tracebacks_show_locals=True,
+        tracebacks_show_locals=False,
         show_time=True
     )
 

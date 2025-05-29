@@ -12,6 +12,28 @@ trigger_obj_namemap = {"id": "TrigObj_id", "filterBits": "TrigObj_filterBits", "
 
 class ObjectSelMixin:
     @staticmethod
+    def delta_r_match(A, B, dr_cut=0.1):
+        """
+        For each object in A (per event), check if it matches any object in B by ΔR < dr_cut.
+        
+        A, B: ak.Arrays of objects with .eta and .phi (same # of events)
+        Returns: ak.Array[bool] of shape (events x #A)
+        """
+        # Cartesian pairs (axis=2 keeps event structure)
+        pairs = ak.cartesian([A, B], axis=1)
+        a, b = ak.unzip(pairs)
+
+        # ΔR computation
+        deta = a.eta - b.eta
+        dphi = np.abs(a.phi - b.phi)
+        dphi = ak.where(dphi > np.pi, 2 * np.pi - dphi, dphi)
+        deltaR = np.sqrt(deta**2 + dphi**2)
+
+        # For each object in A, check if it matches *any* B in same event
+        matched = ak.any(deltaR < dr_cut, axis=-1)
+        return matched
+
+    @staticmethod
     def get_namemap(events: 'ak.Array', col_name: 'str', namemap: 'dict' = {}) -> dict:
         """Create a dictionary mapping field names to their corresponding arrays in events."""
         vec_type = ['pt', 'eta', 'phi', 'mass'] if not col_name == 'TrigObj' else ['pt', 'eta', 'phi']
@@ -49,7 +71,7 @@ class ObjectSelMixin:
 
     @staticmethod
     def fourvector(events: 'ak.Array', objname: 'str'=None, mask=None, sort=True,
-                   sortname='pt', ascending=False, axis=-1) -> vec.Array:
+                   sortname='pt', ascending=False, axis=-1) -> tuple[vec.Array, ak.Array]:
         """Creates a four-vector representation from event data.
 
         This method constructs a four-vector (momentum vector with energy) from the event data
@@ -118,6 +140,10 @@ class ObjectSelMixin:
         """Given events, read only object-related observables and zip them."""
         zipped_dict = ObjectSelMixin.get_namemap(events, objname, namemap)
         return dak.zip(zipped_dict) if isinstance(events, dak.lib.core.Array) else ak.zip(zipped_dict)
+    
+    def get_trig_zipped(self, events) -> ak.Array:
+        """Get zipped trigger objects from events."""
+        return self.set_zipped(events, 'TrigObj', trigger_obj_namemap)
 
 class ObjectMasker(ObjectSelMixin):
     """Handles object selections and mask creation for physics event data.
@@ -146,12 +172,13 @@ class ObjectMasker(ObjectSelMixin):
     ...                                        "eta": (operator.le, abs)})
         """
 
-    def __init__(self, events, name, selcfg, mapcfg, weakrefEvt=True):
+    def __init__(self, events, name, selcfg, mapcfg, weakrefEvt=True, sortname=None):
         self._name = name
         self.__weakref = weakrefEvt
         self.events = events  # This will use the property setter
         self._selcfg = selcfg
         self._mapcfg = mapcfg
+        self._sortname = sortname
 
     @property
     def events(self):
@@ -194,7 +221,7 @@ class ObjectMasker(ObjectSelMixin):
         Returns
         -------
         awkward.Array
-            Combined boolean mask where True indicates passing all conditions
+            Combined boolean mask for obj-level selection
         """
         if not conditions:
             return None
@@ -213,6 +240,11 @@ class ObjectMasker(ObjectSelMixin):
             func = op_func[1] if len(op_func) > 1 else None
             mask = self.custommask(field, op, func)
             combined_mask = combined_mask & mask  # Creates new array instead of modifying in place
+        
+        if self._sortname is not None:
+            sort_mask = self.getsortmask(self.events)
+            combined_mask = combined_mask[sort_mask]
+            
         return combined_mask
 
     def numselmask(self, mask, op):
@@ -229,6 +261,31 @@ class ObjectMasker(ObjectSelMixin):
         aodarr = self.events[aodname][selmask]
         sum_charge = abs(ak.sum(aodarr, axis=1))
         return (sum_charge < ak.num(aodarr, axis=1))
+    
+    def getsortmask(self, events) -> ak.Array:
+        """Get sorting mask for the events based on the configured sortname."""
+        if self._sortname is None:
+            return None
+        sortname = self._get_prop_name(self._sortname)
+        return self.sortmask(events[sortname], axis=-1, ascending=False)
+    
+    def getzipped(self, events, mask=None, **kwargs) -> ak.Array:
+        """Get zipped object with optional masking and sorting if sortname property is set. 
+        Mask is applied before sorting.
+
+        Parameters:
+        - `mask`: mask must be same dimension as any object attributes
+        - `**kwargs`: additional arguments passed to sortmask
+
+        Returns:
+        - Zipped awkward array of object attributes
+        """
+        zipped = self.set_zipped(events, self._name, self._mapcfg)
+        if mask is not None:
+            zipped = zipped[mask]
+        if self._sortname is not None:
+            zipped = zipped[self.sortmask(zipped[self._sortname], **kwargs)]
+        return zipped
 
     def match_trigger(self, lepton, trigger_id, dr_cut=0.1) -> ak.Array:
         """
@@ -254,6 +311,24 @@ class ObjectMasker(ObjectSelMixin):
         
         return ak.any(deltaR < dr_cut, axis=-1)
 
+    def match_trigger_object(self, trigger_id, dr_cut=0.1) -> ak.Array:
+        """
+        Match each lepton (per event) to trigger objects by ΔR and trigger ID.
+
+        Parameters:
+        - trigger_id: int, e.g., 13 for muons, 11 for electrons, 15 for taus
+        - dr_cut: float, deltaR threshold for matching
+
+        Returns:
+        - ak.Array of booleans, same shape as leptons (True if matched)
+        """
+        trig_objs = self.set_zipped(self.events, 'TrigObj', trigger_obj_namemap)
+        leptons = self.getzipped(self.events, mask=None)
+
+        trig_sel = trig_objs[abs(trig_objs['id']) == trigger_id]
+        
+        return self.delta_r_match(leptons, trig_sel, dr_cut)
+
     @staticmethod
     def maskredmask(mask, op, count) -> ak.Array:
         """Reduces per-object mask to event-level selections."""
@@ -261,35 +336,16 @@ class ObjectMasker(ObjectSelMixin):
 
 class ObjectProcessor(ObjectMasker):
     """Processes physics objects in events, applying selections and delta R requirements."""
-    def getzipped(self, events, mask=None, sort=True, sort_by='pt', **kwargs) -> ak.Array:
-        """Get zipped object with optional masking and sorting.
-
-        Parameters:
-        - `mask`: mask must be same dimension as any object attributes
-        - `sort`: whether to sort the zipped object (default: True)
-        - `sort_by`: field to sort by (default: 'pt')
-        - `**kwargs`: additional arguments passed to sortmask
-
-        Returns:
-        - Zipped awkward array of object attributes
-        """
-        zipped = self.set_zipped(events, self._name, self._mapcfg)
-        if mask is not None:
-            zipped = zipped[mask]
-        if sort:
-            zipped = zipped[self.sortmask(zipped[sort_by], **kwargs)]
-        return zipped
-    
-    def event_level_dr_mask(self, events, objmask, dr_threshold, sortname='pt') -> ak.Array:
+    def event_level_dr_mask(self, events, objmask, dr_threshold) -> tuple[ak.Array, ak.Array]:
         """Compute delta R (ΔR) mask for event-level selections (dim = (#events))."""
-        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask, sortname=sortname)
+        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask)
         dr_mask_events = self.maskredmask(dr_mask, opr.ge, 1)
         
         return dr_mask_events
     
-    def apply_obj_level_dr(self, events, objmask, dr_threshold, sortname='pt'):
-        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask, sortname=sortname)
-        zipped = self.getzipped(events, mask=objmask, sort_by=sortname)
+    def apply_obj_level_dr(self, events, objmask, dr_threshold):
+        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask)
+        zipped = self.getzipped(events, mask=objmask)
 
         leading = zipped[:,0]
         subleading = zipped[:,1:][dr_mask][:,0]
@@ -363,14 +419,8 @@ class ObjectProcessor(ObjectMasker):
             Boolean mask to filter the objects.
         **kwargs : dict
             Additional keyword arguments passed to fourvector and sorting:
-            - sort : bool, default=True
-                Whether to sort the objects by pt
-            - sortname : str, default='pt'
-                Field name to sort by
             - ascending : bool, default=False
                 Sort direction (False=descending, True=ascending)
-            - axis : int, default=-1
-                Axis along which to sort
 
         Returns
         -------
@@ -387,13 +437,15 @@ class ObjectProcessor(ObjectMasker):
         >>> # Get dR mask without sorting
         >>> dR_mask = obj.dRwSelf(events, 0.4, pt_mask, sort=False)
         """
-        obj_lvs, sort_mask = self.fourvector(events, self._name, mask, **kwargs)
+        sort = False if self._sortname is None else True
+        obj_lvs, sort_mask = self.fourvector(events, self._name, mask, sort=sort, sortname=self._sortname)
         ld_lv, sd_lvs = obj_lvs[:, 0], obj_lvs[:, 1:]
         dR_mask = self.dRoverlap(ld_lv, sd_lvs, threshold)
         return dR_mask, sort_mask
 
-    def dRwOther(self, events, vec, threshold, **kwargs):
-        object_lv, sort_mask = self.fourvector(events, self._name, **kwargs)
+    def dRwOther(self, events, vec, threshold):
+        sort = False if self._sortname is None else True 
+        object_lv, sort_mask = self.fourvector(events, self._name, sort=sort, sortname=self._sortname)
         return self.dRoverlap(vec, object_lv, threshold), sort_mask
     
     @staticmethod

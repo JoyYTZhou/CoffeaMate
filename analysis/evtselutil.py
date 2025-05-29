@@ -2,28 +2,50 @@
 import dask, logging
 import pandas as pd
 import awkward as ak
+import operator as opr
 from typing import Optional
 from src.utils.coffeautil import weightedSelection, PackedSelection, sequentialSelection
 from src.analysis.objutil import ObjectProcessor
 from functools import lru_cache
 
 class CommonObjSelMixin():
-    def apply_dr_selections(self, events, objname, drcut, obj_base_cond, sortname='pt', selection_name='dR'):
+    def apply_dr_selections(self, events, objname, drcut, obj_mask, sortname='pt', selection_name='dR') -> tuple[ObjectProcessor, ak.Array, ak.Array, ak.Array, ak.Array]:
         """Apply delta R selections to objects in the event data.
         Returns:
             obj_proc: ObjectProcessor instance for the selected object
             events: Filtered events after applying delta R selections
+            sortname: Name of the sorting column
             ld_obj: Leading object after applying delta R
             sd_obj: Subleading object after applying delta R"""
-        obj_proc = self.getObjProc(events, objname)
-        obj_mask = obj_proc.create_combined_mask(obj_base_cond)
-        dR_mask = obj_proc.event_level_dr_mask(events, obj_mask, drcut)
-        obj_proc, events = self.apply_selection_mask(events, selection_name, obj_proc, dR_mask)
-
-        obj_mask = obj_proc.create_combined_mask(obj_base_cond)
-        ld_obj, sd_obj = obj_proc.apply_obj_level_dr(events, obj_mask, drcut, sortname=sortname)
+        obj_proc = self.getObjProc(events, objname, sortname=None)
+        dR_mask_event = obj_proc.event_level_dr_mask(events, obj_mask, drcut)
+        obj_proc, events = self.apply_selection_mask(events, selection_name, obj_proc, dR_mask_event)
         
-        return obj_proc, events, ld_obj, sd_obj
+        obj_mask = obj_mask[dR_mask_event]
+        obj_proc = self.getObjProc(events, objname, sortname=sortname)
+        ld_obj, sd_obj = obj_proc.apply_obj_level_dr(events, obj_mask, drcut)
+        n_obj = ak.sum(obj_mask, axis=1)
+        
+        return obj_proc, events, ld_obj, sd_obj, n_obj
+    
+    def apply_objsel_trigger_match(self, events, objname, trigger_id, obj_base_cond, num_selname, dr_cut=0.1, match_selname='Trigger Match') -> tuple[ObjectProcessor, ak.Array, ak.Array]:
+        """Apply object selection and trigger matching to events.
+        Returns:
+            obj_proc: ObjectProcessor instance for the selected object
+            events: Filtered events after applying object selection and trigger matching
+            obj_mask: Boolean mask representing selected objects"""
+        obj_proc = self.getObjProc(events, objname, sortname=None)
+        obj_mask = obj_proc.create_combined_mask(obj_base_cond)
+        obj_nummask = obj_proc.numselmask(obj_mask, opr.ge)
+        obj_proc, events = self.apply_selection_mask(events, num_selname, obj_proc, obj_nummask)
+
+        obj_mask = (obj_proc.create_combined_mask(obj_base_cond) & obj_proc.match_trigger_object(trigger_id, dr_cut=dr_cut))
+        tau_nummask = obj_proc.numselmask(obj_mask, opr.ge)
+        obj_proc, events = self.apply_selection_mask(events, match_selname, obj_proc, tau_nummask)
+
+        obj_mask = obj_mask[tau_nummask]
+
+        return obj_proc, events, obj_mask
         
 class BaseEventSelections:
     """Base class for handling event selections in particle physics analysis.
