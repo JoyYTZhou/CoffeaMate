@@ -53,11 +53,7 @@ class CutflowProcessor:
             cutflow_events = cutflow[col_name].iloc[-1]
             
         if isinstance(rootfiles, str):
-            if empty_kwd in rootfiles:
-                logging.warning(f"Empty root file detected - {rootfiles}")
-                return cutflow_events == 0
-            else:
-                rootfiles = [rootfiles]
+            rootfiles = [rootfiles]
             
         try:
             total_events = 0
@@ -66,7 +62,7 @@ class CutflowProcessor:
             for root_file in rootfiles:
                 if empty_kwd in root_file:
                     logging.warning(f"Empty root file detected - {root_file}")
-                    return cutflow_events == 0 
+                    return cutflow_events == 0, cutflow_events 
                 try:
                     with uproot.open(root_file) as f:
                         total_events += f["Events"].num_entries
@@ -76,7 +72,7 @@ class CutflowProcessor:
             
             if corrupted_files:
                 logging.warning(f"Found {len(corrupted_files)} corrupted root files")
-                return False
+                return False, cutflow_events
             
             logging.info("Checking event counts...")
             logging.info(f"Events in root files: {total_events}")
@@ -85,11 +81,11 @@ class CutflowProcessor:
             if total_events != cutflow_events:
                 logging.warning(f"Events count from root files {total_events} does not match cutflow {cutflow_events}")
             
-            return total_events == cutflow_events
+            return total_events == cutflow_events, cutflow_events
         
         except Exception as e:
             logging.error(f"Error checking events match: {str(e)}")
-            return False
+            return False, cutflow_events
 
     @staticmethod
     def merge_cutflows(inputdir, dataset_name, keyword='cutflow', save=True, outpath=None):
@@ -597,7 +593,7 @@ class DataSetUtil:
         return result, dataset_info['metadata']
 
     @staticmethod
-    def validate_single_pair(uuid_info, root_dir, csv_dir, is_mc) -> tuple[str, dict]:
+    def validate_single_pair(uuid_info, root_dir, csv_dir, is_mc) -> tuple[str, dict, int]:
         """Helper function to validate a single UUID pair.
         
         Parameters
@@ -612,6 +608,7 @@ class DataSetUtil:
             - "mismatched" if files exist but event counts do not match
             - "missing" if either root or CSV files are missing
         - dict with details about the validation result
+        - int: number of events for the matched cutflow CSV file
         """
         shortname, uuid = uuid_info
         base_pattern = f"{shortname}_{uuid}"
@@ -626,7 +623,7 @@ class DataSetUtil:
                 "root": root_files,
                 "csv": csv_files,
                 "uuid": uuid
-            })
+            }, 0)
         
         # Check if files exist
         if not root_files or not csv_files:
@@ -635,7 +632,7 @@ class DataSetUtil:
                 "uuid": uuid,
                 "missing_root": len(root_files) == 0,
                 "missing_csv": len(csv_files) == 0
-            })
+            }, 0)
         
         # Validate event counts
         try:
@@ -647,10 +644,10 @@ class DataSetUtil:
                         "root": root_files,
                         "csv": csv_files[0],
                         "uuid": uuid,
-                    })
-                events_match = CutflowProcessor.check_events_match(df=df, col_kwd='raw', rootfiles=root_files)
+                    }, 0)
+                events_match, no_events = CutflowProcessor.check_events_match(df=df, col_kwd='raw', rootfiles=root_files)
             else:
-                events_match = CutflowProcessor.check_events_match(df=df, col_kwd=None, rootfiles=root_files)
+                events_match, no_events = CutflowProcessor.check_events_match(df=df, col_kwd=None, rootfiles=root_files)
             
             if not events_match:
                 return ("mismatched", {
@@ -658,22 +655,22 @@ class DataSetUtil:
                     "root": root_files,
                     "csv": csv_files[0],
                     "uuid": uuid
-                })
+                }, 0)
             else:
                 return ("valid", {
                     "shortname": shortname,
                     "uuid": uuid
-                })
+                }, no_events)
         except Exception as e:
             logging.error(f"Error validating files for {shortname} UUID {uuid}: {str(e)}")
             return ("missing", {
                 "shortname": shortname,
                 "uuid": uuid,
                 "error": str(e)
-            })
+            }, 0)
 
     @staticmethod
-    def validate_file_pairs(json_path: str, root_dir: str, csv_dir: str, n_workers: int = None) -> dict:
+    def validate_file_pairs(json_path: str, root_dir: str, csv_dir: str, n_workers: int = None) -> tuple[dict, int]:
         """Validate matching root and cutflow CSV files for a dataset in parallel.
         
         Parameters
@@ -684,6 +681,7 @@ class DataSetUtil:
         
         Returns
         - dict: Dictionary with validation results
+        - int: Total number of events matched
         """
         # Get dataset information
         dataset_info, meta_data = DataSetUtil.extract_uuids(json_path)
@@ -702,13 +700,15 @@ class DataSetUtil:
             
         # Prepare results container
         results = {"mismatched_events": [], "missing_files": []}
+        total_no = 0
         
         # Process in parallel
         with mp.Pool(n_workers) as pool:
             validate_func = partial(DataSetUtil.validate_single_pair, root_dir=root_dir, csv_dir=csv_dir, is_mc=is_mc)
                                  
             # Process all pairs and collect results
-            for result_type, result_info in pool.imap_unordered(validate_func, work_items):
+            for result_type, result_info, no_events in pool.imap_unordered(validate_func, work_items):
+                total_no += no_events
                 if result_type == "valid":
                     pass
                 elif result_type == "mismatched":
@@ -718,7 +718,7 @@ class DataSetUtil:
         
         logging.warning(f"Total of {len(results['missing_files'])} missing files in {root_dir}")
         
-        return results
+        return results, total_no
     
     @staticmethod
     def print_json_as_rich_table(data):

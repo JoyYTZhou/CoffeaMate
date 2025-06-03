@@ -467,13 +467,15 @@ class PostSkimProcessor(PostProcessor):
         Parameters
         - `rq_keys`: list of required keys to check for in the root files"""
         corrupted ={}
+        no_matched_events = {}
         for year in self.years:
             corrupted[year] = {}
             for group in self.groups(year):
                 ori_samples = pjoin(self.cfg['DATA_DIR'], 'preprocessed', f"{group}_{year}.json.gz")
                 dt_dir = pjoin(self.inputdir, year, group)
-                results = DataSetUtil.validate_file_pairs(ori_samples, dt_dir, dt_dir, n_workers=2)
+                results, no_events = DataSetUtil.validate_file_pairs(ori_samples, dt_dir, dt_dir, n_workers=2)
                 corrupted[year][group] = results
+                no_matched_events[year][group] = no_events
         if corrupted:
             logging.warning(f"Corrupted files found: {corrupted}")
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -481,6 +483,9 @@ class PostSkimProcessor(PostProcessor):
             with open(filename, 'w') as f:
                 json.dump(corrupted, f)
             logging.error(f"Saved corrupted files to {filename}")
+        
+        with open('no_matched_events.json', 'w') as f:
+            json.dump(no_matched_events, f, indent=4)
         
         return corrupted
     
