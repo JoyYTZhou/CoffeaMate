@@ -597,77 +597,39 @@ class DataSetUtil:
         """Helper function to validate a single UUID pair.
         
         Parameters
-        - uuid_info: tuple of (shortname, uuid)
-        - root_dir: directory containing root files of pattern {shortname}_{uuid}*.root
+        - uuid_info: tuple containing (shortname, uuid)
+        - root_dir: directory containing root files
         - csv_dir: directory containing cutflow CSV files
-        - is_mc: boolean indicating if the dataset is MC (would contain weight column if so)
-        
+
         Returns
-        - str:
-            - "valid" if files match and event counts are consistent
-            - "mismatched" if files exist but event counts do not match
-            - "missing" if either root or CSV files are missing
-        - dict with details about the validation result
-        - int: number of events for the matched cutflow CSV file
+        - tuple: (status, info_dict, number_of_events)
+            - status: "valid", "mismatched", or "missing"
+            - info_dict: dictionary with details about the validation
+            - number_of_events: total number of events matched
         """
         shortname, uuid = uuid_info
         base_pattern = f"{shortname}_{uuid}"
-        
-        # Find matching files
         root_files = FileSysHelper.glob_files(root_dir, filepattern=f"{base_pattern}*.root")
         csv_files = FileSysHelper.glob_files(csv_dir, filepattern=f"{base_pattern}*cutflow.csv")
-        if len(csv_files) != 1: 
-            logging.error(f"Expected exactly one cutflow CSV file for {shortname} UUID {uuid}, found {len(csv_files)}")
-            return ("mismatched", {
-                "shortname": shortname,
-                "root": root_files,
-                "csv": csv_files,
-                "uuid": uuid
-            }, 0)
-        
-        # Check if files exist
         if not root_files or not csv_files:
-            return ("missing", {
-                "shortname": shortname,
-                "uuid": uuid,
-                "missing_root": len(root_files) == 0,
-                "missing_csv": len(csv_files) == 0
-            }, 0)
-        
-        # Validate event counts
+            return ("missing", {"shortname": shortname, "uuid": uuid, "missing_root": len(root_files) == 0, "missing_csv": len(csv_files) == 0}, 0)
+        if len(csv_files) != 1:
+            logging.error(f"Expected exactly one cutflow CSV file for {shortname} UUID {uuid}, found {len(csv_files)}")
+            return ("mismatched", {"shortname": shortname, "root": root_files, "csv": csv_files, "uuid": uuid}, 0)
         try:
             df = pd.read_csv(csv_files[0], index_col=0)
-            if is_mc: 
+            if is_mc:
                 if not CutflowProcessor.check_wgt_exist(df):
-                    return ("mismatched", {
-                        "shortname": shortname,
-                        "root": root_files,
-                        "csv": csv_files[0],
-                        "uuid": uuid,
-                    }, 0)
+                    return ("mismatched", {"shortname": shortname, "root": root_files, "csv": csv_files[0], "uuid": uuid}, 0)
                 events_match, no_events = CutflowProcessor.check_events_match(df=df, col_kwd='raw', rootfiles=root_files)
             else:
                 events_match, no_events = CutflowProcessor.check_events_match(df=df, col_kwd=None, rootfiles=root_files)
-            
             if not events_match:
-                return ("mismatched", {
-                    "shortname": shortname,
-                    "root": root_files,
-                    "csv": csv_files[0],
-                    "uuid": uuid
-                }, 0)
-            else:
-                return ("valid", {
-                    "shortname": shortname,
-                    "uuid": uuid
-                }, no_events)
+                return ("mismatched", {"shortname": shortname, "root": root_files, "csv": csv_files[0], "uuid": uuid}, 0)
+            return ("valid", {"shortname": shortname, "uuid": uuid}, no_events)
         except Exception as e:
             logging.error(f"Error validating files for {shortname} UUID {uuid}: {str(e)}")
-            return ("missing", {
-                "shortname": shortname,
-                "uuid": uuid,
-                "error": str(e)
-            }, 0)
+            return ("missing", {"shortname": shortname, "uuid": uuid, "error": str(e)}, 0)
 
     @staticmethod
     def validate_file_pairs(json_path: str, root_dir: str, csv_dir: str, n_workers: int = None) -> tuple[dict, int]:
