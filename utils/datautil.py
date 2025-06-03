@@ -29,20 +29,29 @@ class CutflowProcessor:
         return True
         
     @staticmethod
-    def check_events_match(df, col_name, rootfiles, empty_kwd='empty') -> bool:
+    def check_events_match(df, col_kwd, rootfiles, empty_kwd='empty') -> bool:
         """Validates if events count in cutflow matches root files.
         
         Parameters
         - df: pandas DataFrame containing cutflow
-        - col_name: column name in DataFrame containing event counts
+        - col_kwd: keyword to identify the column with event counts
         - rootfiles: single root file path or list of root file paths
         - empty_kwd: keyword to identify empty files
         
         Returns
         - bool: True if events match or file is properly marked as empty, False if mismatch or corruption
         """
-        cutflow_events = df[col_name].iloc[-1]
-
+        if col_kwd is None:
+            cutflow = df
+        else:
+            cutflow = df.filter(like=col_kwd)
+        if cutflow.empty:
+            logging.error(f"Cutflow DataFrame is empty or does not contain the specified column kwd {col_kwd}.")
+            cutflow_events = 0
+        else:
+            col_name = cutflow.columns[0] if len(cutflow.columns) == 1 else col_kwd
+            cutflow_events = cutflow[col_name].iloc[-1]
+            
         if isinstance(rootfiles, str):
             if empty_kwd in rootfiles:
                 logging.warning(f"Empty root file detected - {rootfiles}")
@@ -74,7 +83,7 @@ class CutflowProcessor:
             logging.info(f"Events in cutflow: {cutflow_events}")
 
             if total_events != cutflow_events:
-                logging.warning(f"Eventts count from root files {total_events} does not match cutflow {cutflow_events}")
+                logging.warning(f"Events count from root files {total_events} does not match cutflow {cutflow_events}")
             
             return total_events == cutflow_events
         
@@ -419,6 +428,8 @@ class DatasetIterator:
         self.input_root = input_root_dir
         self.temp_root = temp_root_dir
         self.transfer_root = transfer_root
+        logging.debug("Setup DatasetIterator with years: %s, groups_func: %s, input_root: %s, temp_root: %s, transfer_root: %s", 
+                      years, groups_func.__name__, input_root_dir, temp_root_dir, transfer_root)
 
     def iterate_datasets(self, fullname=False):
         """Iterator that yields (year, group, dataset_name, dataset_info)."""
@@ -439,7 +450,7 @@ class DatasetIterator:
             for group in self.groups_func(year):
                 yield year, group, meta[group]
 
-    def process_datasets(self, callback, setup_dirs=True):
+    def process_datasets(self, callback, setup_dirs=True, callback_args={}):
         """Process multiple datasets across years and groups using a provided callback function.
 
         This function iterates over:
@@ -492,8 +503,15 @@ class DatasetIterator:
                 FileSysHelper.checkpath(output_dir, createdir=True)
             if not FileSysHelper.checkpath(input_dir, createdir=False):
                 continue
+            
+            result = callback(dsname, input_dir, output_dir, **callback_args)
 
-            results[year][group][dsname] = callback(dsname, input_dir, output_dir)
+            if result is None:
+                logging.warning(f"Callback returned None for {dsname} in {year}/{group}. Skipping.")
+            elif isinstance(result, tuple):
+                logging.warning(f"Callback returned a tuple for {dsname} in {year}/{group}. Expected a single result.")
+            else:
+                results[year][group][dsname] = result
 
             if self.transfer_root:
                 transfer_dir = f"{self.transfer_root}/{year}/{group}"
@@ -579,30 +597,36 @@ class DataSetUtil:
         return result, dataset_info['metadata']
 
     @staticmethod
-    def _validate_single_pair(uuid_info, root_dir, csv_dir, is_mc):
+    def validate_single_pair(uuid_info, root_dir, csv_dir, is_mc) -> tuple[str, dict]:
         """Helper function to validate a single UUID pair.
         
         Parameters
         - uuid_info: tuple of (shortname, uuid)
-        - root_dir: directory containing root files
+        - root_dir: directory containing root files of pattern {shortname}_{uuid}*.root
         - csv_dir: directory containing cutflow CSV files
         - is_mc: boolean indicating if the dataset is MC (would contain weight column if so)
         
         Returns
-        - dict: Validation result for this UUID
+        - str:
+            - "valid" if files match and event counts are consistent
+            - "mismatched" if files exist but event counts do not match
+            - "missing" if either root or CSV files are missing
+        - dict with details about the validation result
         """
         shortname, uuid = uuid_info
         base_pattern = f"{shortname}_{uuid}"
         
         # Find matching files
-        root_files = FileSysHelper.glob_files(
-            root_dir, 
-            filepattern=f"{base_pattern}*.root"
-        )
-        csv_files = FileSysHelper.glob_files(
-            csv_dir, 
-            filepattern=f"{base_pattern}*cutflow.csv"
-        )
+        root_files = FileSysHelper.glob_files(root_dir, filepattern=f"{base_pattern}*.root")
+        csv_files = FileSysHelper.glob_files(csv_dir, filepattern=f"{base_pattern}*cutflow.csv")
+        if len(csv_files) != 1: 
+            logging.error(f"Expected exactly one cutflow CSV file for {shortname} UUID {uuid}, found {len(csv_files)}")
+            return ("mismatched", {
+                "shortname": shortname,
+                "root": root_files,
+                "csv": csv_files,
+                "uuid": uuid
+            })
         
         # Check if files exist
         if not root_files or not csv_files:
@@ -624,11 +648,9 @@ class DataSetUtil:
                         "csv": csv_files[0],
                         "uuid": uuid,
                     })
-            events_match = CutflowProcessor.check_events_match(
-                df=df,
-                col_name='raw',
-                rootfiles=root_files
-            )
+                events_match = CutflowProcessor.check_events_match(df=df, col_kwd='raw', rootfiles=root_files)
+            else:
+                events_match = CutflowProcessor.check_events_match(df=df, col_kwd=None, rootfiles=root_files)
             
             if not events_match:
                 return ("mismatched", {
@@ -679,15 +701,11 @@ class DataSetUtil:
             n_workers = max(1, mp.cpu_count() - 2)
             
         # Prepare results container
-        results = {
-            "mismatched_events": [],
-            "missing_files": []
-        }
+        results = {"mismatched_events": [], "missing_files": []}
         
         # Process in parallel
         with mp.Pool(n_workers) as pool:
-            validate_func = partial(DataSetUtil._validate_single_pair, 
-                                 root_dir=root_dir, csv_dir=csv_dir, is_mc=is_mc)
+            validate_func = partial(DataSetUtil.validate_single_pair, root_dir=root_dir, csv_dir=csv_dir, is_mc=is_mc)
                                  
             # Process all pairs and collect results
             for result_type, result_info in pool.imap_unordered(validate_func, work_items):

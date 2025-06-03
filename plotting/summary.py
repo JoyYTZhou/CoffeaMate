@@ -108,13 +108,8 @@ class PostProcessor():
     def _init_iter(self):
         """Initialize the dataset iterator for processing."""
         self.dataset_iter = DatasetIterator(
-            years=self.years,
-            groups_func=self.groups,
-            meta_dict=self.meta_dict,
-            input_root_dir=self.inputdir,
-            temp_root_dir=self.tempdir,
-            transfer_root=self.transferP
-        ) 
+            years=self.years, groups_func=self.groups, meta_dict=self.meta_dict,
+            input_root_dir=self.inputdir, temp_root_dir=self.tempdir, transfer_root=self.transferP) 
         
     def __del__(self):
         FileSysHelper.remove_emptydir(self.tempdir)
@@ -164,18 +159,6 @@ class PostProcessor():
             self.meta_dict[year] = PostProcessor.calc_wgt(pjoin(outputdir, year), self.meta_dict[year],
                                 pjoin(new_meta_dir, f'{year}.json'), self.groups(year))
 
-    # def hadd_csvouts(self) -> None:
-    #     """Hadd csv output files of datasets into one csv file"""
-    #     def process_csv(dsname, dtdir, outdir):
-    #         concat = lambda dfs: pd.concat(dfs, axis=0)
-    #         try:
-    #             df = load_csvs(dtdir, f'{dsname}*output*csv', func=concat)
-    #             df.to_csv(pjoin(outdir, f"{dsname}_out.csv"))
-    #         except Exception as e:
-    #             print(f"Error loading csv files for {dsname}: {e}")
-        
-    #     self.__iterate_meta(process_csv)
-                        
     def merge_cf(self, inputdir, outputdir, extra_kwd=''):
         """Merges and weights all cutflow tables across years and groups. All the weights incorporate xsec * lumi.
         
@@ -462,10 +445,11 @@ class PostSkimProcessor(PostProcessor):
         self.__clean_roots()
     
     def hadd_results(self):
-        self.__hadd_roots()
-        self._hadd_cutflows()
+        # self.__hadd_roots()
+        # self._hadd_cutflows()
+        self._check_hadded()
         logging.debug("Reporting total number of events.")
-        self.__get_total_nwgt_events()
+        # self.__get_total_nwgt_events()
     
     def __clean_roots(self):
         """Delete the corrupted files in the filelist."""
@@ -499,12 +483,30 @@ class PostSkimProcessor(PostProcessor):
             logging.error(f"Saved corrupted files to {filename}")
         
         return corrupted
+    
+    def _check_hadded(self):
+        """Check if the hadded root files have the same number of events as the cutflow tables."""
+        corrupted = {}
+        def check_hadded(dsname, dtdir, outdir):
+            err_code, err_results = DataSetUtil.validate_single_pair((dsname, ''), dtdir, dtdir, self.cfg['IS_MC'])
+            if err_code == 'mismatched':
+                return {err_code: err_results}
+            else:
+                return None
+        
+        self.dataset_iter = DatasetIterator(years=self.years, groups_func=self.groups, meta_dict=self.meta_dict,
+            input_root_dir=self.transferP, temp_root_dir=self.tempdir, transfer_root=None)
+        
+        results = self.dataset_iter.process_datasets(check_hadded)
+        with open('hadded_corrupted.json', 'w') as f:
+            json.dump(results, f, indent=4)
+
+        logging.info("Hadded root files check completed. Results saved to hadded_corrupted.json")
 
     def __hadd_roots(self) -> str:
         """Hadd root files of datasets into appropriate size based on settings"""
-        def process_ds(dsname, dtdir, outdir):
+        def process_ds(dsname, dtdir, outdir, batch_size):
             root_files = FileSysHelper.glob_files(dtdir, f'{dsname}*.root', add_prefix=True, exclude='empty')
-            batch_size = 100 
             corrupted = set()
             for i in range(0, len(root_files), batch_size):
                 batch_files = root_files[i:i+batch_size]
@@ -519,7 +521,9 @@ class PostSkimProcessor(PostProcessor):
                     logging.info(batch_files)
             return list(corrupted)
         
-        results = DataSetUtil.extract_leaf_values(self.dataset_iter.process_datasets(process_ds))
+        batch_size = 100 if self.cfg['IS_MC'] else 5
+        
+        results = DataSetUtil.extract_leaf_values(self.dataset_iter.process_datasets(process_ds, callback_args={'batch_size': batch_size}))
         corrupted = list(chain(*results))
         
         if corrupted:
@@ -580,7 +584,7 @@ class PostSkimProcessor(PostProcessor):
                         return None
                 else:
                     try:
-                        nwgt = resolved_df.filter(like=dsname).iloc[0,0]
+                        nwgt = int(resolved_df.filter(like=dsname).iloc[0,0])
                         logging.debug(f"Number of events for {dsname} is {nwgt}")
                         return nwgt
                     except:
