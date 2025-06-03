@@ -455,7 +455,7 @@ class DatasetIterator:
         3. All datasets within each group (from self.meta_dict)
 
         For each dataset, it:
-        1. Creates necessary directory structure if setup_dirs=True
+            1. Creates necessary directory structure if setup_dirs=True
             2. Executes the callback function with dataset information
             3. Optionally transfers results to transfer_root if specified
 

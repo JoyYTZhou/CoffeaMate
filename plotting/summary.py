@@ -448,7 +448,7 @@ class PostSkimProcessor(PostProcessor):
         # self.__hadd_roots()
         # self._hadd_cutflows()
         self._check_hadded()
-        logging.debug("Reporting total number of events.")
+        # logging.debug("Reporting total number of events.")
         # self.__get_total_nwgt_events()
     
     def __clean_roots(self):
@@ -470,12 +470,13 @@ class PostSkimProcessor(PostProcessor):
         no_matched_events = {}
         for year in self.years:
             corrupted[year] = {}
+            no_matched_events[year] = {}
             for group in self.groups(year):
                 ori_samples = pjoin(self.cfg['DATA_DIR'], 'preprocessed', f"{group}_{year}.json.gz")
                 dt_dir = pjoin(self.inputdir, year, group)
                 results, no_events = DataSetUtil.validate_file_pairs(ori_samples, dt_dir, dt_dir, n_workers=2)
                 corrupted[year][group] = results
-                no_matched_events[year][group] = no_events
+                no_matched_events[year][group] = int(no_events)
         if corrupted:
             logging.warning(f"Corrupted files found: {corrupted}")
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -493,7 +494,8 @@ class PostSkimProcessor(PostProcessor):
         """Check if the hadded root files have the same number of events as the cutflow tables."""
         corrupted = {}
         def check_hadded(dsname, dtdir, outdir):
-            err_code, err_results = DataSetUtil.validate_single_pair((dsname, ''), dtdir, dtdir, self.cfg['IS_MC'])
+            err_code, err_results, no_events = DataSetUtil.validate_single_pair((dsname, ''), dtdir, dtdir, self.cfg['IS_MC'])
+            logging.warning("Number of raw events in cutflow table: %s", no_events)
             if err_code == 'mismatched':
                 return {err_code: err_results}
             else:
@@ -519,14 +521,14 @@ class PostSkimProcessor(PostProcessor):
                 try:
                     new_corrupt = RootFileHandler.call_hadd(outname, batch_files)
                     if new_corrupt is not None:
-                        print(f"Error merging filename batch {i}")
+                        logging.error(f"Error hadding {dsname} batch {i}: {new_corrupt}")
                         corrupted |= new_corrupt
                 except Exception as e:
                     logging.error(f"Hadding {dsname} encountered error {e}")
                     logging.info(batch_files)
             return list(corrupted)
         
-        batch_size = 100 if self.cfg['IS_MC'] else 5
+        batch_size = 60 if self.cfg['IS_MC'] else 5
         
         results = DataSetUtil.extract_leaf_values(self.dataset_iter.process_datasets(process_ds, callback_args={'batch_size': batch_size}))
         corrupted = list(chain(*results))
