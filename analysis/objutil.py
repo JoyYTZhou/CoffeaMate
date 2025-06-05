@@ -344,11 +344,17 @@ class ObjectProcessor(ObjectMasker):
         return dr_mask_events
     
     def apply_obj_level_dr(self, events, objmask, dr_threshold):
-        dr_mask, _ = self.dRwSelf(events, dr_threshold, objmask)
+        """Apply delta R (ΔR) separation requirements to obtain leading and subleading objects.
+        
+        Parameters
+        - objmask : awkward.Array
+            Boolean mask for initial object selection (e.g. pT, eta cuts), UNSORTED."""
+        dr_mask, sortmask = self.dRwSelf(events, dr_threshold, objmask)
         zipped = self.getzipped(events, mask=objmask)
 
         leading = zipped[:,0]
-        subleading = zipped[:,1:][dr_mask][:,0]
+        subleading_candidates = zipped[:,1:][dr_mask]
+        subleading = subleading_candidates[:,0]
 
         return leading, subleading
 
@@ -406,13 +412,11 @@ class ObjectProcessor(ObjectMasker):
 
         return dr_mask_events, events, leading, subleading
 
-    def dRwSelf(self, events, threshold, mask, **kwargs) -> ak.Array:
+    def dRwSelf(self, events, threshold, mask, **kwargs) -> tuple[ak.Array, ak.Array]:
         """Calculate delta R between the leading object and subleading objects in a collection.
 
         Parameters
         ----------
-        events : awkward.Array
-            The input events containing the object properties.
         threshold : float
             The delta R threshold value to compare against.
         mask : awkward.Array
@@ -427,19 +431,11 @@ class ObjectProcessor(ObjectMasker):
         awkward.Array
             Boolean mask indicating pairs of objects that pass the delta R threshold.
         awkward.Array
-            Sorting mask if sort=True, otherwise None
-
-        Examples
-        --------
-        >>> # Get dR mask for muons sorted by pt in descending order
-        >>> dR_mask = obj.dRwSelf(events, 0.4, pt_mask, sort=True, sortname='pt')
-
-        >>> # Get dR mask without sorting
-        >>> dR_mask = obj.dRwSelf(events, 0.4, pt_mask, sort=False)
+            Sorting mask for objects in events. If sort=True, otherwise None
         """
         sort = False if self._sortname is None else True
         obj_lvs, sort_mask = self.fourvector(events, self._name, mask, sort=sort, sortname=self._sortname)
-        ld_lv, sd_lvs = obj_lvs[:, 0], obj_lvs[:, 1:]
+        ld_lv, sd_lvs = obj_lvs[:, 0], obj_lvs[:, 1:] # After sorting
         dR_mask = self.dRoverlap(ld_lv, sd_lvs, threshold)
         return dR_mask, sort_mask
 

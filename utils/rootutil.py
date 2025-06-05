@@ -50,25 +50,18 @@ class RootFileHandler:
             return True
 
     @staticmethod
-    def call_hadd(output_file, input_files) -> tuple[int, set]:
-        """Merge ROOT files using hadd.
-
-        Parameters
-        - `output_file`: path to the output file
-        - `input_files`: list of paths to the input files
-        
-        Return
-        """
-        command = ['hadd', '-f2 -O -k', output_file] + input_files
+    def call_hadd(output_file, input_files) -> set:
+        """Merge ROOT files using hadd."""
+        command = ['hadd', '-f2', '-O', '-k', output_file] + input_files
         result = subprocess.run(command, capture_output=True, text=True)
-        unique_filenames = None
+        
         if result.returncode == 0:
-            print(f"Merged files into {output_file}")
+            print(f"Merged {len(input_files)} files into {output_file}")
+            return None # No corrupt files
         else:
-            print(f"Error merging files: {result.stderr}")    
+            print(f"Error merging files into {output_file}:\n{result.stderr}")
             filenames = re.findall(r"root://[^\s]*\.root", result.stderr)
-            unique_filenames = set(filenames)
-        return unique_filenames
+            return set(filenames) if filenames else set()
 
     @staticmethod
     def find_branches(file_path, object_list, tree_name, extra=[]) -> list:

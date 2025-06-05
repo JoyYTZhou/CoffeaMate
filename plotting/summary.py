@@ -118,6 +118,8 @@ class PostProcessor():
         for year in self.years:
             with open(pjoin(self.cfg['DATA_DIR'], 'weightedMC', f"{year}.json"), 'r') as f:
                 self.meta_dict[year] = json.load(f)
+        if not self.cfg['IS_MC']:
+            self.lumi = {year: 1 for year in self.years}
         logging.info(f"Using metadata from {pjoin(self.cfg['DATA_DIR'], 'weightedMC', f'{year}.json')}")
         self._init_iter()
     
@@ -447,10 +449,10 @@ class PostSkimProcessor(PostProcessor):
     def hadd_results(self):
         # self.__hadd_roots()
         # self._hadd_cutflows()
-        self._check_hadded()
         # logging.debug("Reporting total number of events.")
         # self.__get_total_nwgt_events()
-    
+        self._check_hadded()
+
     def __clean_roots(self):
         """Delete the corrupted files in the filelist."""
         filenames = FileSysHelper.glob_files(os.getcwd(), f"{self.cfg['DIRNAME']}_corrupted*.json")
@@ -514,10 +516,12 @@ class PostSkimProcessor(PostProcessor):
         """Hadd root files of datasets into appropriate size based on settings"""
         def process_ds(dsname, dtdir, outdir, batch_size):
             root_files = FileSysHelper.glob_files(dtdir, f'{dsname}*.root', add_prefix=True, exclude='empty')
+            logging.info(f"Found {len(root_files)} files matching pattern {dsname}*.root")
             corrupted = set()
             for i in range(0, len(root_files), batch_size):
                 batch_files = root_files[i:i+batch_size]
                 outname = pjoin(outdir, f"{dsname}_{i//batch_size+1}.root") 
+                logging.info("Hadding batch %d for dataset %s with %d files to %s", i//batch_size+1, dsname, len(batch_files), outname)
                 try:
                     new_corrupt = RootFileHandler.call_hadd(outname, batch_files)
                     if new_corrupt is not None:
@@ -528,7 +532,7 @@ class PostSkimProcessor(PostProcessor):
                     logging.info(batch_files)
             return list(corrupted)
         
-        batch_size = 60 if self.cfg['IS_MC'] else 5
+        batch_size = 80 if self.cfg['IS_MC'] else 5
         
         results = DataSetUtil.extract_leaf_values(self.dataset_iter.process_datasets(process_ds, callback_args={'batch_size': batch_size}))
         corrupted = list(chain(*results))

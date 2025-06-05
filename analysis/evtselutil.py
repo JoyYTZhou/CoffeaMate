@@ -17,7 +17,7 @@ class CommonObjSelMixin():
             sortname: Name of the sorting column
             ld_obj: Leading object after applying delta R
             sd_obj: Subleading object after applying delta R"""
-        obj_proc = self.getObjProc(events, objname, sortname=None)
+        obj_proc = self.getObjProc(events, objname, sortname=sortname)
         dR_mask_event = obj_proc.event_level_dr_mask(events, obj_mask, drcut)
         obj_proc, events = self.apply_selection_mask(events, selection_name, obj_proc, dR_mask_event)
         
