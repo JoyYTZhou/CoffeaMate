@@ -26,6 +26,7 @@ class CSVPlotter:
         with open(metadata_path, 'r') as f:
             self.meta_dict = json.load(f)
         self.labels = list(self.meta_dict.keys())
+        logging.info(f"Loaded metadata from {metadata_path} with groups: {self.labels}")
     
     def __set_group(self, sig_group, bkg_group):
         """Set the signal and background groups."""
@@ -38,7 +39,8 @@ class CSVPlotter:
         Parameters
         - `cutflow`: the cutflow dictionary to be updated"""
         cutflow[f'{ds}_raw'] = len(df)
-        cutflow[f'{ds}_wgt'] = df[wgtname].sum()
+        if wgtname in df.columns:
+            cutflow[f'{ds}_wgt'] = df[wgtname].sum()
     
     def __get_rwgt_fac(self, group, ds, signals, factor, luminosity) -> float:
         """Get the reweighting factor for the dataset (xsection * lumi)
@@ -54,12 +56,17 @@ class CSVPlotter:
             print(f"Multiplying by {factor}")
         else:
             multiply = 1
-        xsection = self.meta_dict[group][ds].get('xsection', 1)
-        nwgt = self.meta_dict[group][ds]['nwgt']
-        flat_wgt = 1/nwgt * multiply * xsection * luminosity
-        return flat_wgt
+        if group == 'Data':
+            return 1
+        else:
+            xsection = self.meta_dict[group][ds].get('xsection', 1)
+            nwgt = self.meta_dict[group][ds]['nwgt']
+            flat_wgt = 1/nwgt * multiply * xsection * luminosity
+            return flat_wgt
     
-    def process_datasets(self, datasource, metadata_path, postp_output, per_evt_wgt='Generator_weight_values', extraprocess=False, selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
+    def process_datasets(self, datasource, metadata_path, postp_output, 
+                         per_evt_wgt='Generator_weight_values', extraprocess=False, 
+                         selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
         """Reweight the datasets to the desired xsection * luminosity by adding a column `weight` and save the processed dataframes to csv files.
         This also saves the added cutflows (not weighted by xsection * luminosity) to a csv file.
         
@@ -81,23 +88,20 @@ class CSVPlotter:
             if not FileSysHelper.checkpath(load_dir, createdir=False):
                 continue
                 
-            cf_dict, cf_df = self.__process_group(
-                group, load_dir, postp_output, per_evt_wgt,
-                extraprocess, selname, signals, sig_factor, luminosity
-            )
+            cf_dict = self.__process_group(group, load_dir, postp_output, per_evt_wgt,
+                extraprocess, selname, signals, sig_factor, luminosity)
             
-            self.__save_cutflow(cf_df, cf_dict, selname, postp_output, group)
+            self.__save_cutflow(cf_dict, selname, postp_output, group)
             
             if cf_dict:
                 df = self.data_dict.get(group, None)
                 if df is not None: list_of_df.append(df)
-
-        return pd.concat(list_of_df, axis=0).reset_index().drop('index', axis=1)
+        
+        return pd.concat(list_of_df, axis=0).reset_index(drop=True)
     
     def __process_group(self, group, load_dir, postp_output, per_evt_wgt, extraprocess, selname, signals, sig_factor, luminosity):
         """Process a single group of datasets."""
         cf_dict = {}
-        cf_df = DataLoader.load_csvs(load_dir, f'{group}*cf.csv')[0]
         self.data_dict[group] = {}
 
         output_df = self.__process_group_out(
@@ -116,7 +120,7 @@ class CSVPlotter:
                 continue
             self.__addextcf(cf_dict, output_df[output_df.dataset==dsname], dsname, per_evt_wgt)
                 
-        return cf_dict, cf_df
+        return cf_dict
     
     def __process_group_out(self, group, load_dir, postp_output, per_evt_wgt, extraprocess, signals, sig_factor, luminosity):
         """Process the output files of a group and add the weights (by xsec * lumi) to the dataframe."""
@@ -124,6 +128,9 @@ class CSVPlotter:
             df = dfs[0]
             if df.empty:
                 return None
+            if group == "Data":
+                df['weight'] = 1.0
+                return extraprocess(df) if extraprocess else df
             for ds, meta in self.meta_dict[group].items():
                 dsname = meta['shortname']
                 rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor, luminosity)
@@ -134,10 +141,10 @@ class CSVPlotter:
 
         return DataLoader.load_csvs(load_dir, f'{group}*out*', func=add_wgt)
     
-    def __save_cutflow(self, cf_df, cf_dict, selname, postp_output, group):
+    def __save_cutflow(self, cf_dict, selname, postp_output, group):
         """Save the cutflow dataframe to a CSV file."""
         if cf_dict:
-            cf_df = pd.concat([cf_df, pd.DataFrame(cf_dict, index=[selname])])
+            cf_df = pd.DataFrame(cf_dict, index=[selname])
             cf_df.to_csv(pjoin(postp_output, group, f'{group}_{selname.replace(" ", "")}_cf.csv'))
 
     @iterwgt
