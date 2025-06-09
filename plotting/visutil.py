@@ -247,48 +247,31 @@ class CSVPlotter:
         if not all('weight' in df.columns for df in list_of_evts):
             raise ValueError("All DataFrames must have 'weight' column")
 
-        styles = [
-            {'histtype': 'fill', 'alpha': 0.4, 'linewidth': 1.5},
+        styles = [{'histtype': 'fill', 'alpha': 0.4, 'linewidth': 1.5},
             {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1},
-            {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1}
-        ]
+            {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1}]
 
         for attr, options in attridict.items():
             fig, axs, ax2s = PlotStyle.create_ratio_figure(
-                title=title,
-                x_label=options['plot'].get('xlabel', ''),
-                top_ylabel=hist_ylabel,
-                bottom_ylabel=ratio_ylabel
-            )
+                title=title, x_label=options['plot'].get('xlabel', ''),
+                top_ylabel=hist_ylabel, bottom_ylabel=ratio_ylabel)
             
             hist_list = []
             wgt_list = []
             for df in list_of_evts:
                 counts, edges = HistogramHelper.make_histogram(
-                    data=df[attr],
-                    bins=options['hist']['bins'],
-                    range=options['hist']['range'],
-                    weights=df['weight']
-                )
+                    data=df[attr], bins=options['hist']['bins'],
+                    range=options['hist']['range'], weights=df['weight'])
                 hist_list.append(counts)
                 wgt_list.append(df['weight'].sum())
             
             ObjectPlotter.plot_hist_with_err(
-                ax=axs[0],
-                ax2=ax2s[0],
-                hist_list=hist_list,
-                wgt_list=wgt_list,
-                bins=edges,
-                label=labels,
-                xrange=options['hist']['range'],
-                styles=styles,
-            )
+                ax=axs[0], ax2=ax2s[0], hist_list=hist_list, wgt_list=wgt_list,
+                bins=edges, label=labels, xrange=options['hist']['range'], styles=styles)
 
             fig.savefig(
                 pjoin(outdir, f'{attr}{save_suffix}.png'),
-                dpi=400,
-                bbox_inches='tight'
-            )
+                dpi=400, bbox_inches='tight')
 
     def plot_SvBHist(self, ax, evts, att, attoptions, **kwargs) -> list:
         """Plot the signal and background histograms."""
