@@ -42,7 +42,7 @@ class CSVPlotter:
         if wgtname in df.columns:
             cutflow[f'{ds}_wgt'] = df[wgtname].sum()
     
-    def __get_rwgt_fac(self, group, ds, signals, factor, luminosity) -> float:
+    def __get_rwgt_fac(self, group, ds, luminosity) -> float:
         """Get the reweighting factor for the dataset (xsection * lumi)
         
         - `group`: the group of the dataset
@@ -50,18 +50,12 @@ class CSVPlotter:
         - `signals`: the signal groups
         - `factor`: the factor to multiply to the flat weights
         - `luminosity`: the luminosity (in pb^-1)"""
-        if group in signals: 
-            multiply = factor
-            print("Dataset is a signal.")
-            print(f"Multiplying by {factor}")
-        else:
-            multiply = 1
         if group == 'Data':
             return 1
         else:
             xsection = self.meta_dict[group][ds].get('xsection', 1)
             nwgt = self.meta_dict[group][ds]['nwgt']
-            flat_wgt = 1/nwgt * multiply * xsection * luminosity
+            flat_wgt = 1/nwgt * xsection * luminosity
             return flat_wgt
     
     def process_datasets(self, datasource, metadata_path, postp_output, 
@@ -91,7 +85,7 @@ class CSVPlotter:
             cf_dict = self.__process_group(group, load_dir, postp_output, per_evt_wgt,
                 extraprocess, selname, signals, sig_factor, luminosity)
             
-            self.__save_cutflow(cf_dict, selname, postp_output, group)
+            # self.__save_cutflow(cf_dict, selname, postp_output, group)
             
             if cf_dict:
                 df = self.data_dict.get(group, None)
@@ -133,7 +127,7 @@ class CSVPlotter:
                 return extraprocess(df) if extraprocess else df
             for ds, meta in self.meta_dict[group].items():
                 dsname = meta['shortname']
-                rwfac = self.__get_rwgt_fac(group, ds, signals, sig_factor, luminosity)
+                rwfac = self.__get_rwgt_fac(group, ds, luminosity)
                 df.loc[df.dataset == dsname, 'weight'] = df.loc[df.dataset == dsname, per_evt_wgt] * rwfac
             return extraprocess(df) if extraprocess else df
 

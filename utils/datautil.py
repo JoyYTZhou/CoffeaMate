@@ -86,6 +86,23 @@ class CutflowProcessor:
         except Exception as e:
             logging.error(f"Error checking events match: {str(e)}")
             return False, cutflow_events
+    
+    @staticmethod
+    def cutflow_by_sum(df, sel_name, output_dir, group_col='group', wgt_col='weight'):
+        """Summarizes cutflow by summing over a specified group column.
+        
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Containing a group column and a weight column
+        """
+        summed = df.groupby(group_col)[wgt_col].sum(numeric_only=True)
+        result = pd.DataFrame([summed], index=[sel_name])
+        if output_dir is not None:
+            result.to_csv(pjoin(output_dir, f"{sel_name}_cutflow.csv"))
+
+        return result
+        
 
     @staticmethod
     def merge_cutflows(inputdir, dataset_name, keyword='cutflow', save=True, outpath=None):
@@ -112,7 +129,7 @@ class CutflowProcessor:
         return merged_df
 
     @staticmethod
-    def combine_selections(cutflow_files, save=True, outpath=None):
+    def combine_selections(cutflow_files, save=True, outpath=None) -> pd.DataFrame:
         """Combines cutflow tables from different selection steps."""
         # Load all cutflow files
         cutflows = DataLoader.load_csvs(cutflow_files)
