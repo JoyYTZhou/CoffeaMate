@@ -103,17 +103,19 @@ class CutflowProcessor:
 
         return result
         
-
     @staticmethod
     def merge_cutflows(inputdir, dataset_name, keyword='cutflow', save=True, outpath=None):
         """Merges multiple cutflow tables for a single dataset."""
         # Load and concatenate all matching cutflow files
         pattern = f'{dataset_name}*{keyword}*.csv'
-        cutflow_dfs = DataLoader.load_csvs(
-            dirname=inputdir, 
-            filepattern=pattern,
-            func=lambda dfs: pd.concat(dfs)
-        )
+        cutflow_dfs = DataLoader.load_csvs(dirname=inputdir, filepattern=pattern,
+            func=lambda dfs: pd.concat(dfs))
+        
+        has_nan = cutflow_dfs.isna().any().any()
+        
+        if has_nan:
+            logging.warning(f"Cutflow for {dataset_name} in {inputdir} contains NaN values. Filling with 0.")
+            cutflow_dfs.fillna(0, inplace=True)
         
         merged_df = cutflow_dfs.groupby(cutflow_dfs.index, sort=False).sum()
         
