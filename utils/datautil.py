@@ -342,7 +342,7 @@ class CutflowProcessor:
 
 class DataLoader:
     @staticmethod
-    def load_csvs(dirname, filepattern, func=None, *args, **kwargs) -> pd.DataFrame:
+    def load_csvs(dirname, filepattern, func=None, exclude_kwd=None, *args, **kwargs) -> pd.DataFrame:
         """Load csv files matching a pattern into a list of DataFrames. Post process if func is provided.
         
         Parameters
@@ -351,10 +351,10 @@ class DataLoader:
         - `func`: function to apply to the list of DataFrames. Must return an Pandas object.
         - `*args`, `**kwargs`: additional arguments to pass to the function
         """
-        file_names = FileSysHelper.glob_files(dirname, filepattern=filepattern)
+        file_names = FileSysHelper.glob_files(dirname, filepattern=filepattern, exclude=exclude_kwd)
         dfs = [pd.read_csv(file_name, index_col=0, header=0) for file_name in file_names] 
         if not dfs:
-            print(f"No files found with filepattern {filepattern} in {dirname}, please double check if your output files match the input filepattern to glob.")
+            logging.warning(f"No files found with filepattern {filepattern} in {dirname}, please double check if your output files match the input filepattern to glob.")
         if func is None:
             return dfs
         else:

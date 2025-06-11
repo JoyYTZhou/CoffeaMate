@@ -371,7 +371,8 @@ class PostPreselProcessor(PostProcessor):
                 dfs = DataLoader.load_csvs(
                     dirname=dtdir,
                     filepattern=f'{dsname}*output*csv',
-                    func=lambda dfs: pd.concat(dfs, axis=0) if dfs else None
+                    func=lambda dfs: pd.concat(dfs, axis=0) if dfs else None,
+                    exclude_kwd='empty'
                 )
 
                 if dfs is not None:
