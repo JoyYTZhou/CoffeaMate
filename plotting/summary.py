@@ -448,10 +448,10 @@ class PostSkimProcessor(PostProcessor):
         self.__clean_roots()
     
     def hadd_results(self):
-        # self.__hadd_roots()
-        # self._hadd_cutflows()
-        # logging.debug("Reporting total number of events.")
-        # self.__get_total_nwgt_events()
+        self.__hadd_roots()
+        self._hadd_cutflows()
+        logging.debug("Reporting total number of events.")
+        self.__get_total_nwgt_events()
         self._check_hadded()
 
     def __clean_roots(self):
