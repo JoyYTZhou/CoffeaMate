@@ -103,17 +103,19 @@ class CutflowProcessor:
 
         return result
         
-
     @staticmethod
     def merge_cutflows(inputdir, dataset_name, keyword='cutflow', save=True, outpath=None):
         """Merges multiple cutflow tables for a single dataset."""
         # Load and concatenate all matching cutflow files
         pattern = f'{dataset_name}*{keyword}*.csv'
-        cutflow_dfs = DataLoader.load_csvs(
-            dirname=inputdir, 
-            filepattern=pattern,
-            func=lambda dfs: pd.concat(dfs)
-        )
+        cutflow_dfs = DataLoader.load_csvs(dirname=inputdir, filepattern=pattern,
+            func=lambda dfs: pd.concat(dfs))
+        
+        has_nan = cutflow_dfs.isna().any().any()
+        
+        if has_nan:
+            logging.warning(f"Cutflow for {dataset_name} in {inputdir} contains NaN values. Filling with 0.")
+            cutflow_dfs.fillna(0, inplace=True)
         
         merged_df = cutflow_dfs.groupby(cutflow_dfs.index, sort=False).sum()
         
@@ -340,7 +342,7 @@ class CutflowProcessor:
 
 class DataLoader:
     @staticmethod
-    def load_csvs(dirname, filepattern, func=None, *args, **kwargs) -> pd.DataFrame:
+    def load_csvs(dirname, filepattern, func=None, exclude_kwd=None, *args, **kwargs) -> pd.DataFrame:
         """Load csv files matching a pattern into a list of DataFrames. Post process if func is provided.
         
         Parameters
@@ -349,10 +351,10 @@ class DataLoader:
         - `func`: function to apply to the list of DataFrames. Must return an Pandas object.
         - `*args`, `**kwargs`: additional arguments to pass to the function
         """
-        file_names = FileSysHelper.glob_files(dirname, filepattern=filepattern)
+        file_names = FileSysHelper.glob_files(dirname, filepattern=filepattern, exclude=exclude_kwd)
         dfs = [pd.read_csv(file_name, index_col=0, header=0) for file_name in file_names] 
         if not dfs:
-            print(f"No files found with filepattern {filepattern} in {dirname}, please double check if your output files match the input filepattern to glob.")
+            logging.warning(f"No files found with filepattern {filepattern} in {dirname}, please double check if your output files match the input filepattern to glob.")
         if func is None:
             return dfs
         else:

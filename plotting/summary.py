@@ -371,7 +371,8 @@ class PostPreselProcessor(PostProcessor):
                 dfs = DataLoader.load_csvs(
                     dirname=dtdir,
                     filepattern=f'{dsname}*output*csv',
-                    func=lambda dfs: pd.concat(dfs, axis=0) if dfs else None
+                    func=lambda dfs: pd.concat(dfs, axis=0) if dfs else None,
+                    exclude_kwd='empty'
                 )
 
                 if dfs is not None:
@@ -447,10 +448,10 @@ class PostSkimProcessor(PostProcessor):
         self.__clean_roots()
     
     def hadd_results(self):
-        # self.__hadd_roots()
-        # self._hadd_cutflows()
-        # logging.debug("Reporting total number of events.")
-        # self.__get_total_nwgt_events()
+        self.__hadd_roots()
+        self._hadd_cutflows()
+        logging.debug("Reporting total number of events.")
+        self.__get_total_nwgt_events()
         self._check_hadded()
 
     def __clean_roots(self):
