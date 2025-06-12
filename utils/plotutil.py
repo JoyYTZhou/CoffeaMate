@@ -12,9 +12,12 @@ class PlotStyle:
     SIGNAL_COLORS = ['red', 'blue', 'forestgreen']
     
     @staticmethod
-    def setup_cms_style(ax, lumi=None, year=None):
-        """Apply CMS style to an axis"""
-        hep.cms.label(ax=ax, loc=2, label='Work in Progress', 
+    def setup_cms_style(ax, lumi=None, year=None, data=True):
+        """Apply CMS style to an axis
+        
+        Parameters:
+        - `label`: Preliminary/Work in Progress"""
+        hep.cms.label(ax=ax, loc=0, label='Preliminary', data=True,
                      fontsize=11, com=13.6, lumi=lumi, year=year)
         ax.tick_params(axis='both', which='major', labelsize=10, length=0)
     
@@ -22,7 +25,7 @@ class PlotStyle:
     def setup_axis(ax, xlabel=None, ylabel=None, title=None, fontsize=12):
         """Setup axis labels and title"""
         if xlabel:
-            ax.set_xlabel(xlabel, fontsize=fontsize)
+            ax.set_xlabel(xlabel, fontsize=fontsize, loc='right')
         if ylabel:
             ax.set_ylabel(ylabel, fontsize=fontsize)
         if title:
@@ -41,7 +44,7 @@ class PlotStyle:
         return plt.subplots(n_row, n_col, figsize=figsize)
     
     @staticmethod
-    def create_ratio_figure(title: str, x_label, top_ylabel, bottom_ylabel, num_figure=1, set_log=False, lumi=None):
+    def create_ratio_figure(title: str, x_label, top_ylabel, bottom_ylabel, num_figure=1, set_log=False, lumi=None, year=None):
         """Create a figure with ratio panel"""
         fig = plt.figure(figsize=(8*num_figure, 6))
         fig.suptitle(title, fontsize=14)
@@ -60,16 +63,11 @@ class PlotStyle:
             ax2 = fig.add_subplot(gs[1,i])
             ax = fig.add_subplot(gs[0,i], sharex=ax2)
             
-            PlotStyle.setup_cms_style(ax, lumi=lumi)
+            PlotStyle.setup_cms_style(ax, lumi=lumi, year=year)
             PlotStyle.setup_axis(ax, ylabel=top_ylabel[i], fontsize=12)
             ax.tick_params(labelbottom=False)
             
-            PlotStyle.setup_axis(
-                ax2, 
-                xlabel=x_label[i],
-                ylabel=bottom_ylabel[i],
-                fontsize=11
-            )
+            PlotStyle.setup_axis(ax2, xlabel=x_label[i], ylabel=bottom_ylabel[i], fontsize=11)
             ax2.yaxis.get_offset_text().set_fontsize(11)
             
             if set_log:
