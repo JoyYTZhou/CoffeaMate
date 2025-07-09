@@ -117,7 +117,7 @@ class HistogramHelper:
         return ratio, ratio_err
 
     @staticmethod
-    def normalize_histogram(hist, total_wgt, bin_width):
+    def normalize_histogram(hist, total_wgt, bin_width, normalize_sum=1) -> tuple[np.ndarray, np.ndarray]:
         """Normalize histogram to get probability density and calculate errors.
 
         Parameters:
@@ -137,7 +137,7 @@ class HistogramHelper:
         This ensures the total integral of the PDF equals 1
         """
         # First normalize by total events/weights
-        prob_hist = hist / total_wgt
+        prob_hist = hist / total_wgt * normalize_sum
 
         # Then convert to density by dividing by bin width
         density_hist = prob_hist / bin_width
