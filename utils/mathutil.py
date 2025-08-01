@@ -63,6 +63,30 @@ class MathUtil:
         df[dR_name] = fvx.deltaR(fvy)
     
     @staticmethod
+    def add_dEta(df, objx:'str', objy:'str', dEta_name:'str') -> None:
+        """Add delta eta column to the dataframe.
+        
+        Parameters
+        - df: DataFrame
+        - dEta_name: Name of the delta eta column
+        """
+        fvx, _ = ObjectProcessor.fourvector(df, objx, sort=False)
+        fvy, _ = ObjectProcessor.fourvector(df, objy, sort=False)
+        df[dEta_name] = fvx.eta - fvy.eta
+    
+    @staticmethod
+    def add_dPhi(df, objx:'str', objy:'str', dPhi_name:'str') -> None:
+        """Add delta phi column to the dataframe.
+        
+        Parameters
+        - df: DataFrame
+        - dPhi_name: Name of the delta phi column
+        """
+        fvx, _ = ObjectProcessor.fourvector(df, objx, sort=False)
+        fvy, _ = ObjectProcessor.fourvector(df, objy, sort=False)
+        df[dPhi_name] = fvx.phi - fvy.phi
+    
+    @staticmethod
     def add_system_4vec(df, objx:'str', objy:'str', sys_name:'str') -> None:
         """Add system fourvector column to the dataframe.
         """
@@ -73,6 +97,18 @@ class MathUtil:
         df[f'{sys_name}_eta'] = inv_sys.eta
         df[f'{sys_name}_phi'] = inv_sys.phi
         df[f'{sys_name}_mass'] = inv_sys.mass
+
+    @staticmethod
+    def add_rel_M_pt(df, obj_name) -> None:
+        """Add relative mass and pt columns to the dataframe."""
+        fvec, _ = ObjectProcessor.fourvector(df, obj_name, sort=False)
+        df[f'{obj_name}_rel_m_pt'] = fvec.mass / fvec.pt
+    
+    @staticmethod
+    def add_rel_E_pt(df, obj_name) -> None:
+        """Add relative energy and pt columns to the dataframe."""
+        fvec, _ = ObjectProcessor.fourvector(df, obj_name, sort=False)
+        df[f'{obj_name}_rel_e_pt'] = fvec.energy / fvec.pt
     
     @staticmethod
     def add_HT(df, jets:'list', HT_name:'str') -> None:

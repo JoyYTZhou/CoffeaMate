@@ -107,15 +107,13 @@ class CSVPlotter:
         cf_dict = {}
         self.data_dict[group] = {}
 
-        output_df = self.__process_group_out(
-            group, load_dir, postp_output, per_evt_wgt,
-            extraprocess, signals, sig_factor, luminosity
-        )
+        output_df = self.__process_group_out(group, load_dir, postp_output, per_evt_wgt,
+            extraprocess, signals, sig_factor, luminosity)
 
         if output_df is not None:
             self.data_dict[group] = output_df
         
-        for ds, meta in self.meta_dict[group].items():
+        for _, meta in self.meta_dict[group].items():
             dsname = meta['shortname']
             if output_df[output_df.dataset == dsname].empty:
                 cf_dict[f'{dsname}_raw'] = 0
