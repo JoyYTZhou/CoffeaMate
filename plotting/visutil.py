@@ -10,16 +10,22 @@ from src.utils.filesysutil import FileSysHelper, pjoin, pdir, pbase
 from src.utils.plotutil import HistogramHelper, PlotStyle
 
 luminosity = {"2022PreEE": 41.5/2 * 1000, "2022PostEE": 41.5 * 1000/2, "2023Summer": 32.7 * 1000}
+regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ', 'WWZ'], 'HH': ['ggF']}
 
 class CSVPlotter:
-    """Simplified plotter for CSV data"""
+    """Simplified plotter for CSV data.
+    
+    Attributes
+    - `sig_group`: dictionary of {signal group label: [list of datasets]}
+    - `bkg_group`: dictionary of {background group label: [list of datasets]}"""
     def __init__(self, outdir):
         self.outdir = outdir
         FileSysHelper.checkpath(outdir)
         self.meta_dict = None
         self.data_dict = {}
-        self.sig_group = None
-        self.bkg_group = None
+        self.sig_group = {r"b$\bar{b} \tau \tau \times 100$": ["ggF"]}
+        self.bkg_group = {"DYJets": ["DYJets"], r"$t\bar{t}$": ['TTbar'], "SingleH": ["SingleH"], "Others": ["WZ", "WWW", "WW", "WWZ", "WZZ", "WJets", "Others", "ZH", "ZZ"]}
+        self.data_label = 'Data'
         
     def load_metadata(self, metadata_path):
         """Load metadata from JSON file"""
@@ -54,7 +60,10 @@ class CSVPlotter:
             return 1
         else:
             xsection = self.meta_dict[group][ds].get('xsection', 1)
-            nwgt = self.meta_dict[group][ds]['nwgt']
+            nwgt = self.meta_dict[group][ds].get('nwgt', None)
+            if nwgt is None:
+                logging.warning(f"No nwgt found for {group}/{ds}. Using flat weight of 1.")
+                flat_wgt = xsection * luminosity 
             flat_wgt = 1/nwgt * xsection * luminosity
             return flat_wgt
     
@@ -98,15 +107,13 @@ class CSVPlotter:
         cf_dict = {}
         self.data_dict[group] = {}
 
-        output_df = self.__process_group_out(
-            group, load_dir, postp_output, per_evt_wgt,
-            extraprocess, signals, sig_factor, luminosity
-        )
+        output_df = self.__process_group_out(group, load_dir, postp_output, per_evt_wgt,
+            extraprocess, signals, sig_factor, luminosity)
 
         if output_df is not None:
             self.data_dict[group] = output_df
         
-        for ds, meta in self.meta_dict[group].items():
+        for _, meta in self.meta_dict[group].items():
             dsname = meta['shortname']
             if output_df[output_df.dataset == dsname].empty:
                 cf_dict[f'{dsname}_raw'] = 0
@@ -153,15 +160,13 @@ class CSVPlotter:
         else:
             raise FileNotFoundError(f"Check if there are any files of specified pattern in {self._datadir}.")
     
-    def get_hist(self, evts: 'pd.DataFrame', att, options, group: 'dict'=None, **kwargs) -> tuple[list, list, list[int, int], list, list]:
-        """Histogram an attribute of the object for the given dataframe for groups of datasets. 
-        Return sorted histograms based on the total counts.
+    def get_hist(self, evts: 'pd.DataFrame', att:'str', options, group: 'dict' = None, rescale=1, **kwargs) -> tuple[list, list, list[int, int], list, list]:
+        """Returns histograms for the given attribute in the dataframe, each for the specified group.
         
         Parameters
-        - `evts`: DataFrame containing the events to histogram
-        - `att`: attribute to histogram
+        - `att`: attribute to histogram. column in the dataframe
         - `options`: dictionary containing histogram options
-        - `group`: the group of datasets to be plotted. {groupname: [list of datasets]}
+        - `group`: the groups to be plotted with specific labels. {group label: [list of datasets]}
         - `kwargs`: additional histogram parameters
         
         Returns
@@ -181,15 +186,16 @@ class CSVPlotter:
         hist_list = []
         for label in pltlabel:
             proc_list = group[label] if group is not None else [label]
+            # Filter the DataFrame for the current group
             thisdf = evts[evts['group'].isin(proc_list)]
-            
-            counts, edges = HistogramHelper.make_histogram(
-                data=thisdf[att],
-                bins=bins,
-                range=bin_range,
-                weights=thisdf['weight'],
-                density=kwargs.get('density', False)
-            )
+            if thisdf.empty:
+                logging.warning(f"No data for group {label}. Skipping.")
+                continue
+            if thisdf[att].isna().any():
+                logging.warning(f"Attribute {att} is nan for group {label}. Skipping.")
+                continue
+            counts, edges = HistogramHelper.make_histogram(data=thisdf[att], bins=bins, range=bin_range,
+                weights=thisdf['weight']*rescale, density=kwargs.get('density', False))
             hist_list.append(counts)
             bins = edges  # Update bins in case they were modified
             
@@ -212,16 +218,14 @@ class CSVPlotter:
 
     @staticmethod
     def plot_shape(list_of_evts: list[pd.DataFrame], labels: list, attridict: dict, 
-                ratio_ylabel: str, outdir: str, hist_ylabel: str = 'Normalized', 
+                ratio_ylabel: str, outdir: str, hist_ylabel: str = 'Normalized', normalize: bool = True, 
                 title: str = '', save_suffix: str = '') -> None:
         """Compare normalized shapes of distributions with ratio panels.
         
         Parameters
         ----------
-        list_of_evts : list[pd.DataFrame]
-            List of DataFrames to compare
         labels : list
-            Labels for each DataFrame in the comparison
+            Labels for each histogram in the comparison
         attridict : dict
             Dictionary of attributes to plot with their options
             Format: {
@@ -232,14 +236,8 @@ class CSVPlotter:
             }
         ratio_ylabel : str
             Label for ratio panel y-axis
-        outdir : str
-            Directory to save plots
-        hist_ylabel : str, optional
-            Label for histogram y-axis
         title : str, optional
             Plot title
-        save_suffix : str, optional
-            Suffix for saved files
         """
         # Input validation
         if len(list_of_evts) < 2:
@@ -266,67 +264,81 @@ class CSVPlotter:
                 wgt_list.append(df['weight'].sum())
             
             ObjectPlotter.plot_hist_with_err(
-                ax=axs[0], ax2=ax2s[0], hist_list=hist_list, wgt_list=wgt_list,
+                ax=axs[0], ax2=ax2s[0], hist_list=hist_list, wgt_list=wgt_list, normalize=normalize,
                 bins=edges, label=labels, xrange=options['hist']['range'], styles=styles)
 
             fig.savefig(
                 pjoin(outdir, f'{attr}{save_suffix}.png'),
                 dpi=400, bbox_inches='tight')
+    
+    def get_dataMinusMCHist(self, evts, att, options) -> tuple[np.ndarray, np.ndarray, list[int, int]]:
+        """Return a np.ndarray histogram of data minus MC for the given attribute."""
+        b_hists, b_bins, x_range, _, _ = self.get_hist(evts, att, options, self.bkg_group, rescale=-1) 
+        total_bhist = b_hists[0]
+        for b_hist in b_hists[1:]:
+            total_bhist += b_hist
+        if self.sig_group is not None: 
+            s_hists, s_bins, s_range, slabels, _ = self.get_hist(evts, att, options, self.sig_group, rescale=-1) 
+        for s_hist in s_hists:
+            total_bhist += s_hist
+        data_hist, _, _, _, _ = self.get_hist(evts, att, options, {"Data": ["Data"]})
 
-    def plot_SvBHist(self, ax, evts, att, attoptions, **kwargs) -> list:
+        return data_hist+total_bhist, b_bins, x_range
+            
+    def plot_dataMinusMC(self, evts, attridict, bgroup=None, sgroup=None, minus_sig=True, title='', save_name='', lumi=220, **kwargs):
+        """Plot the data minus MC histograms."""
+        if bgroup is not None and sgroup is not None:
+            self.__set_group(sgroup, bgroup)
+        
+        for att, options in attridict.items():
+            xlabel = options['plot'].get('xlabel', '')
+            fig, axes = PlotStyle.create_figure()
+            PlotStyle.setup_cms_style(axes, lumi=lumi)
+            PlotStyle.setup_axis(axes, xlabel=xlabel, title=title)
+            data_hist, bins, x_range = self.get_dataMinusMCHist(evts, att, options, minus_sig=minus_sig)
+            ObjectPlotter.plot_var(
+                ax=axes, hists=data_hist, bin_edges=bins, label=['Data - MC'],
+                xrange=x_range, yerr=True
+            )
+            fig.savefig(pjoin(self.outdir, f'{att}_{save_name}_DataMinusMC.png'),
+                dpi=300, bbox_inches='tight', pad_inches=0.1)
+
+    def __plot_SvBHist(self, ax, evts, att, attoptions, include_data=True, include_sig=True, stack_all=False, rescale_sig=100, **kwargs) -> list:
         """Plot the signal and background histograms."""
-        b_hists, bins, x_range, blabels, _ = self.get_hist(
-            evts, att, attoptions, self.bkg_group
-        )
+        b_hists, bins, x_range, blabels, _ = self.get_hist(evts, att, attoptions, self.bkg_group)
+        if include_data:
+            data_hists, _, _, _, _ = self.get_hist(evts, att, attoptions, {"Data": ["Data"]}, **kwargs)
+        else:
+            data_hists = None
         
         order = kwargs.pop('order', CSVPlotter.get_order(b_hists))
         b_hists, blabels = CSVPlotter.order_list(b_hists, order), CSVPlotter.order_list(blabels, order)
         
-        if self.sig_group is not None:
-            # Get signal histograms
-            s_hists, bins, x_range, slabels, _ = self.get_hist(
-                evts, att, attoptions, self.sig_group, **kwargs
-            )
-            ObjectPlotter.plotSigVBkg(
-                ax=ax,
-                sig_hists=s_hists,
-                bkg_hists=b_hists,
-                bin_edges=bins,
-                sig_label=slabels,
-                bkg_label=blabels,
-                xrange=x_range,
-                **kwargs
-            )
+        if self.sig_group is not None and include_sig:
+            s_hists, bins, x_range, slabels, _ = self.get_hist(evts, att, attoptions, self.sig_group, rescale=rescale_sig, **kwargs)
+            ObjectPlotter.plotSigWBkg(ax=ax, sig_hists=s_hists, bkg_hists=b_hists, data_hist=data_hists, bin_edges=bins, sig_label=slabels, bkg_label=blabels, xrange=x_range, stack_all=stack_all, **kwargs)
         else:
-            ObjectPlotter.plot_var(
-                ax=ax,
-                hist=b_hists,
-                bin_edges=bins,
-                label=blabels,
-                xrange=x_range,
-                **kwargs
-            )
+            ObjectPlotter.plot_var(ax=ax, hists=b_hists, bin_edges=bins, label=blabels, xrange=x_range, **kwargs)
 
         return order
     
-    def plot_SvB(self, evts, attridict, bgroup, sgroup, title='', save_name='', lumi=220, **kwargs):
+    def plot_SvB(self, evts, attridict, bgroup=None, sgroup=None, title='', save_name='', lumi=220, **kwargs):
         """Plot the signal and background histograms."""
-        self.__set_group(sgroup, bgroup)
+        if bgroup is not None and sgroup is not None:
+            self.__set_group(sgroup, bgroup)
         
         for att, options in attridict.items():
             xlabel = options['plot'].get('xlabel', '')
             fig, axes = PlotStyle.create_figure()
             PlotStyle.setup_cms_style(axes, lumi=lumi)
             PlotStyle.setup_axis(axes, xlabel=xlabel, title=title)  # Added title parameter here
-            self.plot_SvBHist(axes, evts, att, options, **kwargs)
+            self.__plot_SvBHist(axes, evts, att, options, **kwargs)
             
-            fig.savefig(
-                pjoin(self.outdir, f'{att}{save_name}.png'),
-                dpi=300,
-                bbox_inches='tight',
-                pad_inches=0.1
-            )
-
+            if save_name:
+                save_name = f'_{save_name}'
+            fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'),
+                dpi=300, bbox_inches='tight', pad_inches=0.1)
+    
     def plot_fourRegions(self, regionA, regionB, regionC, regionD, attridict, bgroup, sgroup, title='', save_name='', lumi=220, **kwargs):
         """Plot the signal and background histograms for the four regions."""
         self.__set_group(sgroup, bgroup)
@@ -367,55 +379,46 @@ class CSVPlotter:
         
 class ObjectPlotter():
     @staticmethod
-    def plot_var(ax, hist, bin_edges: np.ndarray, label, xrange, **kwargs):
+    def plot_var(ax, hists, bin_edges: np.ndarray, label, xrange, stack=True, **kwargs):
         """Plot histograms on an axis"""
-        hep.histplot(hist, bins=bin_edges, label=label, ax=ax, linewidth=1.5, **kwargs)
+        if stack:
+            histtype = 'fill'
+        else:
+            histtype = 'step'
+        hep.histplot(hists, bins=bin_edges, label=label, ax=ax, linewidth=1.5, alpha=0.7, histtype=histtype, stack=stack, **kwargs)
         ax.legend(fontsize=12, loc='upper right')
         ax.set_xlim(*xrange)
 
     @staticmethod
-    def plot_hist_with_err(ax, ax2, hist_list, wgt_list, bins, label, xrange, **kwargs):
+    def plot_hist_with_err(ax, ax2, hist_list, wgt_list, bins, label, xrange, normalize=False, **kwargs):
         """Plot multiple histograms with error bars and ratio panel.
         
         Parameters
         ----------
-        ax : matplotlib.axes.Axes
-            Main plot axes
-        ax2 : matplotlib.axes.Axes
-            Ratio panel axes
-        hist_list : list
-            List of histograms to plot
         wgt_list : list
-            List of total weights for each histogram
+            List of total weights of events in each histogram
         bins : array-like
             Bin edges
         label : list
             Labels for each histogram
-        xrange : tuple
-            (xmin, xmax) for plot range
         **kwargs : dict
             Additional plotting parameters including 'styles' for individual histogram styling
         """
         bin_width = bins[1] - bins[0]
         colors = kwargs.pop('colors', PlotStyle.COLORS[:len(hist_list)])
         styles = kwargs.pop('styles', None) or [{'histtype': 'step', 'alpha': 1.0}] * len(hist_list)
-
-        normalized_data = [
-            HistogramHelper.normalize_histogram(hist, wgt, bin_width)
-            for hist, wgt in zip(hist_list, wgt_list)
-        ]
-        norm_hist_list, norm_err_list = zip(*normalized_data)
+        
+        if normalize:
+            normalized_data = [
+                HistogramHelper.normalize_histogram(hist, wgt, bin_width) for hist, wgt in zip(hist_list, wgt_list)
+            ]
+            norm_hist_list, norm_err_list = zip(*normalized_data)
+        else:
+            norm_hist_list = hist_list
+            norm_err_list = [np.sqrt(hist) for hist in hist_list]
 
         for hist, style, lbl, color in zip(norm_hist_list, styles, label, colors):
-            hep.histplot(
-                hist,
-                bins=bins,
-                label=lbl,
-                ax=ax,
-                color=color,
-                **style,
-                **kwargs
-            )
+            hep.histplot(hist, bins=bins, label=lbl, ax=ax, color=color, **style, **kwargs)
 
         ax.legend(fontsize=12, loc='upper right')
         ax.set_xlim(*xrange)
@@ -444,23 +447,26 @@ class ObjectPlotter():
         ax2.set_ylim(0.5, 1.5)
     
     @staticmethod
-    def plotSigVBkg(ax, sig_hists, bkg_hists, bin_edges, sig_label, bkg_label, xrange, **kwargs):
+    def plotSigWBkg(ax, sig_hists, bkg_hists, data_hist, bin_edges, sig_label, bkg_label, xrange, stack_all=False, **kwargs):
         """Plot signal and background histograms"""
-        hep.histplot(
-            bkg_hists, bins=bin_edges, label=bkg_label,
-            ax=ax, histtype='fill', alpha=0.6,
-            stack=True, linewidth=1
-        )
-        hep.histplot(
-            sig_hists, bins=bin_edges, ax=ax,
-            color=PlotStyle.SIGNAL_COLORS[:len(sig_hists)],
-            label=sig_label, stack=False,
-            histtype='step', alpha=1.0, linewidth=1.5
-        )
+        if stack_all:
+            total_hists = bkg_hists + sig_hists
+            total_label = bkg_label + sig_label
+            hep.histplot(total_hists, bins=bin_edges, label=total_label, ax=ax, histtype='fill', alpha=0.6, stack=True, linewidth=1)
+        else:
+            hep.histplot(bkg_hists, bins=bin_edges, label=bkg_label,
+                ax=ax, histtype='fill', alpha=0.6, stack=True, linewidth=1)
+            hep.histplot(sig_hists, bins=bin_edges, ax=ax,
+                color=PlotStyle.SIGNAL_COLORS[:len(sig_hists)],
+                label=sig_label, stack=False,
+                histtype='step', alpha=1.0, linewidth=1.5)
+
+        if data_hist is not None:
+            hep.histplot(data_hist, bins=bin_edges, ax=ax, color='black', histtype='errorbar', xerr=True, label='Data', linewidth=1.5, **kwargs)
+            
         ax.set_xlim(*xrange)
         ax.set_ylim(bottom=0)
         ax.legend(fontsize=12, loc='upper right')
-
   
     @staticmethod
     def hist_arr(arr, bins: int, range: list[int, int], weights=None, density=False, keep_overflow=True) -> tuple[np.ndarray, np.ndarray]:

@@ -80,7 +80,7 @@ class ObjectSelMixin:
 
         Parameters
         ----------
-        events : awkward.Array
+        events : awkward.Array/pd.DataFrame
             The input events containing the object properties (pt, eta, phi, mass).
         Can be either flat events or pre-zipped object collections.
         objname : str, optional
@@ -88,12 +88,6 @@ class ObjectSelMixin:
             If None, assumes the properties are directly accessible.
         mask : awkward.Array, optional
             Boolean mask to filter the objects. Must match the dimension of object attributes.
-        sort : bool, default=True
-            Whether to sort the resulting four-vectors.
-        sortname : str, default='pt'
-            The field name to sort by when sort=True.
-        ascending : bool, default=False
-            Sort in ascending order if True, descending if False.
         axis : int, default=-1
             Axis along which to perform the sorting.
 
