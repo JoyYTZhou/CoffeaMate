@@ -448,55 +448,14 @@ class ObjectProcessor(ObjectMasker):
     def object_to_df(zipped, prefix='') -> pd.DataFrame:
         """Take a zipped object, compute it if needed, turn it into a dataframe"""
         zipped = arr_handler(zipped, allow_delayed=False)
-        return ak.to_dataframe(zipped).add_prefix(prefix)
+
+        # For each field in the record, extract it as a flat array
+        out = {}
+        for field in zipped.fields:
+            # Will automatically assign None if parent is None
+            out[f"{prefix}{field}"] = ak.to_numpy(zipped[field])
+        return pd.DataFrame(out)
 
 
-
-
-
-
-
-# class TriggerObject(Object):
-#     """Trigger Object class for handling trigger object selections, meant as an observer of the events.
-
-#     Attributes
-#     - `name`: name of the object
-#     - `events`: a weak proxy of the events 
-#     - `selcfg`: selection configuration for the object, {key=abbreviation, value=threshold}
-#     """
-
-#     def __init__(self, events, selcfg, weakrefEvt=True):
-#         """Construct an object from provided events with given selection configuration.
-        
-#         Parameters
-#         - `name`: AOD prefix name of the object, e.g. Electron, Muon, Jet
-#         kwargs: 
-#         - `selcfg`: selection configuration for the object
-#         """
-#         self._name = "TrigObj"
-#         self.__weakref = weakrefEvt
-#         self._selcfg = selcfg
-#         self.events = events
-#         self._mapcfg = trigger_obj_map
-#         self.fields = list(self._mapcfg.keys())
-#         self._maskcollec = {}
-    
-#     def custommask(self, propname, op, value, func=None):
-#         """Create custom mask based on input."""
-#         mask = super().custommask(propname, op, value, func)
-#         self._maskcollec.append(mask)
-        
-#     def bitmask(self, bit):
-#         """Create mask based on trigger bit."""
-#         aodarr = self.events[self._mapcfg['filterBits']]
-#         return (aodarr & bit) > 0
-
-#     def passedTrigObj(self):
-#         mask = ak.all(ak.stack(self._maskcollec), axis=0)
-#         pass
-
-    
-    
-    
     
 
