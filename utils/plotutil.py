@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import seaborn as sns
 import mplhep as hep
 import matplotlib as mpl
 import logging
@@ -256,10 +255,10 @@ class PlotUtil:
         if save: plt.savefig(savename)
         else: plt.show()
 
-def corr_heatmap(df, save=False, *args, **kwargs):
-    """Plot a heatmap of the correlation matrix of the dataframe."""
-    sns.set_style(style='whitegrid')
-    plt.figure(figsize=(25,10))
-    sns.heatmap(df.corr(),vmin=-1,vmax=1,annot=True,cmap='BuPu')
-    if save: plt.savefig(*args, **kwargs)
-    plt.show()
+# def corr_heatmap(df, save=False, *args, **kwargs):
+#     """Plot a heatmap of the correlation matrix of the dataframe."""
+#     sns.set_style(style='whitegrid')
+#     plt.figure(figsize=(25,10))
+#     sns.heatmap(df.corr(),vmin=-1,vmax=1,annot=True,cmap='BuPu')
+#     if save: plt.savefig(*args, **kwargs)
+#     plt.show()

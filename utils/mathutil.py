@@ -102,13 +102,13 @@ class MathUtil:
     def add_rel_M_pt(df, obj_name) -> None:
         """Add relative mass and pt columns to the dataframe."""
         fvec, _ = ObjectProcessor.fourvector(df, obj_name, sort=False)
-        df[f'{obj_name}_rel_m_pt'] = fvec.mass / fvec.pt
+        df[f'{obj_name}_rel_M_pt'] = fvec.mass / fvec.pt
     
     @staticmethod
     def add_rel_E_pt(df, obj_name) -> None:
         """Add relative energy and pt columns to the dataframe."""
         fvec, _ = ObjectProcessor.fourvector(df, obj_name, sort=False)
-        df[f'{obj_name}_rel_e_pt'] = fvec.energy / fvec.pt
+        df[f'{obj_name}_rel_E_pt'] = fvec.energy / fvec.pt
     
     @staticmethod
     def add_HT(df, jets:'list', HT_name:'str') -> None:

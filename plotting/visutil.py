@@ -28,7 +28,7 @@ class CSVPlotter:
         self.data_label = 'Data'
         
     def load_metadata(self, metadata_path):
-        """Load metadata from JSON file"""
+        """Load metadata from JSON file. This initializes the `meta_dict` attribute which contains dataset groups, xsection values, etc."""
         with open(metadata_path, 'r') as f:
             self.meta_dict = json.load(f)
         self.labels = list(self.meta_dict.keys())
@@ -68,7 +68,7 @@ class CSVPlotter:
             return flat_wgt
     
     def process_datasets(self, datasource, metadata_path, postp_output, 
-                         per_evt_wgt='Generator_weight_values', extraprocess=False, 
+                         per_evt_wgt='Generator_weight', extraprocess=False, 
                          selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
         """Reweight the datasets to the desired xsection * luminosity by adding a column `weight` and save the processed dataframes to csv files.
         This also saves the added cutflows (not weighted by xsection * luminosity) to a csv file.

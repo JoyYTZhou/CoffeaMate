@@ -223,7 +223,10 @@ class PreselSelections(CommonObjSelMixin, BaseEventSelections):
         """
         listofdf = [None] * len(self.objcollect)
         for i, (prefix, zipped) in enumerate(self.objcollect.items()):
-            listofdf[i] = ObjectProcessor.object_to_df(zipped, f"{prefix}_")
+            if '_' in prefix:
+                listofdf[i] = pd.DataFrame({prefix: ak.to_numpy(zipped)})
+            else:
+                listofdf[i] = ObjectProcessor.object_to_df(zipped, f"{prefix}_")
         return pd.concat(listofdf, axis=1)
     
     def saveWeights(self, events: ak.Array, weights=['Generator_weight', 'LHEReweightingWeight']) -> None:
