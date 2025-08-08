@@ -60,8 +60,8 @@ class CSVPlotter:
         return (xsection * luminosity) / nwgt
     
     def process_datasets(self, datasource, metadata_path, postp_output, 
-                         per_evt_wgt='Generator_weight', extraprocess=False, 
-                         selname='Pass', signals=['ggF'], sig_factor=100, luminosity=41.5) -> pd.DataFrame:
+                         per_evt_wgt='Generator_weight', extraprocess=lambda df: df, 
+                         selname='Pass', signals=['ggF'], luminosity=41.5) -> pd.DataFrame:
         """Reweight the datasets to the desired xsection * luminosity by adding a column `weight` and save the processed dataframes to csv files.
         This also saves the added cutflows (not weighted by xsection * luminosity) to a csv file.
         
@@ -83,20 +83,13 @@ class CSVPlotter:
             if not FileSysHelper.checkpath(load_dir, createdir=False):
                 continue
                 
-            cf_dict = self.__process_group(group, load_dir, postp_output, per_evt_wgt,
-                extraprocess, selname, signals, sig_factor, luminosity)
-            
-            # self.__save_cutflow(cf_dict, selname, postp_output, group)
-            
-            if cf_dict:
-                df = self.data_dict.get(group, None)
-                if df is not None: list_of_df.append(df)
+            list_of_df.append(self.__process_group(group, load_dir, per_evt_wgt,
+                extraprocess, luminosity))
         
         return pd.concat(list_of_df, axis=0).reset_index(drop=True)
     
-    def __process_group(self, group: str, load_dir: str, postp_output: str, per_evt_wgt: str, 
-                        extraprocess: callable = lambda df: df, selname: str = "", signals: list = [], 
-                        sig_factor: float = 1.0, luminosity: float = 1.0) -> dict:
+    def __process_group(self, group: str, load_dir: str, per_evt_wgt: str, 
+                        extraprocess: callable = lambda df: df, luminosity: float = 1.0) -> pd.DataFrame:
         """
         Process a single group of datasets by applying weights, loading data, and updating counters.
 
@@ -106,15 +99,11 @@ class CSVPlotter:
             postp_output (str): Directory to save processed outputs.
             per_evt_wgt (str): Column name for per-event weights.
             extraprocess (callable, optional): Function to apply additional processing to the DataFrame.
-            selname (str, optional): Selection name for filtering (unused in this function).
-            signals (list, optional): List of signal datasets (unused in this function).
-            sig_factor (float, optional): Scaling factor for signals (unused in this function).
             luminosity (float, optional): Luminosity value for weight calculation.
 
         Returns:
             dict: Dictionary containing raw and weighted counters for each dataset.
         """
-        cf_dict = {}
         self.data_dict[group] = {}
 
         def add_wgt(df):
@@ -126,26 +115,9 @@ class CSVPlotter:
                 df.loc[df.dataset == dsname, 'weight'] = df.loc[df.dataset == dsname, per_evt_wgt] * rwfac
             return df
 
-        FileSysHelper.checkpath(f'{postp_output}/{group}')
         output_df = DataLoader.load_csvs(load_dir, f'{group}*out*', func=lambda dfs: extraprocess(add_wgt(dfs[0])))
-
-        if output_df is not None:
-            self.data_dict[group] = output_df
-            for _, meta in self.meta_dict[group].items():
-                dsname = meta['shortname']
-                if output_df[output_df.dataset == dsname].empty:
-                    cf_dict[f'{dsname}_raw'] = 0
-                    cf_dict[f'{dsname}_wgt'] = 0
-                else:
-                    self.__addextcf(cf_dict, output_df[output_df.dataset == dsname], dsname, per_evt_wgt)
-
-        return cf_dict
-    
-    def __save_cutflow(self, cf_dict, selname, postp_output, group):
-        """Save the cutflow dataframe to a CSV file."""
-        if cf_dict:
-            cf_df = pd.DataFrame(cf_dict, index=[selname])
-            cf_df.to_csv(pjoin(postp_output, group, f'{group}_{selname.replace(" ", "")}_cf.csv'))
+        
+        return output_df
 
     @iterwgt
     def getdata(self, process, ds, file_type='.root'):
