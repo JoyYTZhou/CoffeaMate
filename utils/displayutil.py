@@ -207,18 +207,14 @@ def visualize_csv(file_path, title=None, max_rows=None):
         title (str, optional): Title for the table. Defaults to filename
         max_rows (int, optional): Limit number of rows displayed
     """
-    # Read the CSV file
     df = pd.read_csv(file_path)
     
-    # Limit rows if specified
     if max_rows is not None:
         df = df.head(max_rows)
     
-    # Use filename as default title if not provided
     if title is None:
         title = f"CSV: {file_path}"
     
-    # Print the dataframe using rich table
     print_dataframe_rich(df, title)
 
 def main():
