@@ -112,7 +112,10 @@ class CSVPlotter:
             for ds, meta in self.meta_dict[group].items():
                 dsname = meta['shortname']
                 rwfac = self.__get_rwgt_fac(group, ds, luminosity)
-                df.loc[df.dataset == dsname, 'weight'] = df.loc[df.dataset == dsname, per_evt_wgt] * rwfac
+                if group != 'Data':
+                    df.loc[df.dataset == dsname, 'weight'] = df.loc[df.dataset == dsname, per_evt_wgt] * rwfac
+                else:
+                    df.loc[df.dataset == dsname, 'weight'] = 1.0
             return df
 
         output_df = DataLoader.load_csvs(load_dir, f'{group}*out*', func=lambda dfs: extraprocess(add_wgt(dfs[0])))
