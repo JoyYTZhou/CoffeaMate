@@ -4,6 +4,7 @@ import os
 import pandas as pd
 from scipy.stats import pearsonr
 from src.analysis.objutil import ObjectProcessor
+from src.utils.displayutil import print_dataframe_rich
 
 pjoin = os.path.join
 
@@ -142,54 +143,45 @@ class ABCDUtil:
         print(total_stats)
     
     @staticmethod
-    def split_dataframe(df_ori, condition_func):
-        """
-        Generic function to split a dataframe based on a condition
-        
-        Args:
-            df_ori: Original dataframe
-            condition_func: Function that takes df_ori and returns a boolean mask
-            
-        Returns:
-            tuple: (negative_condition_df, positive_condition_df)
-        """
+    def split_dataframe(df_ori, sel_func=lambda df: df) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """Generic function to split a dataframe based on a condition. Prints the cutflow before and after selection.
+        Returns two dataframes: one that meets the condition and one that does not."""
         df = df_ori.copy()
-        condition = condition_func(df)
-        negative = df[~condition]
-        positive = df[condition]
-        return negative, positive
+        ABCDUtil.extra_sel_cutflow(df, sel_func=sel_func)
+        pos_df = sel_func(df)
+        neg_df = df.drop(pos_df.index)
+        return pos_df, neg_df
         
     @staticmethod
-    def ABCD_closure(N_A, N_B, N_C, N_D) -> pd.DataFrame:
-        """Calculate the closure of the ABCD method."""
+    def ABCD_closure(N_A, N_B, N_C, N_D):
+        """Calculate the closure of the ABCD method and print the results."""
         N_A_Pred = int(N_B * N_C / N_D)
         sigma = N_A_Pred * np.sqrt(1/N_B + 1/N_C + 1/N_D) 
         deviation = (N_A - N_A_Pred) / sigma
         difference = abs((N_A - N_A_Pred)/N_A) * 100
         pull = (N_A - N_A_Pred) / np.sqrt(N_A + N_A_Pred)
         ratio = N_A_Pred / N_A
-        results = {
-            'Metric': [
-                'Predicted events in A',
-                'Prediction/Actual ratio',
-                'Pull significance',
-                'Deviation',
-                'Percentage difference'
-            ],
-            'Value': [
-                f'{N_A_Pred} ± {sigma:.2f}',
-                f'{ratio:.3f}',
-                f'{pull:.3f}',
-                f'{deviation:.3f}',
-                f'{difference:.1f}%'
-            ]
-        }
-        return pd.DataFrame(results).set_index('Metric')
-    
+        results = {'Metric': ['Predicted events in A', 'Prediction/Actual ratio', 'Pull significance', 'Deviation', 'Percentage difference'], 
+               'Value': [f'{N_A_Pred} ± {sigma:.2f}', f'{ratio:.3f}', f'{pull:.3f}', f'{deviation:.3f}', f'{difference:.1f}%']}
+        results_df = pd.DataFrame(results).set_index('Metric')
+        print_dataframe_rich(results_df, title="ABCD Closure Results")
+
     @staticmethod
-    def ABCD_plot(dfA, dfB, dfC, dfD):
-        """Plot the ABCD method."""
-        pass
+    def extra_sel_cutflow(df, sel_func=lambda df: df):
+        """Apply a selection function to the dataframe and print cutflow before and after selection."""
+        initial_cutflow = df.groupby(['year', 'group'])['weight'].sum().reset_index()
+        initial_cutflow['stage'] = 'Initial'
+        
+        df = sel_func(df)
+        cutflow = df.groupby(['year', 'group'])['weight'].sum().reset_index()
+        cutflow['stage'] = 'After Selection'
+        
+        combined_cutflow = pd.concat([initial_cutflow, cutflow], ignore_index=True)
+        years = combined_cutflow['year'].unique()
+        for year in years:
+            year_cutflow = combined_cutflow[combined_cutflow['year'] == year]
+            print_dataframe_rich(year_cutflow, f"Cutflow for year {year}")
+        return combined_cutflow
 
     @staticmethod
     def ABCD_table(dfA, dfB, dfC, dfD, weight=None) -> pd.DataFrame:

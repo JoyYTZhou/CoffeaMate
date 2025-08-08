@@ -49,23 +49,15 @@ class CSVPlotter:
             cutflow[f'{ds}_wgt'] = df[wgtname].sum()
     
     def __get_rwgt_fac(self, group, ds, luminosity) -> float:
-        """Get the reweighting factor for the dataset (xsection * lumi)
-        
-        - `group`: the group of the dataset
-        - `ds`: the dataset name
-        - `signals`: the signal groups
-        - `factor`: the factor to multiply to the flat weights
-        - `luminosity`: the luminosity (in pb^-1)"""
+        """Calculate reweighting factor."""
         if group == 'Data':
             return 1
-        else:
-            xsection = self.meta_dict[group][ds].get('xsection', 1)
-            nwgt = self.meta_dict[group][ds].get('nwgt', None)
-            if nwgt is None:
-                logging.warning(f"No nwgt found for {group}/{ds}. Using flat weight of 1.")
-                flat_wgt = xsection * luminosity 
-            flat_wgt = 1/nwgt * xsection * luminosity
-            return flat_wgt
+        xsection = self.meta_dict[group][ds].get('xsection', 1)
+        nwgt = self.meta_dict[group][ds].get('nwgt')
+        if nwgt is None:
+            logging.warning(f"No nwgt for {group}/{ds}. Using flat weight.")
+            return xsection * luminosity
+        return (xsection * luminosity) / nwgt
     
     def process_datasets(self, datasource, metadata_path, postp_output, 
                          per_evt_wgt='Generator_weight', extraprocess=False, 
@@ -102,45 +94,52 @@ class CSVPlotter:
         
         return pd.concat(list_of_df, axis=0).reset_index(drop=True)
     
-    def __process_group(self, group, load_dir, postp_output, per_evt_wgt, extraprocess, selname, signals, sig_factor, luminosity):
-        """Process a single group of datasets."""
+    def __process_group(self, group: str, load_dir: str, postp_output: str, per_evt_wgt: str, 
+                        extraprocess: callable = lambda df: df, selname: str = "", signals: list = [], 
+                        sig_factor: float = 1.0, luminosity: float = 1.0) -> dict:
+        """
+        Process a single group of datasets by applying weights, loading data, and updating counters.
+
+        Args:
+            group (str): Name of the dataset group to process.
+            load_dir (str): Directory containing input CSV files.
+            postp_output (str): Directory to save processed outputs.
+            per_evt_wgt (str): Column name for per-event weights.
+            extraprocess (callable, optional): Function to apply additional processing to the DataFrame.
+            selname (str, optional): Selection name for filtering (unused in this function).
+            signals (list, optional): List of signal datasets (unused in this function).
+            sig_factor (float, optional): Scaling factor for signals (unused in this function).
+            luminosity (float, optional): Luminosity value for weight calculation.
+
+        Returns:
+            dict: Dictionary containing raw and weighted counters for each dataset.
+        """
         cf_dict = {}
         self.data_dict[group] = {}
 
-        output_df = self.__process_group_out(group, load_dir, postp_output, per_evt_wgt,
-            extraprocess, signals, sig_factor, luminosity)
-
-        if output_df is not None:
-            self.data_dict[group] = output_df
-        
-        for _, meta in self.meta_dict[group].items():
-            dsname = meta['shortname']
-            if output_df[output_df.dataset == dsname].empty:
-                cf_dict[f'{dsname}_raw'] = 0
-                cf_dict[f'{dsname}_wgt'] = 0
-                continue
-            self.__addextcf(cf_dict, output_df[output_df.dataset==dsname], dsname, per_evt_wgt)
-                
-        return cf_dict
-    
-    def __process_group_out(self, group, load_dir, postp_output, per_evt_wgt, extraprocess, signals, sig_factor, luminosity):
-        """Process the output files of a group and add the weights (by xsec * lumi) to the dataframe."""
-        def add_wgt(dfs):
-            df = dfs[0]
-            if df.empty:
+        def add_wgt(df):
+            if df.empty: 
                 return None
-            if group == "Data":
-                df['weight'] = 1.0
-                return extraprocess(df) if extraprocess else df
             for ds, meta in self.meta_dict[group].items():
                 dsname = meta['shortname']
                 rwfac = self.__get_rwgt_fac(group, ds, luminosity)
                 df.loc[df.dataset == dsname, 'weight'] = df.loc[df.dataset == dsname, per_evt_wgt] * rwfac
-            return extraprocess(df) if extraprocess else df
+            return df
 
         FileSysHelper.checkpath(f'{postp_output}/{group}')
+        output_df = DataLoader.load_csvs(load_dir, f'{group}*out*', func=lambda dfs: extraprocess(add_wgt(dfs[0])))
 
-        return DataLoader.load_csvs(load_dir, f'{group}*out*', func=add_wgt)
+        if output_df is not None:
+            self.data_dict[group] = output_df
+            for _, meta in self.meta_dict[group].items():
+                dsname = meta['shortname']
+                if output_df[output_df.dataset == dsname].empty:
+                    cf_dict[f'{dsname}_raw'] = 0
+                    cf_dict[f'{dsname}_wgt'] = 0
+                else:
+                    self.__addextcf(cf_dict, output_df[output_df.dataset == dsname], dsname, per_evt_wgt)
+
+        return cf_dict
     
     def __save_cutflow(self, cf_dict, selname, postp_output, group):
         """Save the cutflow dataframe to a CSV file."""
