@@ -36,47 +36,57 @@ class PlotStyle:
             spine.set_linewidth(0.5)
 
     @staticmethod
-    def create_figure(n_row=1, n_col=1, figsize=None):
-        """Create figure with default sizing"""
-        if figsize is None:
-            figsize = (8*n_col, 5*n_row)
-        return plt.subplots(n_row, n_col, figsize=figsize)
-    
-    @staticmethod
-    def create_ratio_figure(title: str, x_label, top_ylabel, bottom_ylabel, num_figure=1, set_log=False, lumi=None, year=None):
-        """Create a figure with ratio panel"""
-        fig = plt.figure(figsize=(8*num_figure, 6))
-        fig.suptitle(title, fontsize=14)
-        hep.style.use("CMS")
+    def create_figure(n_row=1, n_col=1, figsize=None, ratio_panel=False, title=None, x_label=None, top_ylabel=None, bottom_ylabel=None, num_figure=1, set_log=False, lumi=None, year=None):
+        """Create a figure with optional ratio panel and default sizing.
         
-        gs = fig.add_gridspec(2, 1*num_figure, height_ratios=(4, 1))
-        
-        ax2s = []
-        axs = []
-        
-        x_label = [x_label] if not isinstance(x_label, list) else x_label
-        top_ylabel = [top_ylabel] if not isinstance(top_ylabel, list) else top_ylabel
-        bottom_ylabel = [bottom_ylabel] if not isinstance(bottom_ylabel, list) else bottom_ylabel
-        
-        for i in range(num_figure):
-            ax2 = fig.add_subplot(gs[1,i])
-            ax = fig.add_subplot(gs[0,i], sharex=ax2)
+        Parameters:
+        - n_row, n_col: Number of rows and columns for subplots
+        - figsize: Figure size
+        - ratio_panel: Whether to include a ratio panel
+        - title: Title for the figure
+        - x_label, top_ylabel, bottom_ylabel: Labels for axes
+        - num_figure: Number of figures (for ratio panel)
+        - set_log: Whether to set log scale for the ratio panel
+        - lumi, year: CMS style parameters
+        """
+        if not ratio_panel:
+            if figsize is None:
+                figsize = (8 * n_col, 5 * n_row)
+            return plt.subplots(n_row, n_col, figsize=figsize)
+        else:
+            fig = plt.figure(figsize=(8 * num_figure, 6))
+            if title:
+                fig.suptitle(title, fontsize=14)
+            hep.style.use("CMS")
             
-            PlotStyle.setup_cms_style(ax, lumi=lumi, year=year)
-            PlotStyle.setup_axis(ax, ylabel=top_ylabel[i], fontsize=12)
-            ax.tick_params(labelbottom=False)
+            gs = fig.add_gridspec(2, 1 * num_figure, height_ratios=(4, 1))
             
-            PlotStyle.setup_axis(ax2, xlabel=x_label[i], ylabel=bottom_ylabel[i], fontsize=11)
-            ax2.yaxis.get_offset_text().set_fontsize(11)
+            ax2s = []
+            axs = []
             
-            if set_log:
-                ax2.set_yscale('log')
+            x_label = [x_label] if not isinstance(x_label, list) else x_label
+            top_ylabel = [top_ylabel] if not isinstance(top_ylabel, list) else top_ylabel
+            bottom_ylabel = [bottom_ylabel] if not isinstance(bottom_ylabel, list) else bottom_ylabel
+            
+            for i in range(num_figure):
+                ax2 = fig.add_subplot(gs[1, i])
+                ax = fig.add_subplot(gs[0, i], sharex=ax2)
                 
-            axs.append(ax)
-            ax2s.append(ax2)
+                PlotStyle.setup_cms_style(ax, lumi=lumi, year=year)
+                PlotStyle.setup_axis(ax, ylabel=top_ylabel[i], fontsize=12)
+                ax.tick_params(labelbottom=False)
+                
+                PlotStyle.setup_axis(ax2, xlabel=x_label[i], ylabel=bottom_ylabel[i], fontsize=11)
+                ax2.yaxis.get_offset_text().set_fontsize(11)
+                
+                if set_log:
+                    ax2.set_yscale('log')
+                    
+                axs.append(ax)
+                ax2s.append(ax2)
 
-        fig.subplots_adjust(hspace=0.15)
-        return fig, axs, ax2s
+            fig.subplots_adjust(hspace=0.15)
+            return fig, axs, ax2s
     
 class HistogramHelper:
     """Handles histogram operations"""
@@ -244,21 +254,3 @@ class PlotUtil:
         
         plt.show()
         
-    @staticmethod
-    def table_to_plot(df, save=False, savename='table.png', *args, **kwargs):
-        # ! This currently produces ugly tables
-        """Plot a table."""
-        fig, ax = plt.subplots()
-        ax.axis('tight')
-        ax.axis('off')
-        ax.table(cellText=df.values, colLabels=df.columns, cellLoc='center', loc='center', **kwargs)
-        if save: plt.savefig(savename)
-        else: plt.show()
-
-# def corr_heatmap(df, save=False, *args, **kwargs):
-#     """Plot a heatmap of the correlation matrix of the dataframe."""
-#     sns.set_style(style='whitegrid')
-#     plt.figure(figsize=(25,10))
-#     sns.heatmap(df.corr(),vmin=-1,vmax=1,annot=True,cmap='BuPu')
-#     if save: plt.savefig(*args, **kwargs)
-#     plt.show()

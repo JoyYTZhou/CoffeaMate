@@ -249,9 +249,8 @@ class CSVPlotter:
             {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1}]
 
         for attr, options in attridict.items():
-            fig, axs, ax2s = PlotStyle.create_ratio_figure(
-                title=title, x_label=options['plot'].get('xlabel', ''),
-                top_ylabel=hist_ylabel, bottom_ylabel=ratio_ylabel)
+            fig, axs, ax2s = PlotStyle.create_figure(ratio_panel=True, title=title, x_label=options['plot'].get('xlabel', ''),
+                                                     top_ylabel=hist_ylabel, bottom_ylabel=ratio_ylabel)
             
             hist_list = []
             wgt_list = []
