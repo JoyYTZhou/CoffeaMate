@@ -23,7 +23,7 @@ class CSVPlotter:
         FileSysHelper.checkpath(outdir)
         self.meta_dict = None
         self.data_dict = {}
-        self.sig_group = {r"b$\bar{b} \tau \tau \times 100$": ["ggF"]}
+        self.sig_group = {r"b$\bar{b} \tau \tau": ["ggF"]}
         self.bkg_group = {"DYJets": ["DYJets"], r"$t\bar{t}$": ['TTbar'], "SingleH": ["SingleH"], "Others": ["WZ", "WWW", "WW", "WWZ", "WZZ", "WJets", "Others", "ZH", "ZZ"]}
         self.data_label = 'Data'
         
@@ -38,16 +38,7 @@ class CSVPlotter:
         """Set the signal and background groups."""
         self.sig_group = sig_group
         self.bkg_group = bkg_group
-    
-    def __addextcf(self, cutflow: 'dict', df, ds, wgtname) -> None:
-        """Add the cutflow to the dictionary to be udpated to the cutflow table.
-        
-        Parameters
-        - `cutflow`: the cutflow dictionary to be updated"""
-        cutflow[f'{ds}_raw'] = len(df)
-        if wgtname in df.columns:
-            cutflow[f'{ds}_wgt'] = df[wgtname].sum()
-    
+
     def __get_rwgt_fac(self, group, ds, luminosity) -> float:
         """Calculate reweighting factor."""
         if group == 'Data':
@@ -155,12 +146,13 @@ class CSVPlotter:
         bin_range = histopts.get('range', (0, 200))
         
         pltlabel = list(group.keys()) if group is not None else self.labels
+        if rescale != 1:
+            pltlabel = [f"{label} x {rescale}" for label in pltlabel]
         b_colors = PlotStyle.COLORS[:len(pltlabel)]
         
         hist_list = []
         for label in pltlabel:
             proc_list = group[label] if group is not None else [label]
-            # Filter the DataFrame for the current group
             thisdf = evts[evts['group'].isin(proc_list)]
             if thisdf.empty:
                 logging.warning(f"No data for group {label}. Skipping.")
