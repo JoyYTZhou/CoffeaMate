@@ -23,7 +23,7 @@ class CSVPlotter:
         FileSysHelper.checkpath(outdir)
         self.meta_dict = None
         self.data_dict = {}
-        self.sig_group = {r"b$\bar{b} \tau \tau": ["ggF"]}
+        self.sig_group = {r"$b\bar{b} \tau \tau$": ["ggF"]}
         self.bkg_group = {"DYJets": ["DYJets"], r"$t\bar{t}$": ['TTbar'], "SingleH": ["SingleH"], "Others": ["WZ", "WWW", "WW", "WWZ", "WZZ", "WJets", "Others", "ZH", "ZZ"]}
         self.data_label = 'Data'
         
@@ -301,7 +301,7 @@ class CSVPlotter:
             self.__plot_SvBHist(axes, evts, att, options, **kwargs)
             
             if save_name:
-                save_name = f'_{save_name}'
+                save_name = f'{save_name}'
             fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'),
                 dpi=300, bbox_inches='tight', pad_inches=0.1)
     
@@ -415,16 +415,20 @@ class ObjectPlotter():
     @staticmethod
     def plotSigWBkg(ax, sig_hists, bkg_hists, data_hist, bin_edges, sig_label, bkg_label, xrange, stack_all=False, **kwargs):
         """Plot signal and background histograms"""
+        # Convert labels to raw strings for proper LaTeX rendering
+        bkg_label_raw = [rf"{label}" for label in bkg_label]
+        sig_label_raw = [rf"{label}" for label in sig_label]
+        
         if stack_all:
             total_hists = bkg_hists + sig_hists
-            total_label = bkg_label + sig_label
+            total_label = bkg_label_raw + sig_label_raw
             hep.histplot(total_hists, bins=bin_edges, label=total_label, ax=ax, histtype='fill', alpha=0.6, stack=True, linewidth=1)
         else:
-            hep.histplot(bkg_hists, bins=bin_edges, label=bkg_label,
+            hep.histplot(bkg_hists, bins=bin_edges, label=bkg_label_raw,
                 ax=ax, histtype='fill', alpha=0.6, stack=True, linewidth=1)
             hep.histplot(sig_hists, bins=bin_edges, ax=ax,
                 color=PlotStyle.SIGNAL_COLORS[:len(sig_hists)],
-                label=sig_label, stack=False,
+                label=sig_label_raw, stack=False,
                 histtype='step', alpha=1.0, linewidth=1.5)
 
         if data_hist is not None:
