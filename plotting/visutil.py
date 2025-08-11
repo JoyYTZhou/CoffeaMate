@@ -146,6 +146,7 @@ class CSVPlotter:
         bin_range = histopts.get('range', (0, 200))
         
         pltlabel = list(group.keys()) if group is not None else self.labels
+        logging.info(f"pltlabel is {pltlabel}")
         if rescale != 1:
             pltlabel = [f"{label} x {rescale}" for label in pltlabel]
         b_colors = PlotStyle.COLORS[:len(pltlabel)]
