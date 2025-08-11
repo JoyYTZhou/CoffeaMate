@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import json, logging
 from matplotlib.ticker import ScalarFormatter
+import matplotlib.pyplot as plt
 
 from src.utils.datautil import DataLoader, iterwgt, arr_handler
 from src.analysis.objutil import ObjectProcessor
@@ -437,6 +438,8 @@ class ObjectPlotter():
         ax.set_xlim(*xrange)
         ax.set_ylim(bottom=0)
         ax.legend(fontsize=12, loc='upper right')
+
+        plt.close()
   
     @staticmethod
     def hist_arr(arr, bins: int, range: list[int, int], weights=None, density=False, keep_overflow=True) -> tuple[np.ndarray, np.ndarray]:
