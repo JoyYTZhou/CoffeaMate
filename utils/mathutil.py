@@ -146,10 +146,9 @@ class ABCDUtil:
     def split_dataframe(df_ori, sel_func=lambda df: df) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Generic function to split a dataframe based on a condition. Prints the cutflow before and after selection.
         Returns two dataframes: one that meets the condition and one that does not."""
-        df = df_ori.copy()
-        ABCDUtil.extra_sel_cutflow(df, sel_func=sel_func)
-        pos_df = sel_func(df)
-        neg_df = df.drop(pos_df.index)
+        ABCDUtil.extra_sel_cutflow(df_ori, sel_func=sel_func)
+        pos_df = sel_func(df_ori)
+        neg_df = df_ori.drop(pos_df.index)
         return pos_df, neg_df
         
     @staticmethod
@@ -180,7 +179,8 @@ class ABCDUtil:
         years = combined_cutflow['year'].unique()
         for year in years:
             year_cutflow = combined_cutflow[combined_cutflow['year'] == year]
-            print_dataframe_rich(year_cutflow, f"Cutflow for year {year}")
+            pivoted_cutflow = year_cutflow.pivot(index='stage', columns='group', values='weight')
+            print_dataframe_rich(pivoted_cutflow, f"Cutflow for year {year}")
         return combined_cutflow
 
     @staticmethod
