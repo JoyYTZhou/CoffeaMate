@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import json, logging
 from matplotlib.ticker import ScalarFormatter
+import matplotlib.pyplot as plt
 
 from src.utils.datautil import DataLoader, iterwgt, arr_handler
 from src.analysis.objutil import ObjectProcessor
@@ -23,7 +24,7 @@ class CSVPlotter:
         FileSysHelper.checkpath(outdir)
         self.meta_dict = None
         self.data_dict = {}
-        self.sig_group = {r"b$\bar{b} \tau \tau \times 100$": ["ggF"]}
+        self.sig_group = {r"$b\bar{b} \tau \tau$": ["ggF"]}
         self.bkg_group = {"DYJets": ["DYJets"], r"$t\bar{t}$": ['TTbar'], "SingleH": ["SingleH"], "Others": ["WZ", "WWW", "WW", "WWZ", "WZZ", "WJets", "Others", "ZH", "ZZ"]}
         self.data_label = 'Data'
         
@@ -38,16 +39,7 @@ class CSVPlotter:
         """Set the signal and background groups."""
         self.sig_group = sig_group
         self.bkg_group = bkg_group
-    
-    def __addextcf(self, cutflow: 'dict', df, ds, wgtname) -> None:
-        """Add the cutflow to the dictionary to be udpated to the cutflow table.
-        
-        Parameters
-        - `cutflow`: the cutflow dictionary to be updated"""
-        cutflow[f'{ds}_raw'] = len(df)
-        if wgtname in df.columns:
-            cutflow[f'{ds}_wgt'] = df[wgtname].sum()
-    
+
     def __get_rwgt_fac(self, group, ds, luminosity) -> float:
         """Calculate reweighting factor."""
         if group == 'Data':
@@ -155,12 +147,14 @@ class CSVPlotter:
         bin_range = histopts.get('range', (0, 200))
         
         pltlabel = list(group.keys()) if group is not None else self.labels
+        logging.info(f"pltlabel is {pltlabel}")
+        if rescale != 1:
+            pltlabel = [f"{label} x {rescale}" for label in pltlabel]
         b_colors = PlotStyle.COLORS[:len(pltlabel)]
         
         hist_list = []
         for label in pltlabel:
             proc_list = group[label] if group is not None else [label]
-            # Filter the DataFrame for the current group
             thisdf = evts[evts['group'].isin(proc_list)]
             if thisdf.empty:
                 logging.warning(f"No data for group {label}. Skipping.")
@@ -308,7 +302,7 @@ class CSVPlotter:
             self.__plot_SvBHist(axes, evts, att, options, **kwargs)
             
             if save_name:
-                save_name = f'_{save_name}'
+                save_name = f'{save_name}'
             fig.savefig(pjoin(self.outdir, f'{att}{save_name}.png'),
                 dpi=300, bbox_inches='tight', pad_inches=0.1)
     
@@ -422,16 +416,20 @@ class ObjectPlotter():
     @staticmethod
     def plotSigWBkg(ax, sig_hists, bkg_hists, data_hist, bin_edges, sig_label, bkg_label, xrange, stack_all=False, **kwargs):
         """Plot signal and background histograms"""
+        # Convert labels to raw strings for proper LaTeX rendering
+        bkg_label_raw = [rf"{label}" for label in bkg_label]
+        sig_label_raw = [rf"{label}" for label in sig_label]
+        
         if stack_all:
             total_hists = bkg_hists + sig_hists
-            total_label = bkg_label + sig_label
+            total_label = bkg_label_raw + sig_label_raw
             hep.histplot(total_hists, bins=bin_edges, label=total_label, ax=ax, histtype='fill', alpha=0.6, stack=True, linewidth=1)
         else:
-            hep.histplot(bkg_hists, bins=bin_edges, label=bkg_label,
+            hep.histplot(bkg_hists, bins=bin_edges, label=bkg_label_raw,
                 ax=ax, histtype='fill', alpha=0.6, stack=True, linewidth=1)
             hep.histplot(sig_hists, bins=bin_edges, ax=ax,
                 color=PlotStyle.SIGNAL_COLORS[:len(sig_hists)],
-                label=sig_label, stack=False,
+                label=sig_label_raw, stack=False,
                 histtype='step', alpha=1.0, linewidth=1.5)
 
         if data_hist is not None:
@@ -440,6 +438,8 @@ class ObjectPlotter():
         ax.set_xlim(*xrange)
         ax.set_ylim(bottom=0)
         ax.legend(fontsize=12, loc='upper right')
+
+        plt.close()
   
     @staticmethod
     def hist_arr(arr, bins: int, range: list[int, int], weights=None, density=False, keep_overflow=True) -> tuple[np.ndarray, np.ndarray]:

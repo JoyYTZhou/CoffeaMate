@@ -180,7 +180,8 @@ class ABCDUtil:
         years = combined_cutflow['year'].unique()
         for year in years:
             year_cutflow = combined_cutflow[combined_cutflow['year'] == year]
-            print_dataframe_rich(year_cutflow, f"Cutflow for year {year}")
+            pivoted_cutflow = year_cutflow.pivot(index='stage', columns='group', values='weight')
+            print_dataframe_rich(pivoted_cutflow, f"Cutflow for year {year}")
         return combined_cutflow
 
     @staticmethod
