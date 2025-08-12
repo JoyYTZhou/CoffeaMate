@@ -1,6 +1,6 @@
 # adapted from https://github.com/bu-cms/projectcoffea/blob/master/projectcoffea/helpers/helpers.py
 import numpy as np
-import os
+import os, logging
 import pandas as pd
 from scipy.stats import pearsonr
 from src.analysis.objutil import ObjectProcessor
@@ -169,11 +169,14 @@ class ABCDUtil:
     @staticmethod
     def extra_sel_cutflow(df, sel_func=lambda df: df):
         """Apply a selection function to the dataframe and print cutflow before and after selection."""
+        logging.info(f"{df.columns}")
         initial_cutflow = df.groupby(['year', 'group'])['weight'].sum().reset_index()
+        logging.info(f"Initial cutflow: {initial_cutflow}")
         initial_cutflow['stage'] = 'Initial'
         
-        df = sel_func(df)
-        cutflow = df.groupby(['year', 'group'])['weight'].sum().reset_index()
+        df_selected = sel_func(df)
+        logging.info(df_selected.columns)
+        cutflow = df_selected.groupby(['year', 'group'])['weight'].sum().reset_index()
         cutflow['stage'] = 'After Selection'
         
         combined_cutflow = pd.concat([initial_cutflow, cutflow], ignore_index=True)
