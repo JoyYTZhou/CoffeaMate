@@ -8,6 +8,7 @@ from src.utils.filesysutil import FileSysHelper, pjoin, pbase, pdir
 from src.utils.datautil import CutflowProcessor, DataSetUtil, DatasetIterator, DataLoader
 from src.utils.rootutil import RootFileHandler
 from src.utils.displayutil import create_table, print_dataframe_rich
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 luminosity = {"2022PreEE": (5.0104+2.9700) * 1000, "2022PostEE": (5.8070+17.7819+3.0828) * 1000, "2023Summer": 32.7 * 1000}
 regroup_dict = {"Others": ['WJets', 'WZ', 'WW', 'WWW', 'ZZZ', 'WZZ', 'WWZ'], 'HH': ['ggF']}
@@ -519,21 +520,40 @@ class PostSkimProcessor(PostProcessor):
             root_files = FileSysHelper.glob_files(dtdir, f'{dsname}*.root', add_prefix=True, exclude='empty')
             logging.info(f"Found {len(root_files)} files matching pattern {dsname}*.root")
             corrupted = set()
-            for i in range(0, len(root_files), batch_size):
-                batch_files = root_files[i:i+batch_size]
-                outname = pjoin(outdir, f"{dsname}_{i//batch_size+1}.root") 
-                logging.info("Hadding batch %d for dataset %s with %d files to %s", i//batch_size+1, dsname, len(batch_files), outname)
+            
+            def hadd_batch(batch_idx, batch_files):
+                outname = pjoin(outdir, f"{dsname}_{batch_idx+1}.root") 
+                logging.info("Hadding batch %d for dataset %s with %d files to %s", batch_idx+1, dsname, len(batch_files), outname)
                 try:
                     new_corrupt = RootFileHandler.call_hadd(outname, batch_files)
                     if new_corrupt is not None:
-                        logging.error(f"Error hadding {dsname} batch {i}: {new_corrupt}")
-                        corrupted |= new_corrupt
+                        logging.error(f"Error hadding {dsname} batch {batch_idx}: {new_corrupt}")
+                        return new_corrupt
+                    else:
+                        return set()
                 except Exception as e:
                     logging.error(f"Hadding {dsname} encountered error {e}")
-                    logging.info(batch_files)
+                    return set()
+            
+            # Create batches and submit to thread pool
+            batches = [(i//batch_size, root_files[i:i+batch_size]) 
+                  for i in range(0, len(root_files), batch_size)]
+            
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                future_to_batch = {executor.submit(hadd_batch, batch_idx, batch_files): batch_idx 
+                      for batch_idx, batch_files in batches}
+            
+            for future in as_completed(future_to_batch):
+                batch_idx = future_to_batch[future]
+                try:
+                    result = future.result()
+                    corrupted |= result
+                except Exception as e:
+                    logging.error(f"Batch {batch_idx} generated an exception: {e}")
+            
             return list(corrupted)
         
-        batch_size = 80 if self.cfg['IS_MC'] else 5
+        batch_size = 80 if self.cfg['IS_MC'] else 3
         
         results = DataSetUtil.extract_leaf_values(self.dataset_iter.process_datasets(process_ds, callback_args={'batch_size': batch_size}))
         corrupted = list(chain(*results))
