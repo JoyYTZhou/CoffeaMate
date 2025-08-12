@@ -143,14 +143,14 @@ class ABCDUtil:
         print(total_stats)
     
     @staticmethod
-    def split_dataframe(df_ori, sel_func=lambda df: df) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def split_dataframe(df_ori, sel_func=lambda df: df) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Generic function to split a dataframe based on a condition. Prints the cutflow before and after selection.
         Returns two dataframes: one that meets the condition and one that does not."""
         df = df_ori.copy()
-        ABCDUtil.extra_sel_cutflow(df, sel_func=sel_func)
+        cutflow = ABCDUtil.extra_sel_cutflow(df, sel_func=sel_func)
         pos_df = sel_func(df)
         neg_df = df.drop(pos_df.index)
-        return pos_df, neg_df
+        return pos_df, neg_df, cutflow
         
     @staticmethod
     def ABCD_closure(N_A, N_B, N_C, N_D):
