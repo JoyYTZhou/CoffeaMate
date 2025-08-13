@@ -169,15 +169,19 @@ class ABCDUtil:
     @staticmethod
     def extra_sel_cutflow(df, sel_func=lambda df: df):
         """Apply a selection function to the dataframe and print cutflow before and after selection."""
-        logging.info(f"{df.columns}")
+        logging.debug(f"{df.columns}")
         initial_cutflow = df.groupby(['year', 'group'])['weight'].sum().reset_index()
-        logging.info(f"Initial cutflow: {initial_cutflow}")
+        logging.debug(f"Initial cutflow: {initial_cutflow}")
         initial_cutflow['stage'] = 'Initial'
         
         df_selected = sel_func(df)
-        logging.info(df_selected.columns)
         cutflow = df_selected.groupby(['year', 'group'])['weight'].sum().reset_index()
         cutflow['stage'] = 'After Selection'
+        
+        # Use categorical approach for consistent ordering
+        stage_categories = ['Initial', 'After Selection']
+        initial_cutflow['stage'] = pd.Categorical(initial_cutflow['stage'], categories=stage_categories, ordered=True)
+        cutflow['stage'] = pd.Categorical(cutflow['stage'], categories=stage_categories, ordered=True)
         
         combined_cutflow = pd.concat([initial_cutflow, cutflow], ignore_index=True)
         years = combined_cutflow['year'].unique()
@@ -185,6 +189,12 @@ class ABCDUtil:
             year_cutflow = combined_cutflow[combined_cutflow['year'] == year]
             pivoted_cutflow = year_cutflow.pivot(index='stage', columns='group', values='weight')
             print_dataframe_rich(pivoted_cutflow, f"Cutflow for year {year}")
+
+        summary_cutflow = combined_cutflow.groupby(['stage', 'group'])['weight'].sum().reset_index()
+        summary_cutflow['stage'] = pd.Categorical(summary_cutflow['stage'], categories=stage_categories, ordered=True)
+        summary_cutflow = summary_cutflow.pivot(index='stage', columns='group', values='weight')
+        print_dataframe_rich(summary_cutflow, "Overall Cutflow Summary")
+        combined_cutflow = summary_cutflow
         return combined_cutflow
 
     @staticmethod
