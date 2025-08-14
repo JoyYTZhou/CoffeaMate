@@ -147,9 +147,14 @@ class ABCDUtil:
         """Generic function to split a dataframe based on a condition. Prints the cutflow before and after selection.
         Returns two dataframes: one that meets the condition and one that does not."""
         df = df_ori.copy()
+        df = df.reset_index(drop=True)
+        
         cutflow = ABCDUtil.extra_sel_cutflow(df, sel_func=sel_func)
+        
         pos_df = sel_func(df)
-        neg_df = df.drop(pos_df.index)
+        mask = df.index.isin(pos_df.index)
+        neg_df = df[~mask]
+        
         return pos_df, neg_df, cutflow
         
     @staticmethod

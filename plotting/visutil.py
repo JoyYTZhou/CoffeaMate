@@ -185,7 +185,7 @@ class CSVPlotter:
 
     @staticmethod
     def plot_shape(list_of_evts: list[pd.DataFrame], labels: list, attridict: dict, 
-                ratio_ylabel: str, outdir: str, hist_ylabel: str = 'Normalized', normalize: bool = True, 
+                ratio_ylabel: str, outdir: str, normalize: bool = True, 
                 title: str = '', save_suffix: str = '') -> None:
         """Compare normalized shapes of distributions with ratio panels.
         
@@ -215,6 +215,9 @@ class CSVPlotter:
         styles = [{'histtype': 'fill', 'alpha': 0.4, 'linewidth': 1.5},
             {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1},
             {'histtype': 'step', 'alpha': 1.0, 'linewidth': 1}]
+
+        if normalize: hist_ylabel = "Normalized"
+        else: hist_ylabel = "Events"
 
         for attr, options in attridict.items():
             fig, axs, ax2s = PlotStyle.create_figure(ratio_panel=True, title=title, x_label=options['plot'].get('xlabel', ''),
@@ -357,8 +360,8 @@ class ObjectPlotter():
 
     @staticmethod
     def plot_hist_with_err(ax, ax2, hist_list, wgt_list, bins, label, xrange, normalize=False, **kwargs):
-        """Plot multiple histograms with error bars and ratio panel.
-        
+        """Plot multiple histograms with error bars and ratio panel. The first histogram in the list is used as the denominator.
+
         Parameters
         ----------
         wgt_list : list
@@ -394,7 +397,7 @@ class ObjectPlotter():
 
     @staticmethod
     def _plot_ratio_panel(ax2, norm_hist_list, norm_err_list, error_x, colors):
-        """Plot the ratio panel"""
+        """Plot the ratio panel. The first histogram in the list is used as the denominator."""
         if len(norm_hist_list) == 2:
             ratio, ratio_err = HistogramHelper.calc_ratio_and_errors(
                 norm_hist_list[1], norm_hist_list[0],
