@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def calculate_rates(true_labels: np.ndarray, predicted_labels: np.ndarray):
     """Calculate FPR, FNR, TPR, TNR.
 

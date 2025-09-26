@@ -37,11 +37,10 @@ class PlotStyle:
 
     @staticmethod
     def create_figure(n_row=1, n_col=1, figsize=None, ratio_panel=False, title=None, x_label=None, top_ylabel=None, bottom_ylabel=None, num_figure=1, set_log=False, lumi=None, year=None):
-        """Create a figure with optional ratio panel and default sizing.
+        """Create a figure with optional ratio panel and default sizing, with CMS style.
         
         Parameters:
         - n_row, n_col: Number of rows and columns for subplots
-        - figsize: Figure size
         - ratio_panel: Whether to include a ratio panel
         - title: Title for the figure
         - x_label, top_ylabel, bottom_ylabel: Labels for axes
@@ -91,12 +90,40 @@ class PlotStyle:
 class HistogramHelper:
     """Handles histogram operations"""
     @staticmethod
-    def make_histogram(data, bins, range, weights=None, density=False):
+    def make_histogram(data, bins, range, weights=None, density=False) -> tuple[np.ndarray, np.ndarray]:
         """Create histogram with proper overflow handling"""
         if isinstance(bins, int):
             bins = np.linspace(*range, bins+1)
             data = np.clip(data, bins[0], bins[-1])
         return np.histogram(data, bins=bins, weights=weights, density=density)
+    
+    @staticmethod
+    def get_normalization_factor(data_a, data_b, bins, range, weights_a=None, weights_b=None):
+        """Calculate normalization factor to scale histogram A so it doesn't exceed histogram B.
+        
+        Parameters:
+        data_a (pd.Series): Data for histogram A to be normalized
+        data_b (pd.Series): Reference data for histogram B
+        
+        Returns:
+        float: Normalization factor to apply to histogram A
+        """
+        # Create histograms
+        hist_a, _ = HistogramHelper.make_histogram(data_a, bins=bins, range=range, weights=weights_a)
+        hist_b, _ = HistogramHelper.make_histogram(data_b, bins=bins, range=range, weights=weights_b)
+        
+        # Find bins where A exceeds B
+        exceeding_bins = hist_a > hist_b
+        
+        if not np.any(exceeding_bins):
+            # A doesn't exceed B anywhere, no normalization needed
+            return 1.0
+        
+        # Calculate the maximum normalization factor needed
+        ratios = hist_b[exceeding_bins] / hist_a[exceeding_bins]
+        normalization_factor = np.min(ratios)
+        
+        return normalization_factor
 
     @staticmethod
     def calc_ratio_and_errors(num, den, num_err, den_err):
@@ -118,7 +145,7 @@ class HistogramHelper:
         
         ratio[valid_mask] = num[valid_mask] / den[valid_mask]
         
-        ratio_err[valid_mask] = ratio[valid_mask] * np.sqrt(
+        ratio_err[valid_mask] = np.abs(ratio[valid_mask]) * np.sqrt(
             (num_err[valid_mask]/num[valid_mask])**2 + 
             (den_err[valid_mask]/den[valid_mask])**2
         )
@@ -138,12 +165,6 @@ class HistogramHelper:
         tuple: (normalized_histogram, errors)
             - normalized_histogram is in units of probability density (events/bin_width)
             - errors are propagated appropriately
-
-        Note:
-        To get a proper probability density function (PDF), we need to:
-        1. Divide by total events/weights to get probability per bin
-        2. Divide by bin width to convert to density (per unit x)
-        This ensures the total integral of the PDF equals 1
         """
         # First normalize by total events/weights
         prob_hist = hist / total_wgt * normalize_sum
@@ -155,7 +176,7 @@ class HistogramHelper:
         # Error = sqrt(N)/N * normalized value, where N is raw counts
         density_err = np.where(
             hist > 0,  # Only calculate errors for non-empty bins
-            density_hist * (np.sqrt(hist)/hist),
+            density_hist * np.sqrt(1.0/hist),  # Equivalent to (sqrt(hist)/hist) but avoids division
             0
         )
         return density_hist, density_err
@@ -218,16 +239,7 @@ class PlotUtil:
         PlotStyle.setup_cms_style(ax, lumi=None)
         PlotStyle.setup_cms_style(ax2, lumi=None)
         
-        hep.histplot(
-            ratio,
-            bins,
-            yerr=ratio_err,
-            ax=ax,
-            label=Y_label_1,
-            color=PlotStyle.COLORS[0],
-            histtype='errorbar',
-            alpha=0.9
-        )
+        hep.histplot(ratio, bins, yerr=ratio_err, ax=ax, label=Y_label_1, color=PlotStyle.COLORS[0], histtype='errorbar', alpha=0.9)
         PlotStyle.setup_axis(ax, X_label, Y_label_1, f"{Y_label_1} along {X_label}")
 
         # Bottom panel: Percentage plot
