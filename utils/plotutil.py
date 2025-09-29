@@ -91,7 +91,11 @@ class HistogramHelper:
     """Handles histogram operations"""
     @staticmethod
     def make_histogram(data, bins, range, weights=None, density=False) -> tuple[np.ndarray, np.ndarray]:
-        """Create histogram with proper overflow handling"""
+        """Create histogram with proper overflow handling
+        
+        Return
+        - hist: Histogram counts/weights
+        - bin_edges: Edges of the bins"""
         if isinstance(bins, int):
             bins = np.linspace(*range, bins+1)
             data = np.clip(data, bins[0], bins[-1])
@@ -109,12 +113,18 @@ class HistogramHelper:
         float: Normalization factor to apply to histogram A
         """
         # Create histograms
-        hist_a, _ = HistogramHelper.make_histogram(data_a, bins=bins, range=range, weights=weights_a)
+        hist_a, bin_edges = HistogramHelper.make_histogram(data_a, bins=bins, range=range, weights=weights_a)
         hist_b, _ = HistogramHelper.make_histogram(data_b, bins=bins, range=range, weights=weights_b)
         
         # Find bins where A exceeds B
         exceeding_bins = hist_a > hist_b
-        
+
+        # Log information about exceeding bins
+        exceeding_indices = np.where(exceeding_bins)[0]
+
+        if len(exceeding_indices) > 0:
+            logging.info(f"Histogram A exceeds B in {len(exceeding_indices)} bins: {exceeding_indices}")
+
         if not np.any(exceeding_bins):
             # A doesn't exceed B anywhere, no normalization needed
             return 1.0
@@ -122,6 +132,12 @@ class HistogramHelper:
         # Calculate the maximum normalization factor needed
         ratios = hist_b[exceeding_bins] / hist_a[exceeding_bins]
         normalization_factor = np.min(ratios)
+        
+        # Log the bin with minimum ratio for debugging
+        min_bin_idx = np.argmin(ratios)
+        bin_left = bin_edges[exceeding_indices[min_bin_idx]]
+        bin_right = bin_edges[exceeding_indices[min_bin_idx] + 1]
+        logging.info(f"Minimum ratio {normalization_factor:.4f} found in bin [{bin_left:.3f}, {bin_right:.3f})")
         
         return normalization_factor
 

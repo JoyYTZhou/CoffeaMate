@@ -1,5 +1,15 @@
 import numpy as np
+import logging
+import pandas as pd
 
+def normalize_mc(data_df, mc_df, feature='DiTau_mass') -> tuple[pd.DataFrame, float]:
+    from src.utils.plotutil import HistogramHelper
+
+    renorm_fac = HistogramHelper.get_normalization_factor(mc_df[feature], data_df[feature], bins=30, range=(0, 300), 
+                                weights_a=mc_df['weight'], weights_b=data_df['weight'])
+    mc_df['weight'] *= renorm_fac
+    logging.info(f"MC normalized by factor {renorm_fac:.4f} to match Data in {feature} distribution")
+    return mc_df, renorm_fac
 
 def calculate_rates(true_labels: np.ndarray, predicted_labels: np.ndarray):
     """Calculate FPR, FNR, TPR, TNR.
