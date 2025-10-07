@@ -43,7 +43,7 @@ def infer_multiclass(model, data_df_0, features):
     
     # Compute reweight
     weights = data_df_0["weight"].to_numpy() if "weight" in data_df_0.columns else np.ones(len(data_df_0))
-    w_reco_qcd = (s_data_1 - s_mc) / (s_data_0 + 1e-7) * weights
+    w_reco_qcd = np.maximum(s_data_1 - s_mc, 0) / (s_data_0 + 1e-7) * weights
 
     results_dict = {
         "w_reco_qcd": w_reco_qcd,
