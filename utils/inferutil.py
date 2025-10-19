@@ -30,10 +30,10 @@ def infer_multiclass(model, data_df_0, features):
         logits = model(X_data_tensor)
         probs = torch.softmax(logits, dim=1).numpy()
     
-    s_data_0 = probs[:, 0]  # Probability for class 0
-    s_mc = probs[:, 1]      # Probability for class 1
-    s_data_1 = probs[:, 2]  # Probability for class 2
-    
+    s_data_0 = np.clip(probs[:, 0], 0.01, 0.99)  # Probability for class 0
+    s_mc = np.clip(probs[:, 1], 0.01, 0.99)      # Probability for class 1
+    s_data_1 = np.clip(probs[:, 2], 0.01, 0.99)  # Probability for class 2
+
     logging.info(f"Max probability for class 0 (Data in original region): {s_data_0.max():.4f}")
     logging.info(f"Min probability for class 0 (Data in original region): {s_data_0.min():.4f}")
     logging.info(f"Max probability for class 1 (MC): {s_mc.max():.4f}")
@@ -43,7 +43,8 @@ def infer_multiclass(model, data_df_0, features):
     
     # Compute reweight
     weights = data_df_0["weight"].to_numpy() if "weight" in data_df_0.columns else np.ones(len(data_df_0))
-    w_reco_qcd = np.maximum(s_data_1 - s_mc, 0) / (s_data_0 + 1e-7) * weights
+    # w_reco_qcd = np.maximum(s_data_1 - s_mc, 0) / (s_data_0 + 1e-7) * weights
+    w_reco_qcd = (s_data_1 - s_mc) / s_data_0 * weights
 
     results_dict = {
         "w_reco_qcd": w_reco_qcd,

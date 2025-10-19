@@ -2,7 +2,7 @@ import numpy as np
 import logging
 import pandas as pd
 
-def normalize_mc(data_df, mc_df, feature='DiTau_mass') -> tuple[pd.DataFrame, float]:
+def normalize_mc(data_df, mc_df, feature='DiJet_pt') -> tuple[pd.DataFrame, float]:
     from src.utils.plotutil import HistogramHelper
 
     renorm_fac = HistogramHelper.get_normalization_factor(mc_df[feature], data_df[feature], bins=30, range=(0, 300), 
