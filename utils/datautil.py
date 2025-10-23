@@ -675,6 +675,48 @@ class DataSetUtil:
             for uuid in uuids
         ]
         
+        # First check for orphaned files with UUIDs not in dataset_info
+        logging.info("Checking for orphaned files...")
+        all_expected_uuids = set()
+        for shortname, uuids in dataset_info.items():
+            all_expected_uuids.update(uuids)
+
+        # Find all root files and extract UUIDs
+        all_root_files = FileSysHelper.glob_files(root_dir, filepattern="*.root")
+        all_csv_files = FileSysHelper.glob_files(csv_dir, filepattern="*cutflow.csv")
+
+        orphaned_root = []
+        orphaned_csv = []
+
+        # Check root files for orphaned UUIDs
+        for root_file in all_root_files:
+            filename = os.path.basename(root_file)
+            # Extract UUID from filename (assuming format: shortname_uuid_*.root)
+            parts = filename.replace('.root', '').split('_')
+            if len(parts) >= 2:
+                potential_uuid = parts[1]
+                if potential_uuid not in all_expected_uuids:
+                    orphaned_root.append(root_file)
+
+        # Check CSV files for orphaned UUIDs
+        for csv_file in all_csv_files:
+            filename = os.path.basename(csv_file)
+            # Extract UUID from filename (assuming format: shortname_uuid_*cutflow.csv)
+            parts = filename.replace('cutflow.csv', '').split('_')
+            if len(parts) >= 2:
+                potential_uuid = parts[1]
+                if potential_uuid not in all_expected_uuids:
+                    orphaned_csv.append(csv_file)
+
+        if orphaned_root or orphaned_csv:
+            logging.warning(f"Found {len(orphaned_root)} orphaned root files and {len(orphaned_csv)} orphaned CSV files")
+            for orphan in orphaned_root[:5]:  # Show first 5 as examples
+                logging.warning(f"Orphaned root file: {orphan}")
+            for orphan in orphaned_csv[:5]:  # Show first 5 as examples
+                logging.warning(f"Orphaned CSV file: {orphan}")
+        else:
+            logging.info("No orphaned files found")
+
         # Set up multiprocessing
         if n_workers is None:
             n_workers = max(1, mp.cpu_count() - 2)
