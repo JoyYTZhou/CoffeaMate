@@ -525,12 +525,10 @@ class PostSkimProcessor(PostProcessor):
                 outname = pjoin(outdir, f"{dsname}_{batch_idx+1}.root") 
                 logging.info("Hadding batch %d for dataset %s with %d files to %s", batch_idx+1, dsname, len(batch_files), outname)
                 try:
-                    new_corrupt = RootFileHandler.call_hadd(outname, batch_files)
-                    if new_corrupt is not None:
-                        logging.error(f"Error hadding {dsname} batch {batch_idx}: {new_corrupt}")
-                        return new_corrupt
-                    else:
-                        return set()
+                    corrupted_files = RootFileHandler.call_hadd(outname, batch_files)
+                    if corrupted_files:
+                        logging.error(f"Error hadding {dsname} batch {batch_idx}: {corrupted_files}")
+                    return corrupted_files
                 except Exception as e:
                     logging.error(f"Hadding {dsname} encountered error {e}")
                     return set()

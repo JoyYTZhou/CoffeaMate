@@ -110,7 +110,9 @@ class HistogramHelper:
         data_b (pd.Series): Reference data for histogram B
         
         Returns:
-        float: Normalization factor to apply to histogram A
+        tuple: (normalization_factor, exceeding_mask)
+            - normalization_factor: float to apply to histogram A
+            - exceeding_mask: boolean array indicating events in exceeding bins
         """
         # Create histograms
         hist_a, bin_edges = HistogramHelper.make_histogram(data_a, bins=bins, range=range, weights=weights_a)
@@ -125,9 +127,17 @@ class HistogramHelper:
         if len(exceeding_indices) > 0:
             logging.info(f"Histogram A exceeds B in {len(exceeding_indices)} bins: {exceeding_indices}")
 
+        # Create mask for events in exceeding bins
+        exceeding_mask = np.zeros(len(data_a), dtype=bool)
+        if len(exceeding_indices) > 0:
+            for bin_idx in exceeding_indices:
+                bin_left = bin_edges[bin_idx]
+                bin_right = bin_edges[bin_idx + 1]
+                exceeding_mask |= (data_a >= bin_left) & (data_a < bin_right)
+
         if not np.any(exceeding_bins):
             # A doesn't exceed B anywhere, no normalization needed
-            return 1.0
+            return 1.0, exceeding_mask
         
         # Calculate the maximum normalization factor needed
         ratios = hist_b[exceeding_bins] / hist_a[exceeding_bins]
@@ -139,7 +149,7 @@ class HistogramHelper:
         bin_right = bin_edges[exceeding_indices[min_bin_idx] + 1]
         logging.info(f"Minimum ratio {normalization_factor:.4f} found in bin [{bin_left:.3f}, {bin_right:.3f})")
         
-        return normalization_factor
+        return normalization_factor, exceeding_mask
 
     @staticmethod
     def calc_ratio_and_errors(num, den, num_err, den_err):
