@@ -8,7 +8,8 @@ def normalize_mc(data_df, mc_df, feature='DiTau_pt') -> tuple[pd.DataFrame, floa
 
     renorm_fac, renorm_mask = HistogramHelper.get_normalization_factor(mc_df[feature], data_df[feature], bins=30, range=(0, 300), 
                                 weights_a=mc_df['weight'], weights_b=data_df['weight'])
-    mc_df.loc[renorm_mask, 'weight'] *= renorm_fac
+    mc_df['weight'] *= renorm_fac
+    # mc_df.loc[renorm_mask, 'weight'] *= renorm_fac
     logging.info(f"MC normalized by factor {renorm_fac:.4f} to match Data in {feature} distribution")
     return mc_df, renorm_fac
 
