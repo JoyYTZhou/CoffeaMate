@@ -449,8 +449,8 @@ class PostSkimProcessor(PostProcessor):
         self.__clean_roots()
     
     def hadd_results(self):
-        self.__hadd_roots()
-        self._hadd_cutflows()
+        # self.__hadd_roots()
+        # self._hadd_cutflows()
         logging.debug("Reporting total number of events.")
         self.__get_total_nwgt_events()
         self._check_hadded()
@@ -531,13 +531,13 @@ class PostSkimProcessor(PostProcessor):
                     return corrupted_files
                 except Exception as e:
                     logging.error(f"Hadding {dsname} encountered error {e}")
-                    return set()
+                    return set(batch_files)  # Assume all files in the batch are corrupted
             
             # Create batches and submit to thread pool
             batches = [(i//batch_size, root_files[i:i+batch_size]) 
                   for i in range(0, len(root_files), batch_size)]
             
-            with ThreadPoolExecutor(max_workers=4) as executor:
+            with ThreadPoolExecutor(max_workers=2) as executor:
                 future_to_batch = {executor.submit(hadd_batch, batch_idx, batch_files): batch_idx 
                       for batch_idx, batch_files in batches}
             
@@ -551,7 +551,7 @@ class PostSkimProcessor(PostProcessor):
             
             return list(corrupted)
         
-        batch_size = 80 if self.cfg['IS_MC'] else 3
+        batch_size = 80 if self.cfg['IS_MC'] else 2
         
         results = DataSetUtil.extract_leaf_values(self.dataset_iter.process_datasets(process_ds, callback_args={'batch_size': batch_size}))
         corrupted = list(chain(*results))
@@ -615,7 +615,7 @@ class PostSkimProcessor(PostProcessor):
                 else:
                     try:
                         nwgt = int(resolved_df.filter(like=dsname).iloc[0,0])
-                        logging.debug(f"Number of events for {dsname} is {nwgt}")
+                        logging.debug(f"Number of initial/input events for {dsname} from cutflow tables is {nwgt}")
                         return nwgt
                     except:
                         logging.exception(f"Error finding valid columns for {dsname}")

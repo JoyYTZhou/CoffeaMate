@@ -56,10 +56,10 @@ class RootFileHandler:
         result = subprocess.run(command, capture_output=True, text=True)
         
         if result.returncode == 0:
-            print(f"Merged {len(input_files)} files into {output_file}")
-            return None # No corrupt files
+            logging.info(f"Successfully merged {len(input_files)} files into {output_file}")
+            return set()
         else:
-            print(f"Error merging files into {output_file}:\n{result.stderr}")
+            logging.error(f"Error merging files into {output_file}:\n{result.stderr}")
             filenames = re.findall(r"root://[^\s]*\.root", result.stderr)
             return set(filenames) if filenames else set()
 
