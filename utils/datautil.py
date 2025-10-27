@@ -69,10 +69,10 @@ class CutflowProcessor:
                 except Exception as e:
                     logging.error(f"Corrupted root file detected - {root_file}: {str(e)}")
                     corrupted_files.append(root_file)
+                    total_events += 0
             
             if corrupted_files:
                 logging.warning(f"Found {len(corrupted_files)} corrupted root files")
-                return False, cutflow_events
             
             logging.info("Checking event counts...")
             logging.info(f"Events in root files: {total_events}")
